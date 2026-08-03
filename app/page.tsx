@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 type Screen = "lobby" | "lab" | "pick" | "countdown" | "race" | "result";
 type AnimalKey = "dog" | "rabbit" | "elephant" | "cat";
 type ItemKey = "banana" | "shield" | "magnet" | "ink" | null;
+type DifficultyKey = "wild" | "chaos" | "nightmare";
 
 type Animal = {
   name: string;
@@ -31,6 +32,12 @@ const ITEM_INFO: Record<Exclude<ItemKey, null>, { emoji: string; name: string }>
 
 const TRACK_LENGTH = 4400;
 const LANES = [96, 176, 256];
+const AI_EMOJIS = ["🦊", "🐼", "🐷", "🐸", "🦁", "🐵", "🐯", "🦝", "🐻", "🐨", "🦄", "🐮", "🐹", "🦓", "🦒", "🐺", "🦔", "🐲", "🦧", "🐙", "🦈", "🦖"];
+const DIFFICULTIES: Record<DifficultyKey, { name: string; tag: string; aiSpeed: number; aggression: number; collision: number; count: number }> = {
+  wild: { name: "야생", tag: "치열한 몸싸움", aiSpeed: 1, aggression: .72, collision: .85, count: 16 },
+  chaos: { name: "난장판", tag: "추천 · 적극적인 방해", aiSpeed: 1.08, aggression: 1, collision: 1.05, count: 19 },
+  nightmare: { name: "생존지옥", tag: "고수용 · 자비 없음", aiSpeed: 1.16, aggression: 1.28, collision: 1.25, count: 22 },
+};
 const OBSTACLES = [
   { x: 720, lane: 0, kind: "log" }, { x: 720, lane: 2, kind: "log" },
   { x: 1190, lane: 1, kind: "mud" }, { x: 1600, lane: 0, kind: "log" },
@@ -40,6 +47,24 @@ const OBSTACLES = [
   { x: 3570, lane: 1, kind: "log" },
 ];
 const BOXES = [930, 1880, 2780, 3770];
+const SWEEPERS = [1380, 2320, 3380, 4010];
+
+function createRace(difficulty: DifficultyKey) {
+  const config = DIFFICULTIES[difficulty];
+  return {
+    x: 0, y: 176, z: 0, vz: 0, speed: 0, time: 0, item: null as ItemKey,
+    cooldown: 0, boost: 0, shield: 0, hit: 0, confused: 0, collisionLock: 0,
+    flash: "", crossed: new Set<number>(), bumps: 0,
+    bananas: [] as { x: number; y: number; owner: "ai" | "player"; life: number }[],
+    ai: Array.from({ length: config.count }, (_, i) => ({
+      x: ((i % 7) - 3) * 34 - Math.floor(i / 7) * 46,
+      y: LANES[i % 3], targetY: LANES[i % 3],
+      pace: 3.15 + (i % 6) * .22, aggression: .55 + (i % 5) * .11,
+      shoveCd: .8 + i * .1, itemCd: 2.8 + (i % 6) * .75,
+      stun: 0, attacking: false, emoji: AI_EMOJIS[i % AI_EMOJIS.length],
+    })),
+  };
+}
 
 function Chimera({ head, body, tail, small = false }: { head: number; body: number; tail: number; small?: boolean }) {
   return (
@@ -68,16 +93,17 @@ export default function Home() {
   const [screen, setScreen] = useState<Screen>("lobby");
   const [animal, setAnimal] = useState<AnimalKey>("dog");
   const [parts, setParts] = useState({ head: 0, body: 0, tail: 0 });
+  const [difficulty, setDifficulty] = useState<DifficultyKey>("chaos");
   const [countdown, setCountdown] = useState(3);
-  const [snapshot, setSnapshot] = useState({ x: 0, y: 176, z: 0, speed: 0, rank: 50, time: 0, item: null as ItemKey, cooldown: 0, boost: 0, shield: 0, hit: 0, flash: "" });
-  const [result, setResult] = useState({ rank: 1, time: 0 });
+  const [snapshot, setSnapshot] = useState({ x: 0, y: 176, z: 0, speed: 0, rank: 50, time: 0, item: null as ItemKey, cooldown: 0, boost: 0, shield: 0, hit: 0, confused: 0, danger: 0, bumps: 0, flash: "" });
+  const [result, setResult] = useState({ rank: 1, time: 0, bumps: 0 });
   const keys = useRef<Record<string, boolean>>({});
-  const game = useRef({ x: 0, y: 176, z: 0, vz: 0, speed: 0, time: 0, item: null as ItemKey, cooldown: 0, boost: 0, shield: 0, hit: 0, flash: "", crossed: new Set<number>(), ai: Array.from({ length: 14 }, (_, i) => ({ x: -80 - i * 18, lane: i % 3, pace: 2.7 + (i % 6) * 0.16 })) });
+  const game = useRef(createRace(difficulty));
 
   const resetGame = useCallback(() => {
-    game.current = { x: 0, y: 176, z: 0, vz: 0, speed: 0, time: 0, item: null, cooldown: 0, boost: 0, shield: 0, hit: 0, flash: "", crossed: new Set(), ai: Array.from({ length: 14 }, (_, i) => ({ x: -80 - i * 18, lane: i % 3, pace: 2.7 + (i % 6) * 0.16 })) };
-    setSnapshot({ x: 0, y: 176, z: 0, speed: 0, rank: 50, time: 0, item: null, cooldown: 0, boost: 0, shield: 0, hit: 0, flash: "" });
-  }, []);
+    game.current = createRace(difficulty);
+    setSnapshot({ x: 0, y: 176, z: 0, speed: 0, rank: 50, time: 0, item: null, cooldown: 0, boost: 0, shield: 0, hit: 0, confused: 0, danger: 0, bumps: 0, flash: "" });
+  }, [difficulty]);
 
   const startCountdown = () => {
     resetGame(); setCountdown(3); setScreen("countdown"); playTone(520, 0.1);
@@ -101,18 +127,18 @@ export default function Home() {
     if (g.cooldown > 0) return;
     if (animal === "dog") { g.boost = 4; g.flash = "전력 질주!"; }
     if (animal === "rabbit") { g.vz = 12; g.flash = "슈퍼 깡총!"; }
-    if (animal === "elephant") { g.boost = 1.5; g.shield = 2; g.flash = "코 휘두르기!"; }
-    if (animal === "cat") { g.shield = 2.5; g.flash = "하악질!"; }
+    if (animal === "elephant") { g.boost = 1.5; g.shield = 2; g.ai.forEach((a) => { if (Math.abs(a.x-g.x)<130 && Math.abs(a.y-g.y)<70) { a.x-=110; a.stun=1.4; } }); g.flash = "코 휘두르기! 주변을 날렸다!"; }
+    if (animal === "cat") { g.shield = 2.5; g.ai.forEach((a) => { if (Math.abs(a.x-g.x)<180) a.stun=1.2; }); g.flash = "하악질! 경쟁자들이 움찔!"; }
     g.cooldown = 8; playTone(240, 0.18);
   }, [animal]);
 
   const useItem = useCallback(() => {
     const g = game.current;
     if (!g.item) return;
-    if (g.item === "banana") { g.flash = "🍌 바나나 투척!"; g.boost = 1.4; }
+    if (g.item === "banana") { g.flash = "🍌 바나나 투척!"; g.bananas.push({x:g.x-55,y:g.y,owner:"player",life:7}); }
     if (g.item === "shield") { g.flash = "🐢 등껍질 방어!"; g.shield = 5; }
     if (g.item === "magnet") { g.flash = "🧲 자석 견인!"; g.x += 230; }
-    if (g.item === "ink") { g.flash = "🦑 선두에 먹물 발사!"; g.ai.forEach((a) => { if (a.x > g.x) a.x -= 120; }); }
+    if (g.item === "ink") { g.flash = "🦑 선두에 먹물 발사!"; g.ai.forEach((a) => { if (a.x > g.x) { a.x -= 90; a.stun=1.8; } }); }
     g.item = null; playTone(330, 0.16);
   }, []);
 
@@ -134,15 +160,17 @@ export default function Home() {
     let frame = 0; let last = performance.now(); let finished = false;
     const loop = (now: number) => {
       const dt = Math.min((now - last) / 1000, 0.035); last = now;
-      const g = game.current; g.time += dt; g.cooldown = Math.max(0, g.cooldown - dt); g.boost = Math.max(0, g.boost - dt); g.shield = Math.max(0, g.shield - dt); g.hit = Math.max(0, g.hit - dt);
+      const g = game.current; const config = DIFFICULTIES[difficulty]; const ramp = 1 + (g.x / TRACK_LENGTH) * .2;
+      g.time += dt; g.cooldown = Math.max(0, g.cooldown - dt); g.boost = Math.max(0, g.boost - dt); g.shield = Math.max(0, g.shield - dt); g.hit = Math.max(0, g.hit - dt); g.confused = Math.max(0, g.confused - dt); g.collisionLock = Math.max(0, g.collisionLock - dt);
       const forward = keys.current["d"] || keys.current["arrowright"];
       const brake = keys.current["a"] || keys.current["arrowleft"];
-      const target = forward ? 4.8 : 3.15;
+      const target = forward ? 4.65 : 3.0;
       g.speed += (target - g.speed) * dt * 3.8;
       if (brake) g.speed *= 0.97;
       if (g.boost > 0) g.speed += animal === "dog" ? 1.8 : 1;
       if (g.hit > 0) g.speed *= 0.94;
-      const vertical = (keys.current["s"] || keys.current["arrowdown"] ? 1 : 0) - (keys.current["w"] || keys.current["arrowup"] ? 1 : 0);
+      let vertical = (keys.current["s"] || keys.current["arrowdown"] ? 1 : 0) - (keys.current["w"] || keys.current["arrowup"] ? 1 : 0);
+      if (g.confused > 0) vertical *= -1;
       g.y = Math.max(85, Math.min(267, g.y + vertical * 150 * dt));
       g.vz -= 25 * dt; g.z = Math.max(0, g.z + g.vz * 10 * dt); if (g.z === 0 && g.vz < 0) g.vz = 0;
       g.x += g.speed * 38 * dt;
@@ -159,19 +187,52 @@ export default function Home() {
           g.crossed.add(key); const pool: Exclude<ItemKey, null>[] = ["banana", "shield", "magnet", "ink"]; g.item = pool[(i + Math.floor(g.time)) % pool.length]; g.flash = `${ITEM_INFO[g.item].emoji} ${ITEM_INFO[g.item].name} 획득!`; playTone(1050, 0.12);
         }
       });
-      g.ai.forEach((a, i) => { a.x += (a.pace + Math.sin(g.time * 1.6 + i) * .28) * 35 * dt; if (a.x > TRACK_LENGTH) a.x = TRACK_LENGTH; });
+      SWEEPERS.forEach((x, i) => {
+        const sweeperY = 176 + Math.sin(g.time * (1.7 + i * .18) + i) * 86;
+        const key = 300 + i;
+        if (Math.abs(g.x-x)<34 && Math.abs(g.y-sweeperY)<38 && g.z<30 && !g.crossed.has(key)) {
+          g.crossed.add(key); if (g.shield<=0) { g.hit=1; g.speed=-1.1; g.x-=55; g.flash="💥 회전 장애물 직격!"; playTone(95,.2); } else g.flash="방어막으로 튕겨냈다!";
+        }
+      });
+      g.bananas.forEach((b) => { b.life -= dt; });
+      g.bananas = g.bananas.filter((b) => b.life>0 && b.x>g.x-700);
+      g.bananas.forEach((b) => {
+        if (b.owner==="ai" && Math.abs(g.x-b.x)<28 && Math.abs(g.y-b.y)<30 && g.z<18 && g.collisionLock<=0) {
+          b.life=0; g.collisionLock=.8; if(g.shield<=0){g.hit=1.25;g.speed=-1.35;g.x-=70;g.flash="🍌 경쟁자의 바나나에 미끄러졌다!";g.bumps++;playTone(110,.2);}else g.flash="방어막으로 바나나 무시!";
+        }
+      });
+      g.ai.forEach((a, i) => {
+        a.shoveCd=Math.max(0,a.shoveCd-dt); a.itemCd=Math.max(0,a.itemCd-dt); a.stun=Math.max(0,a.stun-dt);
+        const dx=a.x-g.x; const close=Math.abs(dx)<280;
+        a.attacking=close && a.aggression*config.aggression>.62 && a.shoveCd<=.45;
+        if(a.attacking) a.targetY=g.y;
+        else if(Math.floor(g.time*1.2+i)%13===0) a.targetY=LANES[(i+Math.floor(g.time/2))%3];
+        a.y += Math.sign(a.targetY-a.y)*Math.min(Math.abs(a.targetY-a.y),dt*(88+config.aggression*35));
+        let aiPace=(a.pace+Math.sin(g.time*1.7+i)*.22)*config.aiSpeed*ramp;
+        if(dx<-330) aiPace+=1.15; if(dx>520) aiPace-=.65; if(a.stun>0) aiPace*=.28;
+        a.x+=Math.max(.5,aiPace)*35*dt; a.x=Math.min(TRACK_LENGTH,a.x);
+        if(close && a.itemCd<=0 && dx>25 && dx<240 && i%3===0){g.bananas.push({x:a.x-48,y:a.y,owner:"ai",life:7});a.itemCd=5.5/config.aggression;g.flash=`${a.emoji}가 앞에 바나나를 뿌렸다!`;}
+        if(close && a.itemCd<=0 && dx<0 && dx>-250 && i%5===1){g.x-=32*config.collision;a.x+=55;a.itemCd=6;g.flash=`${a.emoji} 자석 견인 공격!`;}
+        if(Math.abs(dx)<48 && Math.abs(a.y-g.y)<34 && g.z<24 && g.collisionLock<=0 && a.shoveCd<=0){
+          g.collisionLock=.42;a.shoveCd=2.25/config.aggression;
+          if(g.shield>0){a.x-=95;a.stun=1.2;g.flash=`${a.emoji}의 몸통박치기 반격!`;}
+          else{const direction=g.y<176?-1:1;g.hit=.8;g.speed=Math.min(g.speed,.85);g.x-=42*config.collision;g.y=Math.max(85,Math.min(267,g.y+direction*34*config.collision));g.bumps++;if(i%6===2)g.confused=1.35;g.flash=`${a.emoji} 몸통박치기! 균형을 잃었다!`;playTone(145,.14);}
+        }
+        g.bananas.forEach((b)=>{if(b.owner==="player"&&Math.abs(a.x-b.x)<25&&Math.abs(a.y-b.y)<28){b.life=0;a.stun=1.6;a.x-=85;}});
+      });
       const visibleAhead = g.ai.filter((a) => a.x > g.x).length;
       const virtualAhead = Math.max(0, Math.floor((TRACK_LENGTH - g.x) / TRACK_LENGTH * 35));
       const rank = Math.min(50, 1 + visibleAhead + virtualAhead);
+      const danger = g.ai.filter((a)=>Math.abs(a.x-g.x)<220).length;
       if (g.flash && Math.floor(g.time * 10) % 24 === 0) g.flash = "";
-      setSnapshot({ x: g.x, y: g.y, z: g.z, speed: g.speed, rank, time: g.time, item: g.item, cooldown: g.cooldown, boost: g.boost, shield: g.shield, hit: g.hit, flash: g.flash });
-      if (g.x >= TRACK_LENGTH && !finished) { finished = true; setResult({ rank, time: g.time }); playTone(940, .25); setScreen("result"); return; }
-      if (g.time >= 75 && !finished) { finished = true; setResult({ rank, time: g.time }); setScreen("result"); return; }
+      setSnapshot({ x: g.x, y: g.y, z: g.z, speed: g.speed, rank, time: g.time, item: g.item, cooldown: g.cooldown, boost: g.boost, shield: g.shield, hit: g.hit, confused: g.confused, danger, bumps:g.bumps, flash: g.flash });
+      if (g.x >= TRACK_LENGTH && !finished) { finished = true; setResult({ rank, time: g.time, bumps:g.bumps }); playTone(940, .25); setScreen("result"); return; }
+      if (g.time >= 75 && !finished) { finished = true; setResult({ rank, time: g.time, bumps:g.bumps }); setScreen("result"); return; }
       frame = requestAnimationFrame(loop);
     };
     frame = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frame);
-  }, [screen, animal]);
+  }, [screen, animal, difficulty]);
 
   const camera = Math.max(0, Math.min(TRACK_LENGTH - 900, snapshot.x - 210));
   const cyclePart = (key: keyof typeof parts, direction: number) => setParts((p) => ({ ...p, [key]: (p[key] + direction + 6) % 6 }));
@@ -193,19 +254,19 @@ export default function Home() {
       </section>}
 
       {screen === "pick" && <section className="pick-page">
-        <button className="back" onClick={() => setScreen("lobby")}>← 로비</button><div className="round-board"><span>NEXT ROUND</span><b>ROUND 1 · 레이싱</b><h2>우당탕탕 사파리 고속도로</h2><div><i>평지 55%</i><i>진흙 25%</i><i>점프 20%</i></div></div><p className="pick-hint">지형을 읽고 베이스 동물을 선택하세요</p><div className="animal-grid">{(Object.keys(ANIMALS) as AnimalKey[]).map((key) => { const a=ANIMALS[key]; return <button key={key} className={`animal-card ${animal===key?"selected":""}`} style={{"--animal":a.color} as React.CSSProperties} onClick={() => {setAnimal(key);playTone(600,.06)}}><span className="animal-emoji">{a.emoji}</span><span className="check">✓</span><b>{a.name}</b><small>{a.label}</small><div><strong>{a.skill}</strong><span>{a.description}</span></div></button>})}</div><button className="primary deploy" onClick={startCountdown}>출전 준비 완료! <span>→</span></button><p className="control-hint"><b>이동</b> WASD / 방향키　<b>점프</b> SPACE　<b>스킬</b> E　<b>아이템</b> Q</p>
+        <button className="back" onClick={() => setScreen("lobby")}>← 로비</button><div className="round-board"><span>NEXT ROUND</span><b>ROUND 1 · 레이싱</b><h2>우당탕탕 사파리 고속도로</h2><div><i>평지 55%</i><i>진흙 25%</i><i>점프 20%</i></div></div><p className="pick-hint">지형을 읽고 베이스 동물을 선택하세요</p><div className="animal-grid">{(Object.keys(ANIMALS) as AnimalKey[]).map((key) => { const a=ANIMALS[key]; return <button key={key} className={`animal-card ${animal===key?"selected":""}`} style={{"--animal":a.color} as React.CSSProperties} onClick={() => {setAnimal(key);playTone(600,.06)}}><span className="animal-emoji">{a.emoji}</span><span className="check">✓</span><b>{a.name}</b><small>{a.label}</small><div><strong>{a.skill}</strong><span>{a.description}</span></div></button>})}</div><div className="difficulty-picker"><span>경쟁 강도</span>{(Object.keys(DIFFICULTIES) as DifficultyKey[]).map((key)=><button key={key} className={difficulty===key?"selected":""} onClick={()=>setDifficulty(key)}><b>{DIFFICULTIES[key].name}</b><small>{DIFFICULTIES[key].tag}</small></button>)}</div><button className="primary deploy" onClick={startCountdown}>출전 준비 완료! <span>→</span></button><p className="control-hint"><b>이동</b> WASD / 방향키　<b>점프</b> SPACE　<b>스킬</b> E　<b>아이템</b> Q</p>
       </section>}
 
-      {screen === "countdown" && <section className="countdown-page"><div className="letterbox top"/><div className="versus"><div><Chimera {...parts} small/><b>YOU · {ANIMALS[animal].name}</b></div><span>VS</span><div className="rival"><div className="rival-animal">🦊</div><b>49 WILD ANIMALS</b></div></div><p>ROUND 1 · 우당탕탕 사파리 고속도로</p><div className="count-number">{countdown === 0 ? "GO!" : countdown}</div><div className="letterbox bottom"/></section>}
+      {screen === "countdown" && <section className="countdown-page"><div className="letterbox top"/><div className="versus"><div><Chimera {...parts} small/><b>YOU · {ANIMALS[animal].name}</b></div><span>VS</span><div className="rival"><div className="rival-animal">🦊</div><b>49 WILD ANIMALS</b></div></div><p>ROUND 1 · {DIFFICULTIES[difficulty].name} 모드 · 몸싸움 주의!</p><div className="count-number">{countdown === 0 ? "GO!" : countdown}</div><div className="letterbox bottom"/></section>}
 
       {screen === "race" && <section className="race-page">
-        <div className="race-hud"><div className="rank-box"><small>CURRENT</small><b>{snapshot.rank}<sup>위</sup></b><span>/ 50</span></div><div className="progress-wrap"><span>START</span><div className="progress"><i style={{width:`${Math.min(100,snapshot.x/TRACK_LENGTH*100)}%`}}/><em style={{left:`${Math.min(98,snapshot.x/TRACK_LENGTH*100)}%`}}>{ANIMALS[animal].emoji}</em></div><span>FINISH</span></div><div className="timer">⏱ <b>{snapshot.time.toFixed(1)}</b></div></div>
-        <div className="track-window"><div className="sky"><i/><i/><i/></div><div className="track" style={{transform:`translateX(${-camera}px)`}}><div className="lane-lines"><i/><i/></div>{Array.from({length:12},(_,i)=><div className="track-sign" key={i} style={{left:i*400+180}}>{i%3===0?"⚡":i%3===1?"🌴":"⭐"}</div>)}{OBSTACLES.map((o,i)=><div key={i} className={`obstacle ${o.kind}`} style={{left:o.x,top:LANES[o.lane]-25}}>{o.kind==="log"?"🪵":"🟤"}</div>)}{BOXES.map((x,i)=><div key={x} className={`item-box ${game.current.crossed.has(100+i)?"taken":""}`} style={{left:x,top:LANES[(i+1)%3]-25}}>?</div>)}<div className="finish-line" style={{left:TRACK_LENGTH}}><span>FINISH</span></div>{game.current.ai.map((a,i)=><div className="ai-racer" key={i} style={{left:a.x,top:LANES[a.lane],transform:`translateY(-50%) scale(${.72+(a.lane*.04)})`}}><span>{["🦊","🐼","🐷","🐸","🦁","🐵"][i%6]}</span><i>{i+2}</i></div>)}<div className={`player-racer ${snapshot.hit>0?"hit":""}`} style={{left:snapshot.x,top:snapshot.y,transform:`translateY(calc(-50% - ${snapshot.z}px))`}}><div className="player-shadow" style={{transform:`translateY(${snapshot.z}px) scale(${Math.max(.5,1-snapshot.z/130)})`}}/><Chimera {...parts} small/><b>YOU</b>{snapshot.shield>0&&<span className="shield-aura"/>}</div></div>{snapshot.flash&&<div className="game-flash">{snapshot.flash}</div>}</div>
+        <div className="race-hud"><div className="rank-box"><small>CURRENT</small><b>{snapshot.rank}<sup>위</sup></b><span>/ 50</span></div><div className="progress-wrap"><span>START</span><div className="progress"><i style={{width:`${Math.min(100,snapshot.x/TRACK_LENGTH*100)}%`}}/><em style={{left:`${Math.min(98,snapshot.x/TRACK_LENGTH*100)}%`}}>{ANIMALS[animal].emoji}</em></div><span>FINISH</span></div><div className="timer">⏱ <b>{snapshot.time.toFixed(1)}</b></div><div className={`danger-meter ${snapshot.danger>=4?"hot":""}`}><small>주변 위협</small><b>{"!".repeat(Math.min(5,snapshot.danger)) || "안전"}</b></div></div>
+        <div className="track-window"><div className="sky"><i/><i/><i/></div><div className="track" style={{transform:`translateX(${-camera}px)`}}><div className="lane-lines"><i/><i/></div>{Array.from({length:12},(_,i)=><div className="track-sign" key={i} style={{left:i*400+180}}>{i%3===0?"⚡":i%3===1?"🌴":"⭐"}</div>)}{OBSTACLES.map((o,i)=><div key={i} className={`obstacle ${o.kind}`} style={{left:o.x,top:LANES[o.lane]-25}}>{o.kind==="log"?"🪵":"🟤"}</div>)}{SWEEPERS.map((x,i)=><div key={x} className="sweeper" style={{left:x,top:176+Math.sin(snapshot.time*(1.7+i*.18)+i)*86}}>🌀</div>)}{game.current.bananas.map((b,i)=><div key={`${b.x}-${i}`} className={`banana-trap ${b.owner}`} style={{left:b.x,top:b.y}}>🍌</div>)}{BOXES.map((x,i)=><div key={x} className={`item-box ${game.current.crossed.has(100+i)?"taken":""}`} style={{left:x,top:LANES[(i+1)%3]-25}}>?</div>)}<div className="finish-line" style={{left:TRACK_LENGTH}}><span>FINISH</span></div>{game.current.ai.map((a,i)=><div className={`ai-racer ${a.attacking?"attacking":""} ${a.stun>0?"stunned":""}`} key={i} style={{left:a.x,top:a.y,transform:`translateY(-50%) scale(${.72+(a.y/900)})`}}><span>{a.emoji}</span><i>{a.attacking?"⚠ ATTACK":i+2}</i></div>)}<div className={`player-racer ${snapshot.hit>0?"hit":""} ${snapshot.confused>0?"confused":""}`} style={{left:snapshot.x,top:snapshot.y,transform:`translateY(calc(-50% - ${snapshot.z}px))`}}><div className="player-shadow" style={{transform:`translateY(${snapshot.z}px) scale(${Math.max(.5,1-snapshot.z/130)})`}}/><Chimera {...parts} small/><b>YOU</b>{snapshot.shield>0&&<span className="shield-aura"/>}</div></div>{snapshot.flash&&<div className="game-flash">{snapshot.flash}</div>}{snapshot.confused>0&&<div className="confused-alert">↔ 조작 반전!</div>}</div>
         <div className="race-bottom"><div className="skill-card"><span>{ANIMALS[animal].emoji}</span><div><small>E · ACTIVE SKILL</small><b>{ANIMALS[animal].skill}</b><i><em style={{width:`${Math.max(0,100-snapshot.cooldown/8*100)}%`}}/></i></div><strong>{snapshot.cooldown>0?Math.ceil(snapshot.cooldown):"READY"}</strong></div><button className={`item-slot ${snapshot.item?"ready":""}`} onClick={useItem}><small>Q · ITEM</small><b>{snapshot.item?ITEM_INFO[snapshot.item].emoji:"?"}</b><span>{snapshot.item?ITEM_INFO[snapshot.item].name:"비어 있음"}</span></button></div>
         <div className="mobile-controls"><div><button onPointerDown={()=>keys.current["w"]=true} onPointerUp={()=>keys.current["w"]=false}>▲</button><button onPointerDown={()=>keys.current["s"]=true} onPointerUp={()=>keys.current["s"]=false}>▼</button></div><button onPointerDown={()=>keys.current["d"]=true} onPointerUp={()=>keys.current["d"]=false}>BOOST</button><button onClick={doJump}>JUMP</button><button onClick={useSkill}>SKILL</button></div>
       </section>}
 
-      {screen === "result" && <section className="result-page"><div className="confetti">✦　●　▲　★　●　✦　▲</div><p className="eyebrow">RACE COMPLETE</p><h2>{result.rank <= 25 ? "통과! 다음 라운드 진출" : "아깝다! 다시 도전"}</h2><div className="podium"><span className="laurel">❬</span><div className="winner"><div className="crown-big">♛</div><Chimera {...parts}/><b>{ANIMALS[animal].name}</b><small>WILD #0050</small></div><span className="laurel">❭</span></div><div className="score-row"><div><small>최종 순위</small><b>{result.rank}<em>위</em></b></div><div><small>기록</small><b>{result.time.toFixed(2)}<em>초</em></b></div><div><small>획득 팬</small><b>+{Math.max(120,620-result.rank*10)}</b></div></div><div className="result-actions"><button className="secondary" onClick={() => setScreen("lab")}>🧪 모습 바꾸기</button><button className="primary" onClick={() => setScreen("pick")}>한 판 더! →</button></div><button className="share" onClick={() => {navigator.clipboard?.writeText("나 방금 WILD DASH 50에서 우당탕탕 완주했어! 🐾");playTone(800,.1)}}>▣ 쇼츠로 뽐내기</button></section>}
+      {screen === "result" && <section className="result-page"><div className="confetti">✦　●　▲　★　●　✦　▲</div><p className="eyebrow">RACE COMPLETE · {DIFFICULTIES[difficulty].name}</p><h2>{result.rank <= 25 ? "몸싸움을 뚫고 통과!" : "난장판에 휘말렸다!"}</h2><div className="podium"><span className="laurel">❬</span><div className="winner"><div className="crown-big">♛</div><Chimera {...parts}/><b>{ANIMALS[animal].name}</b><small>WILD #0050</small></div><span className="laurel">❭</span></div><div className="score-row"><div><small>최종 순위</small><b>{result.rank}<em>위</em></b></div><div><small>기록</small><b>{result.time.toFixed(2)}<em>초</em></b></div><div><small>버틴 방해</small><b>{result.bumps}<em>회</em></b></div></div><div className="result-actions"><button className="secondary" onClick={() => setScreen("lab")}>🧪 모습 바꾸기</button><button className="primary" onClick={() => setScreen("pick")}>한 판 더! →</button></div><button className="share" onClick={() => {navigator.clipboard?.writeText("나 방금 WILD DASH 50에서 우당탕탕 완주했어! 🐾");playTone(800,.1)}}>▣ 쇼츠로 뽐내기</button></section>}
     </main>
   );
 }
