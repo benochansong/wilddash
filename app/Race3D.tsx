@@ -17,7 +17,11 @@ type Props = {
 };
 
 const LENGTH=7600;
-const TRACK_WIDTH=270;
+// Wide party-race arena: room for the full 50-animal pack to fan out.
+const TRACK_WIDTH=680;
+const CRUISE_SPEED=305;
+const SPRINT_SPEED=355;
+const BRAKE_SPEED=205;
 const EMOJIS=["🦊","🐼","🐷","🐸","🦁","🐵","🐯","🦝","🐻","🐨","🦄","🐮","🐹","🦓","🦒","🐺","🦔","🐲","🦧","🐙","🦈","🦖"];
 const ITEMS: Record<Exclude<ItemKey,null>,string>={banana:"🍌",shield:"🐢",magnet:"🧲",ink:"🦑"};
 const SKILLS:Record<AnimalKey,{name:string,cooldown:number}>={dog:{name:"균형 질주 +10%",cooldown:12},rabbit:{name:"도약 추진",cooldown:8},elephant:{name:"코 방어",cooldown:10},cat:{name:"그림자 회피",cooldown:9}};
@@ -41,14 +45,14 @@ export function Race3D({animal,hero,difficulty,sound,haptics,reducedMotion,onFin
   const [view,setView]=useState({rank:25,time:0,speed:0,progress:0,skillCd:5,item:null as ItemKey,flash:"출발 보호 · 스킬 5초 잠금",section:SECTIONS[0].name});
   const seed=useRef(Math.floor(Math.random()*9999));
   const game=useRef({
-    s:0,lateral:0,speed:180,jump:0,vJump:0,time:0,skillCd:5,boost:0,shield:0,phase:0,hit:0,bumps:0,item:null as ItemKey,flash:"출발 보호 · 스킬 5초 잠금",finished:false,
+    s:0,lateral:0,speed:CRUISE_SPEED,jump:0,vJump:0,time:0,skillCd:5,boost:0,shield:0,phase:0,hit:0,bumps:0,item:null as ItemKey,flash:"출발 보호 · 스킬 5초 잠금",finished:false,
     crossed:new Set<number>(),
-    ai:Array.from({length:49},(_,i)=>({s:((i%10)-5)*12-Math.floor(i/10)*9,lateral:((i%3)-1)*78,speed:176+seeded(i,seed.current)*8,stun:0,phase:seeded(i+80,seed.current)*6.28,itemCd:6+seeded(i+110,seed.current)*7,crossed:new Set<number>(),emoji:EMOJIS[i%EMOJIS.length]})),
-    obstacles:Array.from({length:28},(_,i)=>({id:i,s:520+i*245+seeded(i,seed.current)*70,lateral:(Math.floor(seeded(i+30,seed.current)*3)-1)*82,type:["log","spinner","mud","ball","ramp"][Math.floor(seeded(i+90,seed.current)*5)]})),
-    boxes:Array.from({length:10},(_,i)=>({id:i,s:820+i*650+seeded(i+4,seed.current)*100,lateral:(Math.floor(seeded(i+8,seed.current)*3)-1)*82,taken:false})),
+    ai:Array.from({length:49},(_,i)=>({s:((i%10)-5)*12-Math.floor(i/10)*9,lateral:((i%7)-3)*86,speed:298+seeded(i,seed.current)*18,stun:0,phase:seeded(i+80,seed.current)*6.28,itemCd:6+seeded(i+110,seed.current)*7,crossed:new Set<number>(),emoji:EMOJIS[i%EMOJIS.length]})),
+    // Four hazards share each arena row, leaving several readable escape routes.
+    obstacles:Array.from({length:60},(_,i)=>({id:i,s:520+Math.floor(i/4)*475+seeded(i,seed.current)*72,lateral:((i*3+Math.floor(seeded(i+30,seed.current)*3))%7-3)*90,type:["log","spinner","mud","ball","ramp"][Math.floor(seeded(i+90,seed.current)*5)]})),
+    boxes:Array.from({length:18},(_,i)=>({id:i,s:760+Math.floor(i/3)*1080+seeded(i+4,seed.current)*90,lateral:((i*2)%7-3)*90,taken:false})),
     bananas:[] as {s:number,lateral:number,life:number,owner:"player"|"ai"}[],
   });
-
   const feedback=useCallback((frequency:number,duration=.1)=>{
     if(haptics&&frequency<220&&navigator.vibrate)navigator.vibrate(Math.round(duration*220));
     if(!sound)return;
@@ -84,13 +88,14 @@ export function Race3D({animal,hero,difficulty,sound,haptics,reducedMotion,onFin
     const canvas=canvasRef.current;if(!canvas)return;const ctx=canvas.getContext("2d");if(!ctx)return;
     let frame=0,last=performance.now(),lastUi=0;
     const project=(worldX:number,worldY:number,worldS:number,w:number,h:number)=>{
-      const g=game.current;const dz=worldS-g.s+150;const sectionIndex=SECTIONS.findIndex(v=>v.name===sectionFor(g.s).name);const focal=[500,430,580,470,530][sectionIndex];const scale=focal/Math.max(80,dz+focal);const tangent=(center(g.s+15)-center(g.s))/15;const relativeX=worldX-center(g.s)-tangent*(worldS-g.s)-g.lateral*.18;const horizon=h*[.34,.29,.4,.35,.32][sectionIndex];return{x:w/2+relativeX*scale*(w/900),y:horizon+h*.52*scale-(worldY-elevation(g.s))*scale*(h/520),scale,visible:dz>25&&dz<1900};
+      const g=game.current;const dz=worldS-g.s+150;const sectionIndex=SECTIONS.findIndex(v=>v.name===sectionFor(g.s).name);const speedFov=Math.max(0,Math.min(52,g.speed-CRUISE_SPEED))*.72;const focal=[470,410,535,445,490][sectionIndex]-speedFov;const scale=focal/Math.max(80,dz+focal);const tangent=(center(g.s+15)-center(g.s))/15;const relativeX=worldX-center(g.s)-tangent*(worldS-g.s)-g.lateral*.32;const horizon=h*[.32,.27,.37,.33,.3][sectionIndex];return{x:w/2+relativeX*scale*(w/920),y:horizon+h*.55*scale-(worldY-elevation(g.s))*scale*(h/520),scale,visible:dz>25&&dz<2100};
     };
     const draw=(w:number,h:number)=>{
       const g=game.current;const section=sectionFor(g.s);const gradient=ctx.createLinearGradient(0,0,0,h);gradient.addColorStop(0,section.sky[0]);gradient.addColorStop(.55,section.sky[1]);gradient.addColorStop(.56,section.ground);gradient.addColorStop(1,"#183c35");ctx.fillStyle=gradient;ctx.fillRect(0,0,w,h);
       ctx.save();if(!reducedMotion){const bank=Math.sin(g.s/700)*.025;ctx.translate(w/2,h/2);ctx.rotate(bank);ctx.translate(-w/2,-h/2)}
+      if(!reducedMotion){ctx.save();ctx.globalAlpha=.2+Math.min(.25,Math.max(0,(g.speed-250)/300));ctx.strokeStyle="#ffffff";ctx.lineWidth=3;for(let i=0;i<18;i++){const side=i%2?-1:1;const y=h*.44+((g.s*1.9+i*83)%(h*.6));const spread=(y-h*.35)/(h*.65);const x=w/2+side*(w*.4+spread*w*.24);ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+side*(18+spread*42),y+30+spread*34);ctx.stroke()}ctx.restore()}
       ctx.globalAlpha=.35;ctx.fillStyle="#fff";for(let i=0;i<7;i++){const x=(i*211-g.s*.05)%(w+240)-100;ctx.beginPath();ctx.ellipse(x,70+(i%3)*42,65,20,0,0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1;
-      for(let d=1700;d>=0;d-=55){const s1=g.s+d,s2=s1+60,c1=center(s1),c2=center(s2),e1=elevation(s1),e2=elevation(s2);const a=project(c1-TRACK_WIDTH/2,e1,s1,w,h),b=project(c1+TRACK_WIDTH/2,e1,s1,w,h),c=project(c2+TRACK_WIDTH/2,e2,s2,w,h),d2=project(c2-TRACK_WIDTH/2,e2,s2,w,h);ctx.fillStyle=Math.floor(s1/110)%2?"#8a6c61":"#96796c";ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.lineTo(c.x,c.y);ctx.lineTo(d2.x,d2.y);ctx.closePath();ctx.fill();ctx.strokeStyle="rgba(255,255,255,.35)";ctx.lineWidth=Math.max(1,a.scale*3);[-1/3,1/3].forEach(l=>{const p1=project(c1+l*TRACK_WIDTH/2,e1+1,s1,w,h),p2=project(c2+l*TRACK_WIDTH/2,e2+1,s2,w,h);ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.stroke()});}
+      for(let d=2050;d>=0;d-=48){const s1=g.s+d,s2=s1+54,c1=center(s1),c2=center(s2),e1=elevation(s1),e2=elevation(s2);const a=project(c1-TRACK_WIDTH/2,e1,s1,w,h),b=project(c1+TRACK_WIDTH/2,e1,s1,w,h),c=project(c2+TRACK_WIDTH/2,e2,s2,w,h),d2=project(c2-TRACK_WIDTH/2,e2,s2,w,h);ctx.fillStyle=Math.floor(s1/96)%2?"#8a6c61":"#96796c";ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.lineTo(c.x,c.y);ctx.lineTo(d2.x,d2.y);ctx.closePath();ctx.fill();ctx.strokeStyle="rgba(255,255,255,.28)";ctx.lineWidth=Math.max(1,a.scale*2);[-.6,-.2,.2,.6].forEach(l=>{const p1=project(c1+l*TRACK_WIDTH/2,e1+1,s1,w,h),p2=project(c2+l*TRACK_WIDTH/2,e2+1,s2,w,h);ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.stroke()});}
       const objects:[number,()=>void][]=[];
       g.obstacles.forEach(o=>{const p=project(center(o.s)+o.lateral,elevation(o.s),o.s,w,h);if(!p.visible)return;objects.push([o.s,()=>{ctx.font=`${Math.max(13,58*p.scale)}px sans-serif`;ctx.textAlign="center";ctx.fillText(o.type==="log"?"🪵":o.type==="spinner"?"🌀":o.type==="mud"?"🟤":o.type==="ball"?"🪨":"🔺",p.x,p.y)}])});
       g.boxes.filter(b=>!b.taken).forEach(b=>{const p=project(center(b.s)+b.lateral,elevation(b.s)+12,b.s,w,h);if(p.visible)objects.push([b.s,()=>{ctx.fillStyle="#ff4f9b";ctx.strokeStyle="#17152f";ctx.lineWidth=Math.max(1,3*p.scale);const size=42*p.scale;ctx.fillRect(p.x-size/2,p.y-size,size,size);ctx.strokeRect(p.x-size/2,p.y-size,size,size);ctx.fillStyle="#fff";ctx.font=`bold ${25*p.scale}px sans-serif`;ctx.fillText("?",p.x,p.y-size*.18)}])});
@@ -102,7 +107,7 @@ export function Race3D({animal,hero,difficulty,sound,haptics,reducedMotion,onFin
       const fog=ctx.createLinearGradient(0,h*.22,0,h*.55);fog.addColorStop(0,"rgba(255,255,255,.48)");fog.addColorStop(1,"rgba(255,255,255,0)");ctx.fillStyle=fog;ctx.fillRect(0,h*.2,w,h*.38);
     };
     const loop=(now:number)=>{const g=game.current;const dt=Math.min(.035,(now-last)/1000);last=now;if(g.finished)return;g.time+=dt;g.skillCd=Math.max(0,g.skillCd-dt);g.boost=Math.max(0,g.boost-dt);g.shield=Math.max(0,g.shield-dt);g.phase=Math.max(0,g.phase-dt);g.hit=Math.max(0,g.hit-dt);
-      const steer=(keys.current["d"]||keys.current["arrowright"]?1:0)-(keys.current["a"]||keys.current["arrowleft"]?1:0);g.lateral+=steer*185*dt;g.lateral=Math.max(-TRACK_WIDTH*.43,Math.min(TRACK_WIDTH*.43,g.lateral));const accelerate=keys.current["w"]||keys.current["arrowup"];const brake=keys.current["s"]||keys.current["arrowdown"];let target=accelerate?195:180;if(brake)target=145;if(g.boost>0)target*=1.1;if(g.hit>0)target*=.72;g.speed+=(target-g.speed)*dt*3.6;g.s+=g.speed*dt;
+      const steer=(keys.current["d"]||keys.current["arrowright"]?1:0)-(keys.current["a"]||keys.current["arrowleft"]?1:0);g.lateral+=steer*360*dt;g.lateral=Math.max(-TRACK_WIDTH*.46,Math.min(TRACK_WIDTH*.46,g.lateral));const accelerate=keys.current["w"]||keys.current["arrowup"];const brake=keys.current["s"]||keys.current["arrowdown"];let target=accelerate?SPRINT_SPEED:CRUISE_SPEED;if(brake)target=BRAKE_SPEED;if(g.boost>0)target*=1.1;if(g.hit>0)target*=.72;g.speed+=(target-g.speed)*dt*4.4;g.s+=g.speed*dt;
       g.vJump-=620*dt;g.jump=Math.max(0,g.jump+g.vJump*dt);if(g.jump===0&&g.vJump<0)g.vJump=0;
       g.obstacles.forEach(o=>{if(g.crossed.has(o.id))return;if(Math.abs(g.s-o.s)<28&&Math.abs(g.lateral-o.lateral)<52){g.crossed.add(o.id);if(o.type==="ramp"){g.vJump=310;g.flash="🔺 램프 점프!"}else if(g.jump<26&&g.phase<=0){if(g.shield>0){g.shield=0;g.flash="방어 성공!"}else{g.hit=.65;g.speed*=.72;g.bumps++;g.flash=`${o.type==="mud"?"진흙탕":"장애물"} 충돌!`;feedback(130,.16)}}}});
       g.boxes.forEach((b,i)=>{if(!b.taken&&Math.abs(g.s-b.s)<30&&Math.abs(g.lateral-b.lateral)<54){b.taken=true;const pool:Exclude<ItemKey,null>[]=g.ai.filter(a=>a.s>g.s).length>30?["shield","magnet","ink","magnet"]:["banana","shield","ink","magnet"];g.item=pool[i%pool.length];g.flash=`${ITEMS[g.item]} 아이템 획득`;feedback(920,.08)}});
