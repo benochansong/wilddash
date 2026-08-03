@@ -11,6 +11,10 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title,
     description,
+    manifest: "/manifest.webmanifest",
+    applicationName: "WILD DASH 50",
+    appleWebApp: { capable: true, title: "WILD DASH 50", statusBarStyle: "black-translucent" },
+    icons: { icon: [{ url: "/app-icon.png", type: "image/png" }], apple: [{ url: "/app-icon.png", type: "image/png" }] },
     openGraph: { title, description, images: [{ url: `${origin}/og.png`, width: 1672, height: 941, alt: "WILD DASH 50 난장판 동물 레이싱" }] },
     twitter: { card: "summary_large_image", title, description, images: [`${origin}/og.png`] },
   };
