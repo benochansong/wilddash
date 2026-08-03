@@ -8,6 +8,8 @@ type Props = {
   mode: ArenaMode;
   hero: string;
   difficulty: "wild" | "chaos" | "nightmare";
+  sound: boolean;
+  haptics: boolean;
   onComplete: (success: boolean, score: number) => void;
 };
 
@@ -20,7 +22,7 @@ const MODE_INFO = {
 const FRUIT = ["🍎", "🍋", "🍇", "🍉", "🍊", "🍓"];
 const RIVALS = ["🦊", "🐼", "🐸", "🦁", "🐷", "🐵", "🐯", "🦝"];
 
-export function ArenaRound({ mode, hero, difficulty, onComplete }: Props) {
+export function ArenaRound({ mode, hero, difficulty, sound, haptics, onComplete }: Props) {
   const info = MODE_INFO[mode];
   const scale = difficulty === "wild" ? .9 : difficulty === "chaos" ? 1 : 1.15;
   const [view, setView] = useState({ x: 50, y: 72, time: info.time, score: 0, hearts: 3, flash: "", shove: 0 });
@@ -36,6 +38,8 @@ export function ArenaRound({ mode, hero, difficulty, onComplete }: Props) {
     if (s.shove > 0) return;
     s.shove = 2.2;
     s.flash = "💥 밀치기!";
+    if(haptics&&navigator.vibrate)navigator.vibrate(28);
+    if(sound){const ctx=new AudioContext();const osc=ctx.createOscillator();const gain=ctx.createGain();osc.frequency.value=180;gain.gain.setValueAtTime(.04,ctx.currentTime);gain.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.1);osc.connect(gain);gain.connect(ctx.destination);osc.start();osc.stop(ctx.currentTime+.1);}
     s.bots.forEach((b) => {
       const d = Math.hypot(b.x - s.x, b.y - s.y);
       if (d < 18) { const push = 18 / Math.max(4, d); b.x += (b.x - s.x) * push; b.y += (b.y - s.y) * push; b.stun = .8; }
@@ -86,6 +90,7 @@ export function ArenaRound({ mode, hero, difficulty, onComplete }: Props) {
         if (contact < 8 && s.immune <= 0) {
           const push = (mode === "final" ? 8 : 4) * scale / Math.max(2, contact);
           s.x += (s.x-b.x)*push; s.y += (s.y-b.y)*push; s.immune=.65; s.flash=`${b.emoji} 몸통박치기!`;
+          if(haptics&&navigator.vibrate)navigator.vibrate(35);
         }
         if (mode === "final" && b.windup < -.25) b.windup = 2.4 / scale;
       });
@@ -109,7 +114,7 @@ export function ArenaRound({ mode, hero, difficulty, onComplete }: Props) {
       frame=requestAnimationFrame(loop);
     };
     frame=requestAnimationFrame(loop); return()=>cancelAnimationFrame(frame);
-  }, [info.time, mode, onComplete, scale]);
+  }, [haptics, info.time, mode, onComplete, scale]);
 
   const tilePhase=Math.floor((info.time-view.time)/2.25);
   const press=(key:string,value:boolean)=>{keys.current[key]=value};
