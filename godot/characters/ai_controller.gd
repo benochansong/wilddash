@@ -32,6 +32,9 @@ var _last_brain_updated := false
 var _last_raycast_used := false
 var _race_route: Array[Vector3] = []
 var _route_index := 1
+var _recovery_sample_elapsed := 0.0
+var _recovery_sample_progress := 0.0
+var _recovery_stagnant_seconds := 0.0
 
 func _ready() -> void:
 	_racer = get_node_or_null(racer_path) as WildDashCharacterController
@@ -43,6 +46,7 @@ func _ready() -> void:
 	_cached_target_yaw = _racer.rotation.y
 	if ai_mode == AIMode.RACE:
 		_last_progress = RaceManager.get_track_progress(_racer)
+		_recovery_sample_progress = _last_progress
 
 func _physics_process(delta: float) -> void:
 	var started_usec := Time.get_ticks_usec()
@@ -57,6 +61,7 @@ func _physics_process(delta: float) -> void:
 		return
 	if _racer.global_position.y < -28.0:
 		_recover_to_track()
+	_update_hard_stuck_recovery(delta)
 	if PerformanceManager.optimization_enabled:
 		_process_race_ai_optimized(delta)
 	else:
@@ -72,6 +77,9 @@ func set_race_route(points: Array[Vector3]) -> void:
 	if _racer != null and not _race_route.is_empty():
 		_route_index = maxi(1, _find_nearest_route_index(_racer.global_position) + 1)
 		_route_index = mini(_route_index, _race_route.size() - 1)
+		_recovery_sample_progress = RaceManager.get_track_progress(_racer)
+		_recovery_sample_elapsed = 0.0
+		_recovery_stagnant_seconds = 0.0
 
 func set_arena_target(target: Vector3) -> void:
 	_arena_target = target
@@ -236,6 +244,31 @@ func _update_stuck_state(elapsed: float, progress: float) -> void:
 		_stuck_seconds = maxf(0.0, _stuck_seconds - elapsed * 2.0)
 	_last_progress = progress
 
+func _update_hard_stuck_recovery(delta: float) -> void:
+	if _racer == null or _race_route.size() < 2 or not RaceManager.active:
+		return
+	_recovery_sample_elapsed += delta
+	if _recovery_sample_elapsed < 1.0:
+		return
+	var progress := RaceManager.get_track_progress(_racer)
+	var advanced := progress - _recovery_sample_progress
+	if advanced < 1.5:
+		_recovery_stagnant_seconds += _recovery_sample_elapsed
+	else:
+		_recovery_stagnant_seconds = 0.0
+	_recovery_sample_progress = progress
+	_recovery_sample_elapsed = 0.0
+	if _recovery_stagnant_seconds < 4.0:
+		return
+	print("AI HARD STUCK RECOVERY racer=%s checkpoint=%d progress=%.1f" % [
+		RaceManager.get_racer_label(_racer),
+		RaceManager.get_checkpoint_progress(_racer),
+		progress,
+	])
+	_recover_to_track()
+	_recovery_stagnant_seconds = 0.0
+	_recovery_sample_progress = RaceManager.get_track_progress(_racer)
+
 func _recover_to_track() -> void:
 	if _racer == null:
 		return
@@ -243,6 +276,15 @@ func _recover_to_track() -> void:
 	_racer.reset_motion(respawn)
 	if not _race_route.is_empty():
 		_route_index = mini(_find_nearest_route_index(respawn) + 1, _race_route.size() - 1)
+		var target := _race_route[_route_index]
+		var direction := target - respawn
+		direction.y = 0.0
+		if direction.length_squared() > 0.001:
+			_cached_target_yaw = atan2(-direction.normalized().x, -direction.normalized().z)
+			_racer.rotation.y = _cached_target_yaw
+	_recovery_sample_elapsed = 0.0
+	_recovery_stagnant_seconds = 0.0
+	_recovery_sample_progress = RaceManager.get_track_progress(_racer)
 	print("AI TRACK RECOVERY racer=%s checkpoint=%d" % [RaceManager.get_racer_label(_racer), RaceManager.get_checkpoint_progress(_racer)])
 
 func _find_nearest_route_index(position: Vector3) -> int:
