@@ -66,9 +66,6 @@ func _test_item_box_pickup() -> bool:
 	add_child(box)
 	box.global_position = _racer_a.global_position + Vector3.UP * 0.8
 	await get_tree().physics_frame
-	# Production behavior is Area3D auto-pickup. force_pickup remains a seam
-	# for tests/high-speed assistance, but must not be called twice after the
-	# area has already granted the one-slot inventory item.
 	if _racer_a.get_held_item() == &"" and not box.force_pickup(_racer_a):
 		return _fail("Item Box did not grant an item")
 	if _racer_a.get_held_item() == &"":
@@ -120,8 +117,6 @@ func _test_trap() -> bool:
 	ItemSystem.grant_item(_racer_a, ItemSystem.STICKY_FRUIT)
 	if not ItemSystem.use_held_item(_racer_a):
 		return _fail("Sticky Fruit could not be used")
-	var trap := get_node_or_null("StickyFruit_%d" % Time.get_ticks_msec())
-	# The node name contains the creation millisecond, so find it by class.
 	var found := false
 	for child in get_children():
 		if child is WildDashStickyFruitTrap:
@@ -196,9 +191,9 @@ func _test_ai_item_use() -> bool:
 	if brain == null:
 		return _fail("AI item brain failed to instantiate")
 	brain.name = "SmokeAIItemBrain"
-	brain.racer_path = NodePath("../ItemTesterB")
+	brain.configure(_racer_b, null)
 	add_child(brain)
-	if not brain.force_decision():
+	if not brain.evaluate_and_use_now():
 		return _fail("AI did not use useful Rocket Nut")
 	if ItemSystem.get_last_used_item(_racer_b) != ItemSystem.ROCKET_NUT:
 		return _fail("AI item use was not recorded")
