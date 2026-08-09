@@ -2,6 +2,7 @@ class_name WildDashModeController
 extends Node3D
 
 const RACER_SCENE: PackedScene = preload("res://characters/test_racer.tscn")
+const AI_SKILL_BRAIN_SCRIPT: Script = preload("res://characters/ai_skill_brain.gd")
 
 var mode_id: StringName = &""
 var display_name := ""
@@ -86,6 +87,12 @@ func spawn_ai_driver(
 	driver.preserve_player_identity = preserve_player_identity
 	add_child(driver)
 	ai_drivers.append(driver)
+
+	var skill_brain := AI_SKILL_BRAIN_SCRIPT.new() as WildDashAISkillBrain
+	if skill_brain != null:
+		skill_brain.name = "%sSkillBrain" % racer.name
+		skill_brain.racer_path = NodePath("../%s" % racer.name)
+		add_child(skill_brain)
 	return driver
 
 func create_box(
