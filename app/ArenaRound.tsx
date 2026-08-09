@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { inputManager, type InputAction } from "../game/input/InputManager";
 import { audio } from "../game/audio/AudioManager";
+import { isArenaContact } from "../game/systems/collisionSystem";
+import { isFinalPlayerEliminated, isFinalRoundSuccess, isFruitRoundSuccess, isSurvivalRoundFailure, resolveRoundTimeout } from "../game/systems/roundSystem";
 
 export type ArenaMode = "fruit" | "survival" | "final";
 
@@ -67,7 +69,7 @@ export function ArenaRound({ mode, hero, difficulty, sound, haptics, onComplete 
           if (!f.active) { f.respawn -= dt; if (f.respawn<=0) { f.active=true; f.x=10+((f.id*29+s.time*13)%80); f.y=10+((f.id*43+s.time*9)%80); } }
           if (f.active && Math.hypot(f.x - s.x, f.y - s.y) < 7) { f.active = false; f.respawn=1.4; s.score++; s.flash = `${f.emoji} 획득! ${s.score}/8`; }
         });
-        if (s.score >= 8) { s.done = true; onComplete(true, s.score); return; }
+        if (isFruitRoundSuccess(s.score)) { s.done = true; onComplete(true, s.score); return; }
       }
 
       s.bots.forEach((b, i) => {
@@ -83,7 +85,7 @@ export function ArenaRound({ mode, hero, difficulty, sound, haptics, onComplete 
         b.x += (tx - b.x) / dist * pace * dt; b.y += (ty - b.y) / dist * pace * dt;
         if (mode === "fruit") s.fruit.forEach((f) => { if (f.active && Math.hypot(f.x-b.x,f.y-b.y)<5) { f.active=false; f.respawn=1.8; } });
         const contact = Math.hypot(b.x-s.x,b.y-s.y);
-        if (contact < 8 && s.immune <= 0) {
+        if (isArenaContact(s.x,s.y,b.x,b.y) && s.immune <= 0) {
           const push = (mode === "final" ? 8 : 4) * scale / Math.max(2, contact);
           s.x += (s.x-b.x)*push; s.y += (s.y-b.y)*push; s.immune=.65; s.flash=`${b.emoji} 몸통박치기!`;
           if(haptics&&navigator.vibrate)navigator.vibrate(35);
@@ -96,15 +98,15 @@ export function ArenaRound({ mode, hero, difficulty, sound, haptics, onComplete 
         const phase = Math.floor((info.time-s.time)/2.25);
         const collapsed = (index+phase*3)%11 < Math.min(3, 1+Math.floor(phase/4));
         if (collapsed && s.immune<=0) { s.hearts--; s.immune=1.8; s.x=50; s.y=50; s.flash="💔 바닥 붕괴! 중앙으로 구조!"; }
-        if (s.hearts<=0) { s.done=true; onComplete(false,Math.ceil(info.time-s.time)); return; }
+        if (isSurvivalRoundFailure(s.hearts)) { s.done=true; onComplete(false,Math.ceil(info.time-s.time)); return; }
       }
       if (mode === "final") {
         const playerRadius=Math.hypot(s.x-50,(s.y-50)*1.25);
         s.bots=s.bots.filter((b)=>Math.hypot(b.x-50,(b.y-50)*1.25)<48);
-        if(playerRadius>48){s.done=true;onComplete(false,s.bots.length);return;}
-        if(s.bots.length===0){s.done=true;onComplete(true,2);return;}
+        if(isFinalPlayerEliminated(playerRadius)){s.done=true;onComplete(false,s.bots.length);return;}
+        if(isFinalRoundSuccess(s.bots.length)){s.done=true;onComplete(true,2);return;}
       }
-      if (s.time<=0) { s.done=true; onComplete(mode === "survival" || (mode === "final" && s.bots.length===0), mode === "fruit" ? s.score : s.hearts); return; }
+      if (s.time<=0) { const outcome=resolveRoundTimeout(mode,s.score,s.hearts,s.bots.length); s.done=true; onComplete(outcome.success,outcome.score); return; }
       setView({x:s.x,y:s.y,time:s.time,score:s.score,hearts:s.hearts,flash:s.flash,shove:s.shove});
       if (s.flash && Math.floor(s.time*10)%18===0) s.flash="";
       frame=requestAnimationFrame(loop);

@@ -7,7 +7,9 @@ import { RACE3D_SKILLS as SKILLS } from "../game/config/animals";
 import { RACE3D_ITEM_EMOJIS as ITEMS } from "../game/config/items";
 import { RACE3D_BRAKE_SPEED as BRAKE_SPEED, RACE3D_CRUISE_SPEED as CRUISE_SPEED, RACE3D_LENGTH as LENGTH, RACE3D_SECTIONS as SECTIONS, RACE3D_SPRINT_SPEED as SPRINT_SPEED, RACE3D_TRACK_WIDTH as TRACK_WIDTH } from "../game/config/race";
 import { seeded } from "../game/systems/aiSystem";
-import { obstacleLateral } from "../game/systems/collisionSystem";
+import { isRaceCollision, obstacleLateral } from "../game/systems/collisionSystem";
+import { consumeItem, selectRace3DItem } from "../game/systems/itemSystem";
+import { canUseSkill, tickCooldown } from "../game/systems/skillSystem";
 import { calculateRank } from "../game/systems/rankingSystem";
 import { createRace3DState, sectionFor, trackCenter as center, trackElevation as elevation } from "../game/systems/raceSystem";
 import type { AnimalKey, DifficultyKey, ItemKey } from "../game/types/game";
@@ -34,7 +36,7 @@ export function Race3D({animal,hero,difficulty,sound,haptics,reducedMotion,onFin
   },[haptics,sound]);
 
   const activateSkill=useCallback(()=>{
-    const g=game.current;if(g.skillCd>0){g.flash=`출발 보호 · ${g.skillCd.toFixed(1)}초 후 사용`;return;}
+    const g=game.current;if(!canUseSkill(g.skillCd)){g.flash=`출발 보호 · ${g.skillCd.toFixed(1)}초 후 사용`;return;}
     if(animal==="dog"){g.boost=1.6;g.flash="🐶 균형 질주 +10%";}
     if(animal==="rabbit"){g.vJump=330;g.jump=Math.max(g.jump,10);g.s+=220;g.flash="🐰 고속 도약 추진 +220m";}
     if(animal==="elephant"){g.shield=2;g.flash="🐘 충돌 1회 방어";}
@@ -43,11 +45,11 @@ export function Race3D({animal,hero,difficulty,sound,haptics,reducedMotion,onFin
   },[animal,feedback]);
 
   const activateItem=useCallback(()=>{
-    const g=game.current;if(!g.item)return;
-    if(g.item==="banana"){g.bananas.push({s:g.s-160,lateral:g.lateral,life:7,owner:"player"});g.flash="🍌 뒤에 바나나 설치";}
-    if(g.item==="shield"){g.shield=3.2;g.flash="🐢 충돌 1회 방어";}
-    if(g.item==="magnet"){g.s+=400;g.flash="🧲 초고속 견인 +400m";}
-    if(g.item==="ink"){game.current.ai.filter(a=>a.s>g.s).sort((a,b)=>a.s-b.s).slice(0,6).forEach(a=>a.stun=1.1);g.flash="🦑 앞선 6마리 시야 방해";}
+    const g=game.current;const item=consumeItem(g.item);if(!item)return;
+    if(item==="banana"){g.bananas.push({s:g.s-160,lateral:g.lateral,life:7,owner:"player"});g.flash="🍌 뒤에 바나나 설치";}
+    if(item==="shield"){g.shield=3.2;g.flash="🐢 충돌 1회 방어";}
+    if(item==="magnet"){g.s+=400;g.flash="🧲 초고속 견인 +400m";}
+    if(item==="ink"){game.current.ai.filter(a=>a.s>g.s).sort((a,b)=>a.s-b.s).slice(0,6).forEach(a=>a.stun=1.1);g.flash="🦑 앞선 6마리 시야 방해";}
     g.item=null;feedback(420,.1);
   },[feedback]);
 
@@ -78,11 +80,11 @@ export function Race3D({animal,hero,difficulty,sound,haptics,reducedMotion,onFin
       if(g.phase>0){ctx.strokeStyle="#66ffff";ctx.lineWidth=5;ctx.beginPath();ctx.arc(w/2,playerY-28,48,0,Math.PI*2);ctx.stroke()}ctx.restore();
       const fog=ctx.createLinearGradient(0,h*.22,0,h*.55);fog.addColorStop(0,"rgba(255,255,255,.48)");fog.addColorStop(1,"rgba(255,255,255,0)");ctx.fillStyle=fog;ctx.fillRect(0,h*.2,w,h*.38);
     };
-    const loop=(now:number)=>{const g=game.current;const dt=Math.min(.035,(now-last)/1000);last=now;if(g.finished)return;g.time+=dt;g.skillCd=Math.max(0,g.skillCd-dt);g.boost=Math.max(0,g.boost-dt);g.shield=Math.max(0,g.shield-dt);g.phase=Math.max(0,g.phase-dt);g.hit=Math.max(0,g.hit-dt);
+    const loop=(now:number)=>{const g=game.current;const dt=Math.min(.035,(now-last)/1000);last=now;if(g.finished)return;g.time+=dt;g.skillCd=tickCooldown(g.skillCd,dt);g.boost=Math.max(0,g.boost-dt);g.shield=Math.max(0,g.shield-dt);g.phase=Math.max(0,g.phase-dt);g.hit=Math.max(0,g.hit-dt);
       const steer=(inputManager.isPressed("right")?1:0)-(inputManager.isPressed("left")?1:0);g.lateral+=steer*850*dt;g.lateral=Math.max(-TRACK_WIDTH*.46,Math.min(TRACK_WIDTH*.46,g.lateral));const accelerate=inputManager.isPressed("up");const brake=inputManager.isPressed("down");let target=accelerate?SPRINT_SPEED:CRUISE_SPEED;if(brake)target=BRAKE_SPEED;if(g.boost>0)target*=1.1;if(g.hit>0)target*=.72;g.speed+=(target-g.speed)*dt*4.4;g.s+=g.speed*dt;
       g.vJump-=620*dt;g.jump=Math.max(0,g.jump+g.vJump*dt);if(g.jump===0&&g.vJump<0)g.vJump=0;
-      g.obstacles.forEach(o=>{if(g.crossed.has(o.id))return;if(Math.abs(g.s-o.s)<90&&Math.abs(g.lateral-obstacleLateral(o,g.time))<52){g.crossed.add(o.id);if(o.type==="ramp"){g.vJump=310;g.flash="🔺 램프 점프!"}else if(g.jump<26&&g.phase<=0){if(g.shield>0){g.shield=0;g.flash="방어 성공!"}else{g.hit=.65;g.speed*=.72;g.bumps++;g.flash=`${o.type==="mud"?"진흙탕":"장애물"} 충돌!`;feedback(130,.16)}}}});
-      g.boxes.forEach((b,i)=>{if(!b.taken&&Math.abs(g.s-b.s)<90&&Math.abs(g.lateral-b.lateral)<54){b.taken=true;const pool:Exclude<ItemKey,null>[]=g.ai.filter(a=>a.s>g.s).length>30?["shield","magnet","ink","magnet"]:["banana","shield","ink","magnet"];g.item=pool[i%pool.length];g.flash=`${ITEMS[g.item]} 아이템 획득`;feedback(920,.08)}});
+      g.obstacles.forEach(o=>{if(g.crossed.has(o.id))return;if(isRaceCollision(g.s,o.s,g.lateral,obstacleLateral(o,g.time))){g.crossed.add(o.id);if(o.type==="ramp"){g.vJump=310;g.flash="🔺 램프 점프!"}else if(g.jump<26&&g.phase<=0){if(g.shield>0){g.shield=0;g.flash="방어 성공!"}else{g.hit=.65;g.speed*=.72;g.bumps++;g.flash=`${o.type==="mud"?"진흙탕":"장애물"} 충돌!`;feedback(130,.16)}}}});
+      g.boxes.forEach((b,i)=>{if(!b.taken&&Math.abs(g.s-b.s)<90&&Math.abs(g.lateral-b.lateral)<54){b.taken=true;g.item=selectRace3DItem(g.ai.filter(a=>a.s>g.s).length,i);g.flash=`${ITEMS[g.item]} 아이템 획득`;feedback(920,.08)}});
       g.ai.forEach((a,i)=>{a.stun=Math.max(0,a.stun-dt);a.itemCd=Math.max(0,a.itemCd-dt);const diff=difficulty==="wild"?.985:difficulty==="nightmare"?1.018:1;let pace=a.speed*diff;if(a.s<g.s-1800)pace*=1.035;if(a.s>g.s+1800)pace*=.97;if(a.stun>0)pace*=.45;a.s+=pace*dt;a.lateral+=Math.sin(g.time*.9+a.phase)*45*dt;g.obstacles.forEach(o=>{if(!a.crossed.has(o.id)&&Math.abs(a.s-o.s)<75){a.crossed.add(o.id);if(Math.abs(a.lateral-obstacleLateral(o,g.time))<48&&o.type!=="ramp")a.stun=.38+seeded(i+o.id,seed.current)*.28}});if(a.s>g.s+220&&a.s<g.s+900&&a.itemCd<=0&&i%5===0){g.bananas.push({s:a.s-160,lateral:a.lateral,life:6,owner:"ai"});a.itemCd=9+seeded(i+Math.floor(g.time),seed.current)*5;g.flash=`${a.emoji}가 앞에 바나나 설치!`;}if(Math.abs(a.s-g.s)<75&&Math.abs(a.lateral-g.lateral)<38&&g.jump<20&&g.phase<=0){g.lateral+=Math.sign(g.lateral-a.lateral||1)*28;g.speed*=.94;g.bumps++;if(i%8===0)g.flash=`${a.emoji}와 어깨 충돌!`}});
       g.bananas.forEach(b=>{b.life-=dt;if(b.owner==="player")g.ai.forEach(a=>{if(Math.abs(a.s-b.s)<70&&Math.abs(a.lateral-b.lateral)<35){a.stun=.65;b.life=0}});else if(Math.abs(g.s-b.s)<70&&Math.abs(g.lateral-b.lateral)<35&&g.jump<18&&g.phase<=0){b.life=0;if(g.shield>0){g.shield=0;g.flash="방어막으로 바나나 차단!"}else{g.hit=.5;g.speed*=.82;g.bumps++;g.flash="🍌 AI 바나나에 미끄러짐!";feedback(120,.14)}}});g.bananas=g.bananas.filter(b=>b.life>0);
       const rank=calculateRank(g.s,g.ai);const canvasRect=canvas.getBoundingClientRect();const dpr=Math.min(2,window.devicePixelRatio||1);if(canvas.width!==Math.floor(canvasRect.width*dpr)||canvas.height!==Math.floor(canvasRect.height*dpr)){canvas.width=Math.floor(canvasRect.width*dpr);canvas.height=Math.floor(canvasRect.height*dpr)}ctx.setTransform(dpr,0,0,dpr,0,0);draw(canvasRect.width,canvasRect.height);
