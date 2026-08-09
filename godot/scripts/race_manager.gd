@@ -25,6 +25,8 @@ func unregister_racer(racer: Node3D) -> void:
 	finish_order.erase(racer)
 
 func clear_racers() -> void:
+	active = false
+	_race_started_at_ms = 0
 	racers.clear()
 	finish_order.clear()
 
@@ -35,6 +37,10 @@ func start_race() -> void:
 	GameManager.set_state(GameManager.GameState.RACE)
 	race_started.emit()
 
+func stop_race() -> void:
+	active = false
+	_race_started_at_ms = 0
+
 func record_finish(racer: Node3D) -> int:
 	if racer == null:
 		return MAX_RACERS
@@ -42,25 +48,20 @@ func record_finish(racer: Node3D) -> int:
 		return finish_order.find(racer) + 1
 	if not racers.has(racer):
 		register_racer(racer)
-
 	finish_order.append(racer)
 	var rank := finish_order.size()
 	if racer is WildDashCharacterController:
 		var controller := racer as WildDashCharacterController
 		controller.set_finished(rank)
-
 	racer_finished.emit(racer, rank)
 	if racer is WildDashCharacterController and (racer as WildDashCharacterController).is_player:
 		race_finished.emit(rank)
-
 	if finish_order.size() >= racers.size() and not racers.is_empty():
 		active = false
 		race_completed.emit()
 	return rank
 
 func finish_race(player: Node3D) -> int:
-	# Compatibility seam for Prototype-derived callers. The real 3D vertical
-	# slice records finish order through FinishLine Area3D.
 	return record_finish(player)
 
 func get_rank(racer: Node3D) -> int:
@@ -68,7 +69,6 @@ func get_rank(racer: Node3D) -> int:
 		return MAX_RACERS
 	if finish_order.has(racer):
 		return finish_order.find(racer) + 1
-
 	var progress := get_test_track_progress(racer)
 	var ahead := finish_order.size()
 	for rival in racers:
@@ -92,8 +92,6 @@ func get_standings() -> Array[Node3D]:
 	return standings
 
 func get_test_track_progress(racer: Node3D) -> float:
-	# Vertical Slice 01 uses a straight track toward negative Z.
-	# Production tracks should replace this with checkpoint + Curve3D progress.
 	return -racer.global_position.z
 
 func get_elapsed_seconds() -> float:
