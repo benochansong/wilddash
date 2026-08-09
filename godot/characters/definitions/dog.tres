@@ -1,0 +1,41 @@
+[gd_resource type="Resource" script_class="WildDashAnimalDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://characters/animal_definition.gd" id="1_def"]
+[ext_resource type="PackedScene" path="res://characters/visuals/dog_visual.tscn" id="2_visual"]
+
+[resource]
+script = ExtResource("1_def")
+animal_id = &"dog"
+display_name = "Dog"
+nickname = "멍대시"
+role = "Balanced Runner"
+accent_color = Color(1, 0.54, 0.30, 1)
+visual_scene = ExtResource("2_visual")
+max_speed = 14.5
+cruise_speed = 8.8
+acceleration = 24.0
+turn_speed = 2.15
+jump_velocity = 7.5
+gravity = 22.0
+ai_race_speed = 10.1
+arena_move_speed = 9.5
+arena_acceleration = 28.0
+knockback_decay = 16.0
+ai_arena_speed = 6.7
+collision_radius = 0.62
+collision_height = 1.9
+collision_center_y = 0.95
+camera_follow_distance = 9.5
+camera_follow_height = 5.2
+camera_look_ahead = 4.5
+camera_smoothing = 7.0
+camera_fov = 70.0
+skill_id = &"dash"
+skill_name = "균형 질주"
+skill_description = "2.5초 동안 속도 +18%. 안정적으로 직선을 밀어붙이는 스킬."
+skill_cooldown = 12.0
+skill_duration = 2.5
+skill_speed_multiplier = 1.18
+skill_turn_multiplier = 1.0
+skill_jump_multiplier = 1.0
+skill_knockback_multiplier = 1.0
