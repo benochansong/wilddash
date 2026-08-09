@@ -78,14 +78,34 @@ jobs:
           grep -q "CHECKPOINT PASS count=7" /tmp/wilddash-grand-prix-track.log
           grep -q "FINISH VALIDATION PASS" /tmp/wilddash-grand-prix-track.log
 
+      - name: Verify six-item party racing gameplay
+        run: |
+          set -o pipefail
+          timeout 30s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot res://tests/item_system_smoke.tscn \
+            | tee /tmp/wilddash-items.log
+          grep -q "ITEM BOX PICKUP PASS" /tmp/wilddash-items.log
+          grep -q "ITEM INVENTORY PASS" /tmp/wilddash-items.log
+          grep -q "DASH BERRY PASS" /tmp/wilddash-items.log
+          grep -q "SHIELD PASS" /tmp/wilddash-items.log
+          grep -q "TRAP PASS" /tmp/wilddash-items.log
+          grep -q "SHOCKWAVE PASS" /tmp/wilddash-items.log
+          grep -q "ROCKET PASS" /tmp/wilddash-items.log
+          grep -q "FEATHER PASS" /tmp/wilddash-items.log
+          grep -q "AI ITEM USE PASS" /tmp/wilddash-items.log
+          grep -q "ITEM SYSTEM SMOKE PASS items=6 inventory=1" /tmp/wilddash-items.log
+
       - name: Run four-round campaign with four AI
         run: |
           set -o pipefail
-          timeout 75s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+          timeout 80s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot \
             | tee /tmp/wilddash-godot-4.log
           grep -q "WILD DASH 3D four-round campaign ready: ai=4" /tmp/wilddash-godot-4.log
           grep -q "GRAND PRIX START racers=5 ai=4 checkpoints=7" /tmp/wilddash-godot-4.log
+          grep -q "GRAND PRIX ITEM BOXES READY count=21" /tmp/wilddash-godot-4.log
+          grep -q "ITEM BOX PICKUP" /tmp/wilddash-godot-4.log
+          grep -q "AI ITEM USE" /tmp/wilddash-godot-4.log
           grep -q "GRAND PRIX COMPLETE racers=5 finishers=5" /tmp/wilddash-godot-4.log
           grep -q "FRUIT AI PICKUP" /tmp/wilddash-godot-4.log
           grep -q "FLOOR PHASE 1" /tmp/wilddash-godot-4.log
@@ -96,11 +116,14 @@ jobs:
         run: |
           set -o pipefail
           export WILDDASH_AI_COUNT=10
-          timeout 85s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+          timeout 90s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot \
             | tee /tmp/wilddash-godot-10.log
           grep -q "WILD DASH 3D four-round campaign ready: ai=10" /tmp/wilddash-godot-10.log
           grep -q "GRAND PRIX START racers=11 ai=10 checkpoints=7" /tmp/wilddash-godot-10.log
+          grep -q "GRAND PRIX ITEM BOXES READY count=21" /tmp/wilddash-godot-10.log
+          grep -q "ITEM BOX PICKUP" /tmp/wilddash-godot-10.log
+          grep -q "AI ITEM USE" /tmp/wilddash-godot-10.log
           grep -q "GRAND PRIX COMPLETE racers=11 finishers=11" /tmp/wilddash-godot-10.log
           grep -q "FRUIT AI PICKUP" /tmp/wilddash-godot-10.log
           grep -q "FLOOR PHASE 1" /tmp/wilddash-godot-10.log
