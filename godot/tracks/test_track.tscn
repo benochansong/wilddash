@@ -84,6 +84,7 @@ position = Vector3(0, 1.75, -70)
 script = ExtResource("1_finish")
 monitoring = true
 monitorable = true
+collision_mask = 3
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="FinishLine"]
 shape = SubResource("FinishShape")

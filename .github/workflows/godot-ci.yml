@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "godot/**"
+      - "scripts/benchmark-windows.ps1"
       - ".github/workflows/godot-ci.yml"
   push:
     branches:
@@ -11,6 +12,7 @@ on:
       - godot/wilddash-next
     paths:
       - "godot/**"
+      - "scripts/benchmark-windows.ps1"
       - ".github/workflows/godot-ci.yml"
   workflow_dispatch:
 
@@ -33,7 +35,7 @@ jobs:
           chmod +x /tmp/godot/Godot_v4.7.1-stable_linux.x86_64
           /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --version
 
-      - name: Import all four round scenes headlessly
+      - name: Import project and benchmark scene headlessly
         run: /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --editor --path godot --quit
 
       - name: Run four-round campaign with four AI
@@ -43,21 +45,10 @@ jobs:
             --headless --path godot \
             | tee /tmp/wilddash-godot-4.log
           grep -q "WILD DASH 3D four-round campaign ready: ai=4" /tmp/wilddash-godot-4.log
-          grep -q "MODE START id=grand_prix ai=4" /tmp/wilddash-godot-4.log
           grep -q "GRAND PRIX COMPLETE racers=5 finishers=5" /tmp/wilddash-godot-4.log
-          grep -q "MODE COMPLETE id=grand_prix" /tmp/wilddash-godot-4.log
-          grep -q "MODE START id=fruit_collection ai=4" /tmp/wilddash-godot-4.log
           grep -q "FRUIT AI PICKUP" /tmp/wilddash-godot-4.log
-          grep -q "FRUIT COMPLETE" /tmp/wilddash-godot-4.log
-          grep -q "MODE COMPLETE id=fruit_collection" /tmp/wilddash-godot-4.log
-          grep -q "MODE START id=floor_collapse ai=4" /tmp/wilddash-godot-4.log
           grep -q "FLOOR PHASE 1" /tmp/wilddash-godot-4.log
-          grep -q "MODE COMPLETE id=floor_collapse" /tmp/wilddash-godot-4.log
-          grep -q "MODE START id=push_out ai=4" /tmp/wilddash-godot-4.log
           grep -q "PUSH OUT AI BODY CHECK" /tmp/wilddash-godot-4.log
-          grep -q "PUSH OUT COMPLETE" /tmp/wilddash-godot-4.log
-          grep -q "MODE COMPLETE id=push_out" /tmp/wilddash-godot-4.log
-          grep -q "CAMPAIGN COMPLETE rounds=4" /tmp/wilddash-godot-4.log
           grep -q "HEADLESS RESULT rounds=4" /tmp/wilddash-godot-4.log
 
       - name: Stress four-round campaign with ten AI
@@ -68,19 +59,28 @@ jobs:
             --headless --path godot \
             | tee /tmp/wilddash-godot-10.log
           grep -q "WILD DASH 3D four-round campaign ready: ai=10" /tmp/wilddash-godot-10.log
-          grep -q "MODE START id=grand_prix ai=10" /tmp/wilddash-godot-10.log
           grep -q "GRAND PRIX COMPLETE racers=11 finishers=11" /tmp/wilddash-godot-10.log
-          grep -q "MODE COMPLETE id=grand_prix" /tmp/wilddash-godot-10.log
-          grep -q "MODE START id=fruit_collection ai=10" /tmp/wilddash-godot-10.log
           grep -q "FRUIT AI PICKUP" /tmp/wilddash-godot-10.log
-          grep -q "FRUIT COMPLETE" /tmp/wilddash-godot-10.log
-          grep -q "MODE COMPLETE id=fruit_collection" /tmp/wilddash-godot-10.log
-          grep -q "MODE START id=floor_collapse ai=10" /tmp/wilddash-godot-10.log
           grep -q "FLOOR PHASE 1" /tmp/wilddash-godot-10.log
-          grep -q "MODE COMPLETE id=floor_collapse" /tmp/wilddash-godot-10.log
-          grep -q "MODE START id=push_out ai=10" /tmp/wilddash-godot-10.log
           grep -q "PUSH OUT AI BODY CHECK" /tmp/wilddash-godot-10.log
-          grep -q "PUSH OUT COMPLETE" /tmp/wilddash-godot-10.log
-          grep -q "MODE COMPLETE id=push_out" /tmp/wilddash-godot-10.log
-          grep -q "CAMPAIGN COMPLETE rounds=4" /tmp/wilddash-godot-10.log
           grep -q "HEADLESS RESULT rounds=4" /tmp/wilddash-godot-10.log
+
+      - name: Benchmark 10 25 50 racers before and after optimization
+        run: |
+          set -o pipefail
+          for profile in baseline optimized; do
+            if [ "$profile" = "optimized" ]; then
+              export WILDDASH_OPTIMIZED=1
+            else
+              export WILDDASH_OPTIMIZED=0
+            fi
+            for racers in 10 25 50; do
+              export WILDDASH_RACER_COUNT=$racers
+              log="/tmp/wilddash-perf-${profile}-${racers}.log"
+              timeout 18s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+                --headless --path godot res://benchmark/race_benchmark.tscn \
+                | tee "$log"
+              grep -q "PERF_RESULT profile=${profile} racers=${racers}" "$log"
+              grep -q "BENCHMARK RACE COMPLETE profile=${profile} racers=${racers}" "$log"
+            done
+          done

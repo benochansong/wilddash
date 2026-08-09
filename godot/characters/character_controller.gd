@@ -30,6 +30,7 @@ var finished := false
 var finish_rank := 0
 var _held_item: StringName = &""
 var _knockback_velocity := Vector3.ZERO
+var _performance_lod_level := 0
 
 @onready var _visual := get_node_or_null("VisualModel") as WildDashCharacterVisual
 
@@ -119,6 +120,18 @@ func has_blocking_collision() -> bool:
 		if collision.get_normal().y < 0.55:
 			return true
 	return false
+
+func set_performance_lod(level: int) -> void:
+	_performance_lod_level = clampi(level, 0, 2)
+	# Layer 1 is world/track. Layer 2 is racers. Near racers keep crowd
+	# collision; mid/far racers collide only with the world to reduce pair cost.
+	collision_layer = 2
+	collision_mask = 3 if _performance_lod_level == 0 else 1
+	if _visual:
+		_visual.set_lod_level(_performance_lod_level)
+
+func get_performance_lod() -> int:
+	return _performance_lod_level
 
 func apply_knockback(direction: Vector3, strength: float) -> void:
 	var planar := Vector3(direction.x, 0.0, direction.z)

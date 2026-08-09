@@ -14,6 +14,8 @@ var _animation_tree: AnimationTree
 var _state_machine: AnimationNodeStateMachinePlayback
 var _current_state: StringName = &""
 var _action_lock_until_ms := 0
+var _lod_level := 0
+var _lod_tick := 0
 
 func _ready() -> void:
 	_animation_player = _resolve_animation_player()
@@ -24,7 +26,19 @@ func _ready() -> void:
 			_state_machine = playback
 	play_state(&"Idle")
 
+func set_lod_level(level: int) -> void:
+	_lod_level = clampi(level, 0, 2)
+	_lod_tick = 0
+
 func update_locomotion(speed: float, grounded: bool) -> void:
+	_lod_tick += 1
+	var update_every := 1
+	if _lod_level == 1:
+		update_every = 3
+	elif _lod_level >= 2:
+		update_every = 8
+	if _lod_tick % update_every != 0:
+		return
 	if Time.get_ticks_msec() < _action_lock_until_ms:
 		return
 	if not grounded:
