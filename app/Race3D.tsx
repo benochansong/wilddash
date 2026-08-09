@@ -93,7 +93,7 @@ export function Race3D({animal,hero,difficulty,sound,haptics,reducedMotion,onFin
 
   const press=(action:InputAction,value:boolean)=>inputManager.setExternalAction("race3d-touch",action,value);
   return <section className="race3d-page">
-    <canvas ref={canvasRef} className="race3d-canvas" aria-label="위에서 내려다보는 3D 파티 동물 레이싱 경기장"/>
+    <canvas ref={canvasRef} className="race3d-canvas" aria-label="위에서 내려다보는 원근 연출 파티 동물 레이싱 경기장"/>
     <div className="race3d-hud"><div className="race3d-rank"><small>POSITION</small><b>{view.rank}<sup>위</sup></b><span>/ 50</span></div><div className="race3d-progress"><span>{view.section}</span><i><em style={{width:`${view.progress*100}%`}}/></i><small>넓은 플랫폼 · 장애물 건틀릿 · 복수 경로</small></div><div className="race3d-speed"><b>{Math.round(view.speed)}</b><small>5X SPEED</small></div></div>
     <div className="camera-badge">🎥 OVERHEAD PARTY CAM · 5X</div>
     {view.flash&&<div className="race3d-flash">{view.flash}</div>}
