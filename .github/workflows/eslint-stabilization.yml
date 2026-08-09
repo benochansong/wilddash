@@ -27,6 +27,33 @@ jobs:
       - name: Add ESLint React TypeScript dependencies
         run: npm install --save-dev @eslint/js@9.39.4 typescript-eslint eslint-plugin-react-hooks globals
 
+      - name: Apply minimal lint fixes
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+
+          function edit(path, transform) {
+            const before = fs.readFileSync(path, 'utf8');
+            const after = transform(before);
+            if (before !== after) fs.writeFileSync(path, after);
+          }
+
+          edit('app/Race3D.tsx', (text) =>
+            text.replaceAll('useSkill', 'activateSkill').replaceAll('useItem', 'activateItem')
+          );
+
+          edit('app/page.tsx', (text) =>
+            text
+              .replaceAll('useSkill', 'activateSkill')
+              .replaceAll('useItem', 'activateItem')
+              .replaceAll('\u3000', ' ')
+          );
+
+          edit('app/Tutorial.tsx', (text) =>
+            text.replace('catch{}', 'catch { /* local storage is optional */ }')
+          );
+          NODE
+
       - name: Lint
         run: npm run lint
 
@@ -39,14 +66,14 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Persist ESLint dependency metadata
+      - name: Persist stabilization changes
         run: |
-          if git diff --quiet -- package.json package-lock.json; then
-            echo "No dependency metadata changes to commit."
+          if git diff --quiet; then
+            echo "No stabilization changes to commit."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json
-          git commit -m "chore: add ESLint React TypeScript dependencies [skip ci]"
+          git add package.json package-lock.json app/Race3D.tsx app/page.tsx app/Tutorial.tsx
+          git commit -m "chore: stabilize ESLint and TypeScript checks [skip ci]"
           git push
