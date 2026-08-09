@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { inputManager, type InputAction } from "../game/input/InputManager";
 
 const STEPS = [
-  { icon: "↕", title: "차선을 바꿔보세요", copy: "PC는 W/S 또는 방향키, 모바일은 위·아래 버튼을 사용해요.", keys: ["w", "s", "arrowup", "arrowdown"], action: "MOVE" },
-  { icon: "⬆", title: "장애물을 점프하세요", copy: "통나무와 바나나는 뛰어넘을 수 있어요.", keys: [" "], action: "JUMP" },
-  { icon: "⚡", title: "동물 스킬을 사용하세요", copy: "각 동물의 스킬은 강하지만 재사용 대기시간이 있어요.", keys: ["e"], action: "SKILL" },
-  { icon: "🎁", title: "아이템을 사용하세요", copy: "아이템은 역할과 레벨이 달라요. 순위에 맞는 타이밍이 중요해요.", keys: ["q"], action: "ITEM" },
+  { icon: "↕", title: "차선을 바꿔보세요", copy: "PC는 W/S 또는 방향키, 모바일은 위·아래 버튼을 사용해요.", actions: ["up", "down"] as InputAction[], action: "MOVE" },
+  { icon: "⬆", title: "장애물을 점프하세요", copy: "통나무와 바나나는 뛰어넘을 수 있어요.", actions: ["jump"] as InputAction[], action: "JUMP" },
+  { icon: "⚡", title: "동물 스킬을 사용하세요", copy: "각 동물의 스킬은 강하지만 재사용 대기시간이 있어요.", actions: ["skill"] as InputAction[], action: "SKILL" },
+  { icon: "🎁", title: "아이템을 사용하세요", copy: "아이템은 역할과 레벨이 달라요. 순위에 맞는 타이밍이 중요해요.", actions: ["item"] as InputAction[], action: "ITEM" },
 ] as const;
 
 export function Tutorial({ hero, onDone }: { hero: string; onDone: () => void }) {
@@ -30,13 +31,11 @@ export function Tutorial({ hero, onDone }: { hero: string; onDone: () => void })
     }, 350);
   }, [onDone, step]);
 
-  useEffect(() => {
-    const key = (event: KeyboardEvent) => {
-      if (STEPS[step].keys.includes(event.key.toLowerCase() as never)) advance();
-    };
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
-  }, [advance, step]);
+  useEffect(() => inputManager.activate("tutorial", {
+    onAction: (action) => {
+      if (STEPS[step].actions.includes(action)) advance();
+    },
+  }), [advance, step]);
 
   const current = STEPS[step];
 
