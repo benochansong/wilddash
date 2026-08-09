@@ -1,0 +1,115 @@
+name: Publish WILD DASH Public Site
+
+on:
+  push:
+    branches:
+      - release/wilddash-3d-rc1
+    paths:
+      - "public-site/**"
+      - "godot/**"
+      - ".github/workflows/public-distribution.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: wild-dash-public-pages
+  cancel-in-progress: true
+
+jobs:
+  windows-game:
+    name: Build Windows RC1
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Godot 4.7.1 and export templates
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          Invoke-WebRequest "https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_win64.exe.zip" -OutFile "$env:RUNNER_TEMP\godot.zip"
+          Expand-Archive "$env:RUNNER_TEMP\godot.zip" "$env:RUNNER_TEMP\godot" -Force
+          Invoke-WebRequest "https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_export_templates.tpz" -OutFile "$env:RUNNER_TEMP\templates.zip"
+          Expand-Archive "$env:RUNNER_TEMP\templates.zip" "$env:RUNNER_TEMP\templates" -Force
+          $templateDir = "$env:APPDATA\Godot\export_templates\4.7.1.stable"
+          New-Item -ItemType Directory -Force $templateDir | Out-Null
+          Copy-Item "$env:RUNNER_TEMP\templates\templates\*" $templateDir -Recurse -Force
+          $godot = (Get-ChildItem "$env:RUNNER_TEMP\godot\Godot_v4.7.1-stable_win64.exe").FullName
+          "GODOT_EXE=$godot" | Out-File -FilePath $env:GITHUB_ENV -Append
+          & $godot --version
+
+      - name: Import Godot project
+        shell: pwsh
+        run: |
+          & $env:GODOT_EXE --headless --editor --path godot --quit
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Export Windows x86_64 RC1
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force "godot\build\windows" | Out-Null
+          & $env:GODOT_EXE --headless --path godot --export-release "Windows Desktop" "build/windows/WILD_DASH_3D.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path "godot\build\windows\WILD_DASH_3D.exe")) { throw "Windows executable was not generated" }
+
+      - name: Smoke launch exported executable
+        shell: pwsh
+        run: |
+          $env:WILDDASH_AUTOTEST_LOAD_ONLY = "1"
+          $proc = Start-Process -FilePath "godot\build\windows\WILD_DASH_3D.exe" -ArgumentList "--headless" -PassThru -Wait
+          if ($proc.ExitCode -ne 0) { throw "Exported executable exited with code $($proc.ExitCode)" }
+
+      - name: Upload Windows game artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wild-dash-windows-game
+          path: godot/build/windows/WILD_DASH_3D.exe
+          if-no-files-found: error
+          retention-days: 30
+
+  build-site:
+    name: Build public site
+    needs: windows-game
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download Windows game
+        uses: actions/download-artifact@v4
+        with:
+          name: wild-dash-windows-game
+          path: public-site/downloads
+
+      - name: Prepare public download
+        shell: bash
+        run: |
+          set -euo pipefail
+          mv public-site/downloads/WILD_DASH_3D.exe public-site/downloads/WILD_DASH_3D_RC1.exe
+          (cd public-site/downloads && sha256sum WILD_DASH_3D_RC1.exe > SHA256.txt)
+          printf '{"version":"0.9.0-rc1","commit":"%s"}\n' "$GITHUB_SHA" > public-site/version.json
+          ls -lh public-site/downloads
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: public-site
+
+  deploy:
+    name: Deploy public site
+    needs: build-site
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
