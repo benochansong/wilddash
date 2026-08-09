@@ -25,17 +25,17 @@ max_speed = 14.5
 cruise_speed = 8.8
 
 [node name="Rabbit" parent="." instance=ExtResource("3_racer")]
-position = Vector3(-2, 0.1, 40)
+position = Vector3(-7.5, 0.1, 40)
 is_player = false
 animal_id = &"rabbit"
 
 [node name="Elephant" parent="." instance=ExtResource("3_racer")]
-position = Vector3(2, 0.1, 40)
+position = Vector3(7.3, 0.1, 40)
 is_player = false
 animal_id = &"elephant"
 
 [node name="Cat" parent="." instance=ExtResource("3_racer")]
-position = Vector3(6, 0.1, 40)
+position = Vector3(5.5, 0.1, 40)
 is_player = false
 animal_id = &"cat"
 
@@ -43,23 +43,24 @@ animal_id = &"cat"
 script = ExtResource("4_ai")
 racer_path = NodePath("../Rabbit")
 target_speed = 10.8
-preferred_lane = -2.0
-lane_wander = 0.8
+preferred_lane = -7.5
+lane_wander = 0.2
+steering_strength = 4.8
 
 [node name="ElephantAI" type="Node" parent="."]
 script = ExtResource("4_ai")
 racer_path = NodePath("../Elephant")
 target_speed = 9.9
-preferred_lane = 2.2
-lane_wander = 0.55
-steering_strength = 3.7
+preferred_lane = 7.3
+lane_wander = 0.15
+steering_strength = 4.2
 
 [node name="CatAI" type="Node" parent="."]
 script = ExtResource("4_ai")
 racer_path = NodePath("../Cat")
 target_speed = 10.5
 preferred_lane = 5.5
-lane_wander = 1.0
+lane_wander = 0.15
 steering_strength = 4.6
 
 [node name="ChaseCamera" type="Camera3D" parent="."]
