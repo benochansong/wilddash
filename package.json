@@ -11,12 +11,13 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run typecheck && vite build",
     "desktop": "electron .",
     "desktop:dev": "concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && cross-env DESKTOP_DEV_URL=http://127.0.0.1:5173 electron .\"",
     "dist:win": "npm run build && electron-builder --win nsis",
     "test": "npm run build && node --test tests/desktop-build.test.mjs",
-    "lint": "eslint app src --ignore-pattern dist"
+    "lint": "eslint app src electron"
   },
   "dependencies": {
     "react": "19.2.6",
