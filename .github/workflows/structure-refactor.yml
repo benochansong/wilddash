@@ -25,7 +25,9 @@ jobs:
         run: npm install
 
       - name: Apply structure refactor
-        run: node scripts/structure-refactor.cjs
+        run: |
+          node scripts/structure-refactor.cjs
+          sed -i 's/AI_EMOJIS, BOXES, LANES, OBSTACLES, ROUTES/AI_EMOJIS, LANES, ROUTES/' app/page.tsx
 
       - name: Lint
         run: npm run lint
