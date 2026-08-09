@@ -3,23 +3,28 @@ extends CharacterBody3D
 
 signal skill_requested(animal_id: StringName)
 signal held_item_changed(item_id: StringName)
+signal finished_race(rank: int)
 
 @export var is_player := true
 @export var animal_id: StringName = &"dog"
-@export var max_speed := 14.0
-@export var cruise_speed := 8.0
+@export var max_speed := 14.5
+@export var cruise_speed := 8.8
 @export var acceleration := 24.0
-@export var turn_speed := 1.9
+@export var turn_speed := 2.15
 @export var jump_velocity := 7.5
 @export var gravity := 22.0
 
 var current_speed := 0.0
 var skill_cooldown_remaining := 0.0
+var finished := false
+var finish_rank := 0
 var _held_item: StringName = &""
 
 @onready var _visual := get_node_or_null("VisualModel") as WildDashCharacterVisual
 
 func _ready() -> void:
+	floor_snap_length = 0.35
+	floor_max_angle = deg_to_rad(52.0)
 	RaceManager.register_racer(self)
 
 func _exit_tree() -> void:
@@ -27,6 +32,17 @@ func _exit_tree() -> void:
 
 func _physics_process(delta: float) -> void:
 	skill_cooldown_remaining = maxf(0.0, skill_cooldown_remaining - delta)
+
+	if finished:
+		_apply_finish_coast(delta)
+		_sync_visual()
+		return
+
+	if not RaceManager.active:
+		_settle_before_start(delta)
+		_sync_visual()
+		return
+
 	if not is_player:
 		_sync_visual()
 		return
@@ -49,16 +65,24 @@ func _physics_process(delta: float) -> void:
 	if InputManager.consume_item():
 		ItemSystem.use_held_item(self)
 
-	if not is_on_floor():
-		velocity.y -= gravity * delta
-	elif velocity.y < 0.0:
-		velocity.y = 0.0
-
+	_apply_gravity(delta)
 	var forward := -global_transform.basis.z.normalized()
 	velocity.x = forward.x * current_speed
 	velocity.z = forward.z * current_speed
 	move_and_slide()
+
+	if get_slide_collision_count() > 0:
+		current_speed = maxf(cruise_speed * 0.55, current_speed * 0.92)
 	_sync_visual()
+
+func set_finished(rank: int) -> void:
+	if finished:
+		return
+	finished = true
+	finish_rank = rank
+	finished_race.emit(rank)
+	if _visual:
+		_visual.play_result(rank == 1)
 
 func try_use_skill() -> bool:
 	if skill_cooldown_remaining > 0.0:
@@ -66,8 +90,6 @@ func try_use_skill() -> bool:
 	skill_cooldown_remaining = _cooldown_for_animal(animal_id)
 	if _visual:
 		_visual.play_action(&"Skill")
-	# Effects are intentionally not implemented in the scaffold. The signal is
-	# the seam for dog/rabbit/elephant/cat skill scenes or systems later.
 	skill_requested.emit(animal_id)
 	return true
 
@@ -77,6 +99,27 @@ func set_held_item(item_id: StringName) -> void:
 
 func get_held_item() -> StringName:
 	return _held_item
+
+func _settle_before_start(delta: float) -> void:
+	current_speed = move_toward(current_speed, 0.0, acceleration * delta)
+	velocity.x = 0.0
+	velocity.z = 0.0
+	_apply_gravity(delta)
+	move_and_slide()
+
+func _apply_finish_coast(delta: float) -> void:
+	current_speed = move_toward(current_speed, 0.0, acceleration * 0.7 * delta)
+	var forward := -global_transform.basis.z.normalized()
+	velocity.x = forward.x * current_speed
+	velocity.z = forward.z * current_speed
+	_apply_gravity(delta)
+	move_and_slide()
+
+func _apply_gravity(delta: float) -> void:
+	if not is_on_floor():
+		velocity.y -= gravity * delta
+	elif velocity.y < 0.0:
+		velocity.y = 0.0
 
 func _sync_visual() -> void:
 	if _visual:

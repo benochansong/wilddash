@@ -36,5 +36,12 @@ jobs:
       - name: Import project headlessly
         run: /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --editor --path godot --quit
 
-      - name: Run test scene headlessly
-        run: /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path godot --quit-after 10
+      - name: Run four-racer vertical slice headlessly
+        run: |
+          set -o pipefail
+          /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot --fixed-fps 60 --quit-after 1200 \
+            | tee /tmp/wilddash-godot.log
+          grep -q "WILD DASH 3D Vertical Slice 01 ready" /tmp/wilddash-godot.log
+          grep -q "PLAYER FINISH" /tmp/wilddash-godot.log
+          grep -q "RACE COMPLETE" /tmp/wilddash-godot.log

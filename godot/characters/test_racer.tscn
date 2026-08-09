@@ -7,19 +7,12 @@
 radius = 0.65
 height = 1.9
 
-[node name="CharacterRoot" type="CharacterBody3D" groups=["player_racer"]]
+[node name="CharacterRoot" type="CharacterBody3D"]
 script = ExtResource("1_controller")
+floor_snap_length = 0.35
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 position = Vector3(0, 0.95, 0)
 shape = SubResource("CapsuleShape_player")
 
 [node name="VisualModel" parent="." instance=ExtResource("2_visual")]
-
-[node name="CameraRig" type="Node3D" parent="."]
-
-[node name="Camera3D" type="Camera3D" parent="CameraRig"]
-position = Vector3(0, 4.8, 8.5)
-rotation_degrees = Vector3(-18, 0, 0)
-current = true
-fov = 70.0

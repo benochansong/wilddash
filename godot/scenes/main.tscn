@@ -1,8 +1,11 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scenes/main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://tracks/test_track.tscn" id="2_track"]
 [ext_resource type="PackedScene" path="res://characters/test_racer.tscn" id="3_racer"]
+[ext_resource type="Script" path="res://characters/ai_controller.gd" id="4_ai"]
+[ext_resource type="Script" path="res://camera/chase_camera.gd" id="5_camera"]
+[ext_resource type="Script" path="res://ui/race_hud.gd" id="6_hud"]
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1_main")
@@ -14,5 +17,58 @@ shadow_enabled = true
 
 [node name="TestTrack" parent="." instance=ExtResource("2_track")]
 
-[node name="TestRacer" parent="." instance=ExtResource("3_racer")]
-position = Vector3(0, 0.1, 40)
+[node name="Dog" parent="." instance=ExtResource("3_racer")]
+position = Vector3(-6, 0.1, 40)
+is_player = true
+animal_id = &"dog"
+max_speed = 14.5
+cruise_speed = 8.8
+
+[node name="Rabbit" parent="." instance=ExtResource("3_racer")]
+position = Vector3(-2, 0.1, 40)
+is_player = false
+animal_id = &"rabbit"
+
+[node name="Elephant" parent="." instance=ExtResource("3_racer")]
+position = Vector3(2, 0.1, 40)
+is_player = false
+animal_id = &"elephant"
+
+[node name="Cat" parent="." instance=ExtResource("3_racer")]
+position = Vector3(6, 0.1, 40)
+is_player = false
+animal_id = &"cat"
+
+[node name="RabbitAI" type="Node" parent="."]
+script = ExtResource("4_ai")
+racer_path = NodePath("../Rabbit")
+target_speed = 10.8
+preferred_lane = -2.0
+lane_wander = 0.8
+
+[node name="ElephantAI" type="Node" parent="."]
+script = ExtResource("4_ai")
+racer_path = NodePath("../Elephant")
+target_speed = 9.9
+preferred_lane = 2.2
+lane_wander = 0.55
+steering_strength = 3.7
+
+[node name="CatAI" type="Node" parent="."]
+script = ExtResource("4_ai")
+racer_path = NodePath("../Cat")
+target_speed = 10.5
+preferred_lane = 5.5
+lane_wander = 1.0
+steering_strength = 4.6
+
+[node name="ChaseCamera" type="Camera3D" parent="."]
+script = ExtResource("5_camera")
+target_path = NodePath("../Dog")
+position = Vector3(-6, 5.2, 49.5)
+current = true
+fov = 70.0
+
+[node name="RaceHUD" type="CanvasLayer" parent="."]
+script = ExtResource("6_hud")
+player_path = NodePath("../Dog")
