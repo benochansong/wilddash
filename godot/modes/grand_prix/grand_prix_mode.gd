@@ -4,10 +4,12 @@ const TRACK_SCENE: PackedScene = preload("res://tracks/test_track.tscn")
 const CHASE_CAMERA_SCRIPT: Script = preload("res://camera/chase_camera.gd")
 const AI_ANIMALS: Array[StringName] = [&"rabbit", &"elephant", &"cat", &"dog"]
 const AI_SPEEDS: Array[float] = [10.8, 9.9, 10.5, 10.1]
+const SAFE_LANES: Array[float] = [-7.2, 7.2, 5.5, -0.8, -5.8, 0.8, 6.4, -6.4, 4.9, -1.8]
 
 var _player_rank := 0
 var _fps_sum := 0.0
 var _fps_samples := 0
+var _headless_debug_elapsed := 0.0
 
 func _ready() -> void:
 	setup_mode(&"grand_prix", "ROUND 1 — Wild World Grand Prix", "W/↑ 가속 · A/D 조향 · Space 점프", false)
@@ -19,11 +21,11 @@ func _ready() -> void:
 	player = spawn_racer("Dog", &"dog", Vector3(-5.8, 0.1, 40.0), true, WildDashCharacterController.MovementMode.RACE)
 	var ai_total: int = GameManager.ai_count
 	for i in range(ai_total):
-		var t := 0.5 if ai_total <= 1 else float(i) / float(ai_total - 1)
-		var lane := lerpf(-7.2, 7.2, t)
+		var lane: float = SAFE_LANES[i % SAFE_LANES.size()]
 		var animal: StringName = AI_ANIMALS[i % AI_ANIMALS.size()]
 		var speed: float = AI_SPEEDS[i % AI_SPEEDS.size()] - float(i / AI_SPEEDS.size()) * 0.12
-		var racer := spawn_racer("AI_%02d" % (i + 1), animal, Vector3(lane, 0.1, 40.0), false, WildDashCharacterController.MovementMode.RACE)
+		var start_z := 40.0 + float(i / SAFE_LANES.size()) * 1.6
+		var racer := spawn_racer("AI_%02d" % (i + 1), animal, Vector3(lane, 0.1, start_z), false, WildDashCharacterController.MovementMode.RACE)
 		spawn_ai_driver(racer, WildDashAIController.AIMode.RACE, speed, lane, 0.12)
 
 	var camera := CHASE_CAMERA_SCRIPT.new() as Camera3D
@@ -42,6 +44,7 @@ func _ready() -> void:
 		await get_tree().create_timer(1.0).timeout
 	GameManager.begin_round(&"grand_prix")
 	RaceManager.start_race()
+	print("MODE START id=grand_prix ai=%d" % ai_racers.size())
 	print("GRAND PRIX START racers=%d ai=%d" % [RaceManager.racers.size(), ai_racers.size()])
 
 func _process(_delta: float) -> void:
@@ -53,6 +56,23 @@ func _process(_delta: float) -> void:
 		_fps_samples += 1
 	var rank: int = RaceManager.get_rank(player)
 	hud.set_metrics("Rank %d/%d   Speed %.1f   FPS %d" % [rank, RaceManager.racers.size(), player.current_speed, fps])
+
+func _physics_process(delta: float) -> void:
+	if DisplayServer.get_name() != "headless" or not RaceManager.active:
+		return
+	_headless_debug_elapsed += delta
+	if _headless_debug_elapsed < 5.0:
+		return
+	_headless_debug_elapsed = 0.0
+	var parts: Array[String] = []
+	for racer: Node3D in RaceManager.racers:
+		if racer is WildDashCharacterController:
+			var controller := racer as WildDashCharacterController
+			parts.append("%s x=%.1f z=%.1f speed=%.1f finished=%s" % [
+				RaceManager.get_racer_label(racer), controller.global_position.x,
+				controller.global_position.z, controller.current_speed, str(controller.finished),
+			])
+	print("GRAND PRIX PROGRESS " + " | ".join(parts))
 
 func _on_player_finished(rank: int) -> void:
 	_player_rank = rank
