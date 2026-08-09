@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - stabilization/wilddash-prototype
   workflow_dispatch:
 
 permissions:
