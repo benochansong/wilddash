@@ -49,6 +49,23 @@ export type GameSettings = {
   largeTouch: boolean;
 };
 
+export type GameUnlocks = {
+  characters: string[];
+};
+
+export type GameRecords = Record<string, number>;
+
+export type GameSaveDataV1 = {
+  version: 1;
+  profile: GameProfile;
+  settings: GameSettings;
+  tutorialCompleted: boolean;
+  unlocks: GameUnlocks;
+  records: GameRecords;
+};
+
+export type GameSaveData = GameSaveDataV1;
+
 export type RaceSnapshot = {
   x: number;
   y: number;
