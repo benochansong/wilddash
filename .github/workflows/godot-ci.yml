@@ -50,12 +50,29 @@ jobs:
           grep -q "CHARACTER PROFILE id=cat" /tmp/wilddash-characters.log
           grep -q "CHARACTER SYSTEM PASS animals=4 states=7" /tmp/wilddash-characters.log
 
+      - name: Verify character skill gameplay and AI utility
+        run: |
+          set -o pipefail
+          timeout 25s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot res://tests/skill_system_smoke.tscn \
+            | tee /tmp/wilddash-skills.log
+          grep -q "SKILL INPUT PASS keyboard=E gamepad=X item=Q/B separate=true" /tmp/wilddash-skills.log
+          grep -q "DOG SKILL PASS" /tmp/wilddash-skills.log
+          grep -q "RABBIT SKILL PASS" /tmp/wilddash-skills.log
+          grep -q "ELEPHANT SKILL PASS" /tmp/wilddash-skills.log
+          grep -q "CAT SKILL PASS" /tmp/wilddash-skills.log
+          grep -q "AI SKILL USE PASS" /tmp/wilddash-skills.log
+          grep -q "CHARACTER SKILL SYSTEM PASS skills=4 chimera=true item_separate=true" /tmp/wilddash-skills.log
+
       - name: Verify chimera composition system
         run: |
           set -o pipefail
           timeout 20s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot res://tests/chimera_system_smoke.tscn \
             | tee /tmp/wilddash-chimera.log
+          grep -q "CHIMERA HEAD SKILL PASS" /tmp/wilddash-chimera.log
+          grep -q "CHIMERA BODY PASSIVE PASS" /tmp/wilddash-chimera.log
+          grep -q "CHIMERA TAIL BONUS PASS" /tmp/wilddash-chimera.log
           grep -q "CHIMERA PROFILE head=rabbit body=elephant tail=cat" /tmp/wilddash-chimera.log
           grep -q "CHIMERA SYSTEM PASS slots=3 palettes=4 patterns=4 save_version=2" /tmp/wilddash-chimera.log
 
@@ -98,7 +115,7 @@ jobs:
       - name: Run four-round campaign with four AI
         run: |
           set -o pipefail
-          timeout 80s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+          timeout 85s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot \
             | tee /tmp/wilddash-godot-4.log
           grep -q "WILD DASH 3D four-round campaign ready: ai=4" /tmp/wilddash-godot-4.log
@@ -116,7 +133,7 @@ jobs:
         run: |
           set -o pipefail
           export WILDDASH_AI_COUNT=10
-          timeout 90s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+          timeout 95s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot \
             | tee /tmp/wilddash-godot-10.log
           grep -q "WILD DASH 3D four-round campaign ready: ai=10" /tmp/wilddash-godot-10.log
