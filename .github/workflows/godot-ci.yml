@@ -118,7 +118,7 @@ jobs:
           & $env:GODOT_EXE --headless --editor --path godot --quit
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Export package and smoke-test Windows RC2
+      - name: Export smoke-test and stage Windows RC2 artifact
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
@@ -136,20 +136,20 @@ jobs:
           $shaFile = Join-Path $outDir "WILD_DASH_3D_RC2.sha256"
           "$hash  WILD_DASH_3D_RC2.exe" | Set-Content $shaFile
 
-          $zip = Join-Path $PWD "godot\build\WILD-DASH-3D-Windows-RC2-Character-Chimera.zip"
-          if (Test-Path $zip) { Remove-Item $zip -Force }
-          Compress-Archive -Path $exe,$shaFile -DestinationPath $zip -CompressionLevel Optimal
-          if (-not (Test-Path $zip)) { throw "RC2 ZIP package was not generated" }
-          Write-Host "RC2 ZIP: $zip bytes=$((Get-Item $zip).Length) sha256=$hash"
-
           $env:WILDDASH_AI_COUNT = "4"
           $proc = Start-Process -FilePath $exe -ArgumentList "--headless" -PassThru -Wait
           if ($proc.ExitCode -ne 0) { throw "RC2 executable exited with code $($proc.ExitCode)" }
           Write-Host "RC2_SMOKE_PASS exit=0"
 
+          $zip = Join-Path $env:RUNNER_TEMP "WILD-DASH-3D-Windows-RC2-Character-Chimera.zip"
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path $exe,$shaFile -DestinationPath $zip -CompressionLevel Optimal
+          if (-not (Test-Path $zip)) { throw "RC2 ZIP package was not generated" }
+          Write-Host "RC2_ARTIFACT_READY path=$zip bytes=$((Get-Item $zip).Length) sha256=$hash"
+
       - name: Upload Windows RC2 Character and Chimera build
         uses: actions/upload-artifact@v4
         with:
           name: WILD-DASH-3D-Windows-RC2-Character-Chimera
-          path: godot/build/WILD-DASH-3D-Windows-RC2-Character-Chimera.zip
+          path: ${{ runner.temp }}/WILD-DASH-3D-Windows-RC2-Character-Chimera.zip
           if-no-files-found: error
