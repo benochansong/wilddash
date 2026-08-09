@@ -1,0 +1,41 @@
+[gd_resource type="Resource" script_class="WildDashAnimalDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://characters/animal_definition.gd" id="1_def"]
+[ext_resource type="PackedScene" path="res://characters/visuals/cat_visual.tscn" id="2_visual"]
+
+[resource]
+script = ExtResource("1_def")
+animal_id = &"cat"
+display_name = "Cat"
+nickname = "냥쏘"
+role = "Evasive Sprinter"
+accent_color = Color(0.71, 0.40, 0.96, 1)
+visual_scene = ExtResource("2_visual")
+max_speed = 14.2
+cruise_speed = 8.7
+acceleration = 27.0
+turn_speed = 2.65
+jump_velocity = 7.8
+gravity = 21.5
+ai_race_speed = 10.5
+arena_move_speed = 10.4
+arena_acceleration = 32.0
+knockback_decay = 18.0
+ai_arena_speed = 7.4
+collision_radius = 0.50
+collision_height = 1.65
+collision_center_y = 0.825
+camera_follow_distance = 8.7
+camera_follow_height = 4.8
+camera_look_ahead = 5.0
+camera_smoothing = 8.8
+camera_fov = 74.0
+skill_id = &"evasion"
+skill_name = "그림자 회피"
+skill_description = "2.2초 동안 속도와 방향 전환이 크게 향상되고 넉백을 덜 받습니다."
+skill_cooldown = 9.0
+skill_duration = 2.2
+skill_speed_multiplier = 1.14
+skill_turn_multiplier = 1.35
+skill_jump_multiplier = 1.08
+skill_knockback_multiplier = 0.60
