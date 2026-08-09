@@ -1,30 +1,38 @@
 ; WILD DASH 3D - Godot project
-; Four-round prototype lives beside the React/Electron Prototype V1.
+; Windows offline single-player Release Candidate.
 config_version=5
 
 [application]
 config/name="WILD DASH 3D"
-run/main_scene="res://scenes/main.tscn"
+config/version="0.9.0-rc1"
+run/main_scene="res://scenes/lobby.tscn"
 
 [autoload]
-GameManager="*res://scripts/game_manager.gd"
+SaveManager="*res://scripts/save_manager.gd"
+InputManager="*res://scripts/input_manager.gd"
+SettingsManager="*res://scripts/settings_manager.gd"
+AudioManager="*res://scripts/audio_manager.gd"
 ResultManager="*res://scripts/result_manager.gd"
 RaceManager="*res://scripts/race_manager.gd"
-InputManager="*res://scripts/input_manager.gd"
-AudioManager="*res://scripts/audio_manager.gd"
-SaveManager="*res://scripts/save_manager.gd"
+GameManager="*res://scripts/game_manager.gd"
 ItemSystem="*res://systems/item_system.gd"
 PerformanceManager="*res://scripts/performance_manager.gd"
+PauseManager="*res://scripts/pause_manager.gd"
 
 [display]
-window/size/viewport_width=1440
+window/size/viewport_width=1600
 window/size/viewport_height=900
-window/size/window_width_override=1440
+window/size/window_width_override=1600
 window/size/window_height_override=900
 window/stretch/mode="canvas_items"
+window/energy_saving/keep_screen_on=true
+
+[input_devices]
+joypads/ignore_joypad_on_unfocused_application=true
 
 [physics]
 common/physics_ticks_per_second=60
 
 [rendering]
 renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
