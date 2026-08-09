@@ -6,6 +6,7 @@ var _fps_min := 9999
 var _fps_max := 0
 var _fps_sum := 0.0
 var _fps_samples := 0
+var _headless_debug_elapsed := 0.0
 
 func _ready() -> void:
 	GameManager.configure_run(&"dog", &"chaos", {"head": 0, "body": 0, "tail": 0})
@@ -29,6 +30,26 @@ func _process(_delta: float) -> void:
 	_fps_max = maxi(_fps_max, fps)
 	_fps_sum += fps
 	_fps_samples += 1
+
+func _physics_process(delta: float) -> void:
+	if DisplayServer.get_name() != "headless" or not RaceManager.active:
+		return
+	_headless_debug_elapsed += delta
+	if _headless_debug_elapsed < 5.0:
+		return
+	_headless_debug_elapsed = 0.0
+	var parts: Array[String] = []
+	for racer in RaceManager.racers:
+		if racer is WildDashCharacterController:
+			var controller := racer as WildDashCharacterController
+			parts.append("%s x=%.1f z=%.1f speed=%.1f finished=%s" % [
+				RaceManager.get_racer_label(racer),
+				controller.global_position.x,
+				controller.global_position.z,
+				controller.current_speed,
+				str(controller.finished),
+			])
+	print("RACE PROGRESS " + " | ".join(parts))
 
 func _on_player_finished(rank: int) -> void:
 	print("PLAYER FINISH rank=%d elapsed=%.2fs" % [rank, RaceManager.get_elapsed_seconds()])
