@@ -326,9 +326,9 @@ func _use_sticky_fruit(character: Node) -> bool:
 	var world := controller.get_parent()
 	if world == null:
 		return false
-	var trap := TRAP_SCRIPT.new()
+	var trap: WildDashStickyFruitTrap = TRAP_SCRIPT.new() as WildDashStickyFruitTrap
 	trap.name = "StickyFruit_%d" % Time.get_ticks_msec()
-	trap.set("owner_racer", controller)
+	trap.owner_racer = controller
 	world.add_child(trap)
 	var forward := -controller.global_transform.basis.z.normalized()
 	trap.global_position = controller.global_position - forward * 2.2 + Vector3.UP * 0.25
@@ -359,10 +359,10 @@ func _use_rocket_nut(character: Node) -> bool:
 	var world := controller.get_parent()
 	if world == null:
 		return false
-	var rocket := ROCKET_SCRIPT.new()
+	var rocket: WildDashRocketNut = ROCKET_SCRIPT.new() as WildDashRocketNut
 	rocket.name = "RocketNut_%d" % Time.get_ticks_msec()
 	world.add_child(rocket)
-	rocket.call("configure", controller, target)
+	rocket.configure(controller, target)
 	var forward := -controller.global_transform.basis.z.normalized()
 	rocket.global_position = controller.global_position + forward * 2.0 + Vector3.UP * 0.9
 	return true
