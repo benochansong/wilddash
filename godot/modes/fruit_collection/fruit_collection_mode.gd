@@ -18,6 +18,7 @@ var fruit_respawn: Array[float] = []
 var fruit_cycles: Array[int] = []
 var ai_scores: Array[int] = []
 var player_score := 0
+var _logged_ai_pickup := false
 
 func _ready() -> void:
 	setup_mode(&"fruit_collection", "ROUND 2 — Fruit Collection", "과일 8개를 먼저 모으세요 · WASD/방향키 이동")
@@ -58,12 +59,15 @@ func _physics_process(delta: float) -> void:
 	hud.set_metrics("YOU %d/%d   Best AI %d   Time %.1f" % [player_score, TARGET_SCORE, best_ai, time_remaining])
 
 	if player_score >= TARGET_SCORE:
+		print("FRUIT COMPLETE reason=player_target player=%d best_ai=%d" % [player_score, best_ai])
 		finish_mode(true, player_score, {"best_ai": best_ai, "target": TARGET_SCORE})
 		return
 	if best_ai >= TARGET_SCORE:
+		print("FRUIT COMPLETE reason=ai_target player=%d best_ai=%d" % [player_score, best_ai])
 		finish_mode(false, player_score, {"best_ai": best_ai, "target": TARGET_SCORE})
 		return
 	if time_remaining <= 0.0:
+		print("FRUIT COMPLETE reason=timeout player=%d best_ai=%d" % [player_score, best_ai])
 		finish_mode(false, player_score, {"best_ai": best_ai, "target": TARGET_SCORE, "timeout": true})
 
 func _create_fruits() -> void:
@@ -117,6 +121,9 @@ func _update_ai_targets_and_pickups() -> void:
 		if fruit_active[fruit_index] and racer.global_position.distance_to(fruits[fruit_index].global_position) < 1.05:
 			_collect_fruit(fruit_index)
 			ai_scores[ai_index] += 1
+			if not _logged_ai_pickup:
+				_logged_ai_pickup = true
+				print("FRUIT AI PICKUP racer=%s score=%d" % [racer.name, ai_scores[ai_index]])
 
 func _nearest_active_fruit(origin: Vector3) -> int:
 	var best_index := -1
