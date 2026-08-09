@@ -25,7 +25,7 @@ jobs:
         run: npm install
 
       - name: Add ESLint React TypeScript dependencies
-        run: npm install --save-dev @eslint/js typescript-eslint eslint-plugin-react-hooks globals
+        run: npm install --save-dev @eslint/js@9.39.4 typescript-eslint eslint-plugin-react-hooks globals
 
       - name: Lint
         run: npm run lint
