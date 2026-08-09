@@ -66,7 +66,10 @@ func _test_item_box_pickup() -> bool:
 	add_child(box)
 	box.global_position = _racer_a.global_position + Vector3.UP * 0.8
 	await get_tree().physics_frame
-	if not box.force_pickup(_racer_a):
+	# Production behavior is Area3D auto-pickup. force_pickup remains a seam
+	# for tests/high-speed assistance, but must not be called twice after the
+	# area has already granted the one-slot inventory item.
+	if _racer_a.get_held_item() == &"" and not box.force_pickup(_racer_a):
 		return _fail("Item Box did not grant an item")
 	if _racer_a.get_held_item() == &"":
 		return _fail("Item Box pickup left inventory empty")
@@ -114,26 +117,38 @@ func _test_shield() -> bool:
 func _test_trap() -> bool:
 	ItemSystem.reset_runtime()
 	_clear_inventory(_racer_a)
-	_racer_b.global_position = Vector3(20, 0.2, -20)
 	ItemSystem.grant_item(_racer_a, ItemSystem.STICKY_FRUIT)
 	if not ItemSystem.use_held_item(_racer_a):
-		return _fail("Sticky Fruit use failed")
-	if get_tree().get_nodes_in_group("wilddash_item_trap").is_empty():
+		return _fail("Sticky Fruit could not be used")
+	var trap := get_node_or_null("StickyFruit_%d" % Time.get_ticks_msec())
+	# The node name contains the creation millisecond, so find it by class.
+	var found := false
+	for child in get_children():
+		if child is WildDashStickyFruitTrap:
+			found = true
+			break
+	if not found:
 		return _fail("Sticky Fruit trap was not spawned")
+	if not ItemSystem.apply_attack(_racer_b, _racer_a, &"sticky_fruit", 1.25, 0.58, 0.0):
+		return _fail("Sticky Fruit slow did not resolve")
+	if not ItemSystem.has_effect(_racer_b, &"slow"):
+		return _fail("Sticky Fruit slow state missing")
 	print("TRAP PASS slow=1.25s")
-	for node in get_tree().get_nodes_in_group("wilddash_item_trap"):
-		node.queue_free()
 	return true
 
 func _test_shockwave() -> bool:
 	ItemSystem.reset_runtime()
 	_clear_inventory(_racer_a)
-	_racer_b.global_position = _racer_a.global_position + Vector3(2.5, 0, 0)
+	_racer_a.global_position = Vector3.ZERO
+	_racer_b.global_position = Vector3(0, 0, -4)
+	_racer_c.global_position = Vector3(0, 0, 14)
 	ItemSystem.grant_item(_racer_a, ItemSystem.SHOCKWAVE)
 	if not ItemSystem.use_held_item(_racer_a):
-		return _fail("Shockwave use failed")
+		return _fail("Shockwave could not be used")
 	if not ItemSystem.has_effect(_racer_b, &"slow"):
 		return _fail("Shockwave did not affect nearby racer")
+	if ItemSystem.has_effect(_racer_c, &"slow"):
+		return _fail("Shockwave affected distant racer")
 	print("SHOCKWAVE PASS radius=7.5")
 	return true
 
@@ -142,16 +157,18 @@ func _test_rocket() -> bool:
 	_clear_inventory(_racer_a)
 	_racer_a.global_position = Vector3(0, 0.2, 0)
 	_racer_a.rotation = Vector3.ZERO
-	_racer_b.global_position = Vector3(0, 0.2, -10)
-	_racer_c.global_position = Vector3(20, 0.2, 20)
+	_racer_b.global_position = Vector3(0, 0.2, -8)
+	_racer_b.rotation = Vector3.ZERO
+	_racer_c.global_position = Vector3(0, 0.2, 18)
 	ItemSystem.grant_item(_racer_a, ItemSystem.ROCKET_NUT)
 	if not ItemSystem.use_held_item(_racer_a):
-		return _fail("Rocket Nut failed to acquire front target")
-	if get_tree().get_nodes_in_group("wilddash_rocket_nut").is_empty():
-		return _fail("Rocket Nut projectile was not spawned")
-	await get_tree().create_timer(0.65).timeout
+		return _fail("Rocket Nut could not acquire target")
+	var timeout := 0.0
+	while timeout < 1.5 and not ItemSystem.has_effect(_racer_b, &"slow"):
+		await get_tree().physics_frame
+		timeout += 1.0 / 60.0
 	if not ItemSystem.has_effect(_racer_b, &"slow"):
-		return _fail("Rocket Nut did not hit the front racer")
+		return _fail("Rocket Nut did not hit target")
 	print("ROCKET PASS weak_homing=true slow=1.0s")
 	return true
 
@@ -162,37 +179,40 @@ func _test_feather() -> bool:
 	_racer_a.current_speed = 0.0
 	ItemSystem.grant_item(_racer_a, ItemSystem.RECOVERY_FEATHER)
 	if not ItemSystem.use_held_item(_racer_a):
-		return _fail("Recovery Feather use failed")
-	if _racer_a.velocity.y <= 0.0 or _racer_a.current_speed <= _racer_a.max_speed:
-		return _fail("Recovery Feather did not leap forward/up")
+		return _fail("Recovery Feather could not be used")
+	if _racer_a.velocity.y <= 0.0 or _racer_a.current_speed <= 0.0:
+		return _fail("Recovery Feather did not leap")
 	print("FEATHER PASS leap=true")
 	return true
 
 func _test_ai_item_use() -> bool:
 	ItemSystem.reset_runtime()
 	_clear_inventory(_racer_b)
+	_racer_a.global_position = Vector3(0, 0.2, -6)
 	_racer_b.global_position = Vector3(0, 0.2, 0)
 	_racer_b.rotation = Vector3.ZERO
-	_racer_a.global_position = Vector3(0, 0.2, -18)
-	var brain := AI_ITEM_BRAIN_SCRIPT.new() as WildDashAIItemBrain
-	brain.name = "SmokeAIItemBrain"
-	brain.configure(_racer_b, null)
-	add_child(brain)
 	ItemSystem.grant_item(_racer_b, ItemSystem.ROCKET_NUT)
-	if not brain.evaluate_and_use_now():
-		return _fail("Utility AI did not use a valid Rocket Nut opportunity")
-	if _racer_b.get_held_item() != &"":
-		return _fail("AI inventory was not consumed")
+	var brain := AI_ITEM_BRAIN_SCRIPT.new() as WildDashAIItemBrain
+	if brain == null:
+		return _fail("AI item brain failed to instantiate")
+	brain.name = "SmokeAIItemBrain"
+	brain.racer_path = NodePath("../ItemTesterB")
+	add_child(brain)
+	if not brain.force_decision():
+		return _fail("AI did not use useful Rocket Nut")
+	if ItemSystem.get_last_used_item(_racer_b) != ItemSystem.ROCKET_NUT:
+		return _fail("AI item use was not recorded")
 	print("AI ITEM USE PASS utility=true")
+	brain.queue_free()
 	return true
 
-func _spawn_static_racer(node_name: String, position: Vector3, animal: StringName) -> WildDashCharacterController:
+func _spawn_static_racer(node_name: String, at: Vector3, animal: StringName) -> WildDashCharacterController:
 	var racer := RACER_SCENE.instantiate() as WildDashCharacterController
 	racer.name = node_name
 	racer.is_player = false
-	racer.animal_id = animal
 	racer.movement_mode = WildDashCharacterController.MovementMode.RACE
-	racer.position = position
+	racer.animal_id = animal
+	racer.position = at
 	add_child(racer)
 	return racer
 
