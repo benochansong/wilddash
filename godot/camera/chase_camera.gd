@@ -21,9 +21,12 @@ func set_target(target: Node3D) -> void:
 func _process(delta: float) -> void:
 	if _target == null:
 		return
+	var reduced_motion := SettingsManager.is_reduced_motion()
+	var effective_look_ahead := 2.2 if reduced_motion else look_ahead
+	var effective_smoothing := 10.0 if reduced_motion else position_smoothing
 	var forward := -_target.global_transform.basis.z.normalized()
 	var desired_position := _target.global_position - forward * follow_distance + Vector3.UP * follow_height
-	var weight := 1.0 - exp(-position_smoothing * delta)
+	var weight := 1.0 - exp(-effective_smoothing * delta)
 	global_position = global_position.lerp(desired_position, weight)
-	var look_target := _target.global_position + forward * look_ahead + Vector3.UP * 1.0
+	var look_target := _target.global_position + forward * effective_look_ahead + Vector3.UP * 1.0
 	look_at(look_target, Vector3.UP)
