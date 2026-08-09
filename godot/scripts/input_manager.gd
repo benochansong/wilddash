@@ -15,7 +15,7 @@ func _ready() -> void:
 	_ensure_action(ACTION_BRAKE, [KEY_S, KEY_DOWN])
 	_ensure_action(ACTION_JUMP, [KEY_SPACE])
 	_ensure_action(ACTION_SKILL, [KEY_E])
-	_ensure_action(ACTION_ITEM, [KEY_Q])
+	_ensure_action(ACTION_ITEM, [KEY_Q], [JOY_BUTTON_B])
 
 func get_steer_axis() -> float:
 	return Input.get_axis(ACTION_LEFT, ACTION_RIGHT)
@@ -38,12 +38,28 @@ func consume_skill() -> bool:
 func consume_item() -> bool:
 	return Input.is_action_just_pressed(ACTION_ITEM)
 
-func _ensure_action(action: StringName, physical_keys: Array) -> void:
+func _ensure_action(action: StringName, physical_keys: Array, joy_buttons: Array = []) -> void:
 	if not InputMap.has_action(action):
 		InputMap.add_action(action)
-	if not InputMap.action_get_events(action).is_empty():
-		return
 	for key_code in physical_keys:
-		var event := InputEventKey.new()
-		event.physical_keycode = key_code
-		InputMap.action_add_event(action, event)
+		if not _has_physical_key(action, key_code):
+			var event := InputEventKey.new()
+			event.physical_keycode = key_code
+			InputMap.action_add_event(action, event)
+	for button_index in joy_buttons:
+		if not _has_joy_button(action, button_index):
+			var joy_event := InputEventJoypadButton.new()
+			joy_event.button_index = button_index
+			InputMap.action_add_event(action, joy_event)
+
+func _has_physical_key(action: StringName, key_code: int) -> bool:
+	for event in InputMap.action_get_events(action):
+		if event is InputEventKey and (event as InputEventKey).physical_keycode == key_code:
+			return true
+	return false
+
+func _has_joy_button(action: StringName, button_index: int) -> bool:
+	for event in InputMap.action_get_events(action):
+		if event is InputEventJoypadButton and (event as InputEventJoypadButton).button_index == button_index:
+			return true
+	return false
