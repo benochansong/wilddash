@@ -42,21 +42,21 @@ func _ready() -> void:
 		driver.avoidance_distance = 7.5
 		driver.set_race_route(_route_points)
 
-	# CI must validate the same 1.48 km checkpoint route without spending two
-	# real-time minutes in round one. A deterministic high-speed autopilot is
-	# attached only in headless mode; Windows/human play remains untouched.
+	# CI validates the same full route, but at a moderate accelerated pace.
+	# Keeping this below extreme tunneling speeds makes turns, checkpoint gates,
+	# obstacle avoidance and recovery exercise the production path reliably.
 	if headless:
-		var headless_driver := spawn_ai_driver(player, WildDashAIController.AIMode.RACE, 58.0, 0.0, 0.0)
-		headless_driver.steering_strength = 13.0
-		headless_driver.acceleration = 90.0
+		var headless_driver := spawn_ai_driver(player, WildDashAIController.AIMode.RACE, 36.0, 0.0, 0.0)
+		headless_driver.steering_strength = 10.0
+		headless_driver.acceleration = 65.0
 		headless_driver.avoidance_distance = 8.0
 		headless_driver.set_race_route(_route_points)
 		for driver in ai_drivers:
 			if driver == headless_driver:
 				continue
-			driver.target_speed *= 4.35
-			driver.acceleration = 88.0
-			driver.steering_strength = 12.0
+			driver.target_speed *= 2.65
+			driver.acceleration = 62.0
+			driver.steering_strength = 9.5
 
 	var camera := CHASE_CAMERA_SCRIPT.new() as Camera3D
 	if camera != null:
@@ -91,6 +91,10 @@ func _process(_delta: float) -> void:
 	hud.set_metrics("Rank %d/%d   CP %d/%d   Progress %d%%   Speed %.1f   FPS %d" % [rank, RaceManager.racers.size(), checkpoint_progress, checkpoint_total, roundi(progress_percent), player.current_speed, fps])
 
 func _physics_process(delta: float) -> void:
+	if RaceManager.active:
+		for racer in RaceManager.racers:
+			RaceManager.sync_checkpoint_from_position(racer)
+
 	if player != null and player.global_position.y < -28.0 and not player.finished:
 		player.reset_motion(RaceManager.get_respawn_position(player))
 		_orient_to_route(player)
