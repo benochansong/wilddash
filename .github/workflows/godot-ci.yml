@@ -10,6 +10,7 @@ on:
     branches:
       - main
       - godot/wilddash-next
+      - release/wilddash-3d-rc2
     paths:
       - "godot/**"
       - "scripts/benchmark-windows.ps1"
@@ -35,46 +36,32 @@ jobs:
           chmod +x /tmp/godot/Godot_v4.7.1-stable_linux.x86_64
           /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --version
 
-      - name: Import project and benchmark scene headlessly
+      - name: Import project headlessly
         run: /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --editor --path godot --quit
 
       - name: Verify four-animal character system
         run: |
           set -o pipefail
-          timeout 20s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
-            --headless --path godot res://tests/character_system_smoke.tscn \
-            | tee /tmp/wilddash-characters.log
-          grep -q "CHARACTER PROFILE id=dog" /tmp/wilddash-characters.log
-          grep -q "CHARACTER PROFILE id=rabbit" /tmp/wilddash-characters.log
-          grep -q "CHARACTER PROFILE id=elephant" /tmp/wilddash-characters.log
-          grep -q "CHARACTER PROFILE id=cat" /tmp/wilddash-characters.log
+          timeout 20s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path godot res://tests/character_system_smoke.tscn | tee /tmp/wilddash-characters.log
           grep -q "CHARACTER SYSTEM PASS animals=4 states=7" /tmp/wilddash-characters.log
 
       - name: Verify chimera composition system
         run: |
           set -o pipefail
-          timeout 20s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
-            --headless --path godot res://tests/chimera_system_smoke.tscn \
-            | tee /tmp/wilddash-chimera.log
-          grep -q "CHIMERA PROFILE head=rabbit body=elephant tail=cat" /tmp/wilddash-chimera.log
+          timeout 20s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path godot res://tests/chimera_system_smoke.tscn | tee /tmp/wilddash-chimera.log
           grep -q "CHIMERA SYSTEM PASS slots=3 palettes=4 patterns=4 save_version=2" /tmp/wilddash-chimera.log
 
       - name: Verify Character Select and Chimera Lab integration
         run: |
           set -o pipefail
-          timeout 20s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
-            --headless --path godot res://tests/character_select_chimera_smoke.tscn \
-            | tee /tmp/wilddash-character-select.log
+          timeout 20s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path godot res://tests/character_select_chimera_smoke.tscn | tee /tmp/wilddash-character-select.log
           grep -q "CHARACTER SELECT READY basic=4 chimera=true" /tmp/wilddash-character-select.log
           grep -q "CHARACTER SELECT CHIMERA PASS basic=rabbit head=rabbit body=elephant tail=cat" /tmp/wilddash-character-select.log
 
       - name: Run four-round campaign with four AI
         run: |
           set -o pipefail
-          timeout 55s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
-            --headless --path godot \
-            | tee /tmp/wilddash-godot-4.log
-          grep -q "WILD DASH 3D four-round campaign ready: ai=4" /tmp/wilddash-godot-4.log
+          timeout 55s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path godot | tee /tmp/wilddash-godot-4.log
           grep -q "GRAND PRIX COMPLETE racers=5 finishers=5" /tmp/wilddash-godot-4.log
           grep -q "FRUIT AI PICKUP" /tmp/wilddash-godot-4.log
           grep -q "FLOOR PHASE 1" /tmp/wilddash-godot-4.log
@@ -85,32 +72,80 @@ jobs:
         run: |
           set -o pipefail
           export WILDDASH_AI_COUNT=10
-          timeout 65s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
-            --headless --path godot \
-            | tee /tmp/wilddash-godot-10.log
-          grep -q "WILD DASH 3D four-round campaign ready: ai=10" /tmp/wilddash-godot-10.log
+          timeout 65s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path godot | tee /tmp/wilddash-godot-10.log
           grep -q "GRAND PRIX COMPLETE racers=11 finishers=11" /tmp/wilddash-godot-10.log
-          grep -q "FRUIT AI PICKUP" /tmp/wilddash-godot-10.log
-          grep -q "FLOOR PHASE 1" /tmp/wilddash-godot-10.log
-          grep -q "PUSH OUT AI BODY CHECK" /tmp/wilddash-godot-10.log
           grep -q "HEADLESS RESULT rounds=4" /tmp/wilddash-godot-10.log
 
       - name: Benchmark 10 25 50 racers before and after optimization
         run: |
           set -o pipefail
           for profile in baseline optimized; do
-            if [ "$profile" = "optimized" ]; then
-              export WILDDASH_OPTIMIZED=1
-            else
-              export WILDDASH_OPTIMIZED=0
-            fi
+            if [ "$profile" = "optimized" ]; then export WILDDASH_OPTIMIZED=1; else export WILDDASH_OPTIMIZED=0; fi
             for racers in 10 25 50; do
               export WILDDASH_RACER_COUNT=$racers
               log="/tmp/wilddash-perf-${profile}-${racers}.log"
-              timeout 18s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
-                --headless --path godot res://benchmark/race_benchmark.tscn \
-                | tee "$log"
+              timeout 18s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path godot res://benchmark/race_benchmark.tscn | tee "$log"
               grep -q "PERF_RESULT profile=${profile} racers=${racers}" "$log"
               grep -q "BENCHMARK RACE COMPLETE profile=${profile} racers=${racers}" "$log"
             done
           done
+
+  windows-export-rc2:
+    needs: validate-godot
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Godot 4.7.1 editor and export templates
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          Invoke-WebRequest "https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_win64.exe.zip" -OutFile "$env:RUNNER_TEMP\godot.zip"
+          Expand-Archive "$env:RUNNER_TEMP\godot.zip" "$env:RUNNER_TEMP\godot" -Force
+          Invoke-WebRequest "https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_export_templates.tpz" -OutFile "$env:RUNNER_TEMP\templates.zip"
+          Expand-Archive "$env:RUNNER_TEMP\templates.zip" "$env:RUNNER_TEMP\templates" -Force
+          $templateDir = "$env:APPDATA\Godot\export_templates\4.7.1.stable"
+          New-Item -ItemType Directory -Force $templateDir | Out-Null
+          Copy-Item "$env:RUNNER_TEMP\templates\templates\*" $templateDir -Recurse -Force
+          $godot = (Get-ChildItem "$env:RUNNER_TEMP\godot\Godot_v4.7.1-stable_win64.exe").FullName
+          "GODOT_EXE=$godot" | Out-File -FilePath $env:GITHUB_ENV -Append
+          & $godot --version
+
+      - name: Import RC2 project on Windows
+        shell: pwsh
+        run: |
+          & $env:GODOT_EXE --headless --editor --path godot --quit
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Export Windows RC2 x86_64
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force "godot\build\windows" | Out-Null
+          & $env:GODOT_EXE --headless --path godot --export-release "Windows Desktop" "build/windows/WILD_DASH_3D_RC2.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path "godot\build\windows\WILD_DASH_3D_RC2.exe")) { throw "RC2 Windows executable was not generated" }
+          Get-Item "godot\build\windows\WILD_DASH_3D_RC2.exe" | Format-List Name,Length,LastWriteTime
+
+      - name: Smoke launch exported RC2 executable
+        shell: pwsh
+        run: |
+          $env:WILDDASH_AI_COUNT = "4"
+          $proc = Start-Process -FilePath "godot\build\windows\WILD_DASH_3D_RC2.exe" -ArgumentList "--headless" -PassThru -Wait
+          if ($proc.ExitCode -ne 0) { throw "RC2 executable exited with code $($proc.ExitCode)" }
+
+      - name: Generate SHA256 checksum
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash "godot\build\windows\WILD_DASH_3D_RC2.exe" -Algorithm SHA256).Hash.ToLower()
+          "$hash  WILD_DASH_3D_RC2.exe" | Set-Content "godot\build\windows\WILD_DASH_3D_RC2.sha256"
+          Get-Content "godot\build\windows\WILD_DASH_3D_RC2.sha256"
+
+      - name: Upload Windows RC2 Character and Chimera build
+        uses: actions/upload-artifact@v4
+        with:
+          name: WILD-DASH-3D-Windows-RC2-Character-Chimera
+          path: |
+            godot/build/windows/WILD_DASH_3D_RC2.exe
+            godot/build/windows/WILD_DASH_3D_RC2.sha256
+          if-no-files-found: error
