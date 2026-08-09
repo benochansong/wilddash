@@ -10,6 +10,7 @@ const AI_PUSH_STRENGTH := 7.2
 
 var ai_alive: Array[bool] = []
 var ai_push_cooldowns: Array[float] = []
+var _logged_ai_body_check := false
 
 func _ready() -> void:
 	setup_mode(&"push_out", "FINAL — Push-Out Arena", "Space 또는 E로 밀치기 · 상대를 링 밖으로 밀어내세요")
@@ -40,12 +41,15 @@ func _physics_process(delta: float) -> void:
 	hud.set_metrics("Rivals %d/%d   Time %.1f" % [remaining, ai_racers.size(), time_remaining])
 
 	if _is_out(player):
+		print("PUSH OUT COMPLETE reason=player_out remaining=%d" % remaining)
 		finish_mode(false, remaining, {"rivals_remaining": remaining, "player_out": true})
 		return
 	if remaining <= 0:
+		print("PUSH OUT COMPLETE reason=all_rivals_out")
 		finish_mode(true, ai_racers.size(), {"rivals_remaining": 0})
 		return
 	if time_remaining <= 0.0:
+		print("PUSH OUT COMPLETE reason=timeout remaining=%d" % remaining)
 		finish_mode(false, ai_racers.size() - remaining, {"rivals_remaining": remaining, "timeout": true})
 
 func _create_ring() -> void:
@@ -95,6 +99,9 @@ func _update_ai(delta: float) -> void:
 			racer.apply_knockback(-direction, 2.4)
 			ai_push_cooldowns[i] = 1.35 + float(i % 3) * 0.18
 			hud.set_message("AI body check! Use Space/E to shove back")
+			if not _logged_ai_body_check:
+				_logged_ai_body_check = true
+				print("PUSH OUT AI BODY CHECK racer=%s distance=%.2f" % [racer.name, distance])
 
 func _on_player_push() -> void:
 	if mode_finished or player == null:
