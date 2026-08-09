@@ -62,6 +62,8 @@ func spawn_racer(
 	racers.append(racer)
 	if is_player_character:
 		player = racer
+		if hud != null:
+			hud.bind_character(racer)
 	else:
 		ai_racers.append(racer)
 	return racer
