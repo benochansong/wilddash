@@ -7,11 +7,13 @@ extends Node
 @export var lane_wander := 0.7
 @export var steering_strength := 4.2
 @export var acceleration := 12.0
-@export var avoidance_distance := 5.5
+@export var avoidance_distance := 6.5
 
 var _racer: WildDashCharacterController
 var _phase := 0.0
 var _avoidance_sign := 1.0
+var _stuck_seconds := 0.0
+var _last_progress := 0.0
 
 func _ready() -> void:
 	_racer = get_node_or_null(racer_path) as WildDashCharacterController
@@ -19,28 +21,40 @@ func _ready() -> void:
 	_avoidance_sign = -1.0 if randf() < 0.5 else 1.0
 	if _racer != null:
 		_racer.is_player = false
+		_last_progress = RaceManager.get_test_track_progress(_racer)
 
 func _physics_process(delta: float) -> void:
 	if _racer == null or _racer.finished or not RaceManager.active:
 		return
 
+	var obstacle_ahead := _has_obstacle_ahead()
 	var desired_x := preferred_lane + sin(Time.get_ticks_msec() * 0.0016 + _phase) * lane_wander
-	if _has_obstacle_ahead():
-		desired_x += _avoidance_sign * 3.2
+	if obstacle_ahead:
+		desired_x += _avoidance_sign * 3.8
+		if _racer.is_on_floor():
+			_racer.velocity.y = _racer.jump_velocity * 0.88
 	else:
 		_avoidance_sign = 1.0 if preferred_lane >= _racer.global_position.x else -1.0
-	desired_x = clampf(desired_x, -7.2, 7.2)
 
+	var progress := RaceManager.get_test_track_progress(_racer)
+	if progress - _last_progress < 0.04:
+		_stuck_seconds += delta
+	else:
+		_stuck_seconds = maxf(0.0, _stuck_seconds - delta * 2.0)
+	_last_progress = progress
+
+	if _stuck_seconds > 1.0:
+		_avoidance_sign *= -1.0
+		desired_x += _avoidance_sign * 4.8
+		_stuck_seconds = 0.0
+
+	desired_x = clampf(desired_x, -7.2, 7.2)
 	var error_x := desired_x - _racer.global_position.x
-	var desired_direction := Vector3(clampf(error_x * 0.18, -0.72, 0.72), 0.0, -1.0).normalized()
+	var desired_direction := Vector3(clampf(error_x * 0.2, -0.8, 0.8), 0.0, -1.0).normalized()
 	var target_yaw := atan2(-desired_direction.x, -desired_direction.z)
 	_racer.rotation.y = lerp_angle(_racer.rotation.y, target_yaw, clampf(steering_strength * delta, 0.0, 1.0))
 
-	var speed_goal := target_speed
-	if _racer.get_slide_collision_count() > 0:
-		speed_goal *= 0.72
-	_racer.current_speed = move_toward(_racer.current_speed, speed_goal, acceleration * delta)
-
+	_racer.current_speed = move_toward(_racer.current_speed, target_speed, acceleration * delta)
 	var forward := -_racer.global_transform.basis.z.normalized()
 	_racer.velocity.x = forward.x * _racer.current_speed
 	_racer.velocity.z = forward.z * _racer.current_speed
@@ -49,6 +63,9 @@ func _physics_process(delta: float) -> void:
 	elif _racer.velocity.y < 0.0:
 		_racer.velocity.y = 0.0
 	_racer.move_and_slide()
+
+	if _racer.has_blocking_collision():
+		_racer.current_speed *= 0.9
 
 func _has_obstacle_ahead() -> bool:
 	if _racer == null or _racer.get_world_3d() == null:
