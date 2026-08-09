@@ -69,7 +69,7 @@ func set_reduced_motion(value: bool) -> void:
 func set_high_contrast(value: bool) -> void:
 	_set_accessibility_value("high_contrast", value)
 
-func rebind_keyboard(action: StringName, keycode: Key) -> bool:
+func rebind_keyboard(action: StringName, keycode: int) -> bool:
 	if not InputManager.rebind_keyboard(action, keycode):
 		return false
 	var controls: Dictionary = settings.get("controls", {})
