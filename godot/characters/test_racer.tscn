@@ -1,32 +1,24 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://characters/character_controller.gd" id="1_controller"]
-
-[sub_resource type="StandardMaterial3D" id="Material_player"]
-albedo_color = Color(0.34, 0.92, 0.55, 1)
-roughness = 0.72
-
-[sub_resource type="CapsuleMesh" id="CapsuleMesh_player"]
-material = SubResource("Material_player")
-radius = 0.65
-height = 1.9
+[ext_resource type="PackedScene" path="res://characters/visuals/test_visual.tscn" id="2_visual"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape_player"]
 radius = 0.65
 height = 1.9
 
-[node name="TestRacer" type="CharacterBody3D" groups=["player_racer"]]
+[node name="CharacterRoot" type="CharacterBody3D" groups=["player_racer"]]
 script = ExtResource("1_controller")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 position = Vector3(0, 0.95, 0)
 shape = SubResource("CapsuleShape_player")
 
-[node name="BodyMesh" type="MeshInstance3D" parent="."]
-position = Vector3(0, 0.95, 0)
-mesh = SubResource("CapsuleMesh_player")
+[node name="VisualModel" parent="." instance=ExtResource("2_visual")]
 
-[node name="Camera3D" type="Camera3D" parent="."]
+[node name="CameraRig" type="Node3D" parent="."]
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig"]
 position = Vector3(0, 4.8, 8.5)
 rotation_degrees = Vector3(-18, 0, 0)
 current = true
