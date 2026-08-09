@@ -52,8 +52,8 @@ func consume_item() -> bool:
 func consume_pause() -> bool:
 	return Input.is_action_just_pressed(ACTION_PAUSE)
 
-func rebind_keyboard(action: StringName, physical_keycode: Key) -> bool:
-	if action not in GAME_ACTIONS:
+func rebind_keyboard(action: StringName, physical_keycode: int) -> bool:
+	if action not in GAME_ACTIONS or physical_keycode == int(KEY_NONE):
 		return false
 	var events: Array[InputEvent] = InputMap.action_get_events(action)
 	for event: InputEvent in events:
@@ -84,8 +84,8 @@ func apply_keyboard_bindings(bindings: Dictionary) -> void:
 		var raw_key: Variant = bindings[action_text]
 		if typeof(raw_key) != TYPE_INT and typeof(raw_key) != TYPE_FLOAT:
 			continue
-		var keycode := Key(int(raw_key))
-		if keycode != KEY_NONE:
+		var keycode: int = int(raw_key)
+		if keycode != int(KEY_NONE):
 			rebind_keyboard(action, keycode)
 
 func get_keyboard_binding_text(action: StringName) -> String:
@@ -121,7 +121,7 @@ func _add_default_keyboard(action: StringName) -> void:
 	var codes: Array = DEFAULT_KEYS.get(String(action), [])
 	for code: Variant in codes:
 		var event := InputEventKey.new()
-		event.physical_keycode = Key(int(code))
+		event.physical_keycode = int(code)
 		InputMap.action_add_event(action, event)
 
 func _add_default_gamepad() -> void:
