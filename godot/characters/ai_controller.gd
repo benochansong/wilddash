@@ -4,7 +4,7 @@ extends Node
 @export var racer_path: NodePath
 @export var target_speed := 10.4
 @export var preferred_lane := 0.0
-@export var lane_wander := 0.7
+@export var lane_wander := 0.2
 @export var steering_strength := 4.2
 @export var acceleration := 12.0
 @export var avoidance_distance := 6.5
@@ -17,11 +17,11 @@ var _last_progress := 0.0
 
 func _ready() -> void:
 	_racer = get_node_or_null(racer_path) as WildDashCharacterController
-	_phase = randf_range(0.0, TAU)
-	_avoidance_sign = -1.0 if randf() < 0.5 else 1.0
-	if _racer != null:
-		_racer.is_player = false
-		_last_progress = RaceManager.get_test_track_progress(_racer)
+	if _racer == null:
+		return
+	_racer.is_player = false
+	_last_progress = RaceManager.get_test_track_progress(_racer)
+	_configure_deterministic_personality(_racer.animal_id)
 
 func _physics_process(delta: float) -> void:
 	if _racer == null or _racer.finished or not RaceManager.active:
@@ -48,7 +48,7 @@ func _physics_process(delta: float) -> void:
 		desired_x += _avoidance_sign * 4.8
 		_stuck_seconds = 0.0
 
-	desired_x = clampf(desired_x, -7.2, 7.2)
+	desired_x = clampf(desired_x, -8.0, 8.0)
 	var error_x := desired_x - _racer.global_position.x
 	var desired_direction := Vector3(clampf(error_x * 0.2, -0.8, 0.8), 0.0, -1.0).normalized()
 	var target_yaw := atan2(-desired_direction.x, -desired_direction.z)
@@ -66,6 +66,21 @@ func _physics_process(delta: float) -> void:
 
 	if _racer.has_blocking_collision():
 		_racer.current_speed *= 0.9
+
+func _configure_deterministic_personality(id: StringName) -> void:
+	match id:
+		&"rabbit":
+			_phase = 0.6
+			_avoidance_sign = -1.0
+		&"elephant":
+			_phase = 2.2
+			_avoidance_sign = 1.0
+		&"cat":
+			_phase = 4.4
+			_avoidance_sign = -1.0
+		_:
+			_phase = 0.0
+			_avoidance_sign = 1.0
 
 func _has_obstacle_ahead() -> bool:
 	if _racer == null or _racer.get_world_3d() == null:
