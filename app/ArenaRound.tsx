@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { inputManager, type InputAction } from "../game/input/InputManager";
 
 export type ArenaMode = "fruit" | "survival" | "final";
 
@@ -26,7 +27,6 @@ export function ArenaRound({ mode, hero, difficulty, sound, haptics, onComplete 
   const info = MODE_INFO[mode];
   const scale = difficulty === "wild" ? .9 : difficulty === "chaos" ? 1 : 1.15;
   const [view, setView] = useState({ x: 50, y: 72, time: Number(info.time), score: 0, hearts: 3, flash: "", shove: 0 });
-  const keys = useRef<Record<string, boolean>>({});
   const state = useRef({
     x: 50, y: 72, time: Number(info.time), score: 0, hearts: 3, immune: 0, shove: 0, flash: "", done: false,
     fruit: Array.from({ length: 12 }, (_, i) => ({ id: i, x: 10 + ((i * 31) % 80), y: 12 + ((i * 47) % 70), active: true, respawn: 0, emoji: FRUIT[i % FRUIT.length] })),
@@ -46,12 +46,7 @@ export function ArenaRound({ mode, hero, difficulty, sound, haptics, onComplete 
     });
   }, [haptics, sound]);
 
-  useEffect(() => {
-    const down = (e: KeyboardEvent) => { keys.current[e.key.toLowerCase()] = true; if (e.key.toLowerCase() === "e" || e.key === " ") shove(); };
-    const up = (e: KeyboardEvent) => { keys.current[e.key.toLowerCase()] = false; };
-    window.addEventListener("keydown", down); window.addEventListener("keyup", up);
-    return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); };
-  }, [shove]);
+  useEffect(() => inputManager.activate(`arena:${mode}`, { onJump: shove, onSkill: shove }), [mode, shove]);
 
   useEffect(() => {
     let frame = 0; let last = performance.now();
@@ -60,8 +55,8 @@ export function ArenaRound({ mode, hero, difficulty, sound, haptics, onComplete 
       const s = state.current;
       if (s.done) return;
       s.time = Math.max(0, s.time - dt); s.immune = Math.max(0, s.immune - dt); s.shove = Math.max(0, s.shove - dt);
-      const dx = (keys.current["d"] || keys.current["arrowright"] ? 1 : 0) - (keys.current["a"] || keys.current["arrowleft"] ? 1 : 0);
-      const dy = (keys.current["s"] || keys.current["arrowdown"] ? 1 : 0) - (keys.current["w"] || keys.current["arrowup"] ? 1 : 0);
+      const dx = (inputManager.isPressed("right") ? 1 : 0) - (inputManager.isPressed("left") ? 1 : 0);
+      const dy = (inputManager.isPressed("down") ? 1 : 0) - (inputManager.isPressed("up") ? 1 : 0);
       const len = Math.hypot(dx, dy) || 1;
       s.x += dx / len * 34 * dt; s.y += dy / len * 34 * dt;
       s.x = Math.max(4, Math.min(96, s.x)); s.y = Math.max(5, Math.min(94, s.y));
@@ -117,7 +112,7 @@ export function ArenaRound({ mode, hero, difficulty, sound, haptics, onComplete 
   }, [haptics, info.time, mode, onComplete, scale]);
 
   const tilePhase=Math.floor((info.time-view.time)/2.25);
-  const press=(key:string,value:boolean)=>{keys.current[key]=value};
+  const press=(action:InputAction,value:boolean)=>inputManager.setExternalAction("arena-touch",action,value);
   return <section className={`arena-page arena-${mode}`}>
     <div className="arena-head"><div><small>{info.round}</small><h2>{info.title}</h2><p>{info.mission}</p></div><div className="arena-stat">{mode==="fruit"?<>🍎 <b>{view.score}/8</b></>:mode==="survival"?<>❤️ <b>{view.hearts}</b></>:<>🏆 <b>{state.current.bots.length}명</b></>}<span>{view.time.toFixed(1)}초</span></div></div>
     <div className={`mini-arena ${view.flash?"impact":""}`}>
@@ -129,6 +124,6 @@ export function ArenaRound({ mode, hero, difficulty, sound, haptics, onComplete 
       {view.flash&&<div className="arena-flash">{view.flash}</div>}
     </div>
     <div className="arena-help"><span>이동 WASD / 방향키</span><span>밀치기 SPACE 또는 E</span></div>
-    <div className="arena-mobile"><div className="dpad"><button onPointerDown={()=>press("w",true)} onPointerUp={()=>press("w",false)}>▲</button><button onPointerDown={()=>press("a",true)} onPointerUp={()=>press("a",false)}>◀</button><button onPointerDown={()=>press("s",true)} onPointerUp={()=>press("s",false)}>▼</button><button onPointerDown={()=>press("d",true)} onPointerUp={()=>press("d",false)}>▶</button></div><button className="shove-button" onPointerDown={shove}>밀치기!</button></div>
+    <div className="arena-mobile"><div className="dpad"><button onPointerDown={()=>press("up",true)} onPointerUp={()=>press("up",false)}>▲</button><button onPointerDown={()=>press("left",true)} onPointerUp={()=>press("left",false)}>◀</button><button onPointerDown={()=>press("down",true)} onPointerUp={()=>press("down",false)}>▼</button><button onPointerDown={()=>press("right",true)} onPointerUp={()=>press("right",false)}>▶</button></div><button className="shove-button" onPointerDown={()=>inputManager.trigger("skill")}>밀치기!</button></div>
   </section>;
 }

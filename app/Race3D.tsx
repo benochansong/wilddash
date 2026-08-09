@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { inputManager, type InputAction } from "../game/input/InputManager";
 
 type AnimalKey = "dog" | "rabbit" | "elephant" | "cat";
 type DifficultyKey = "wild" | "chaos" | "nightmare";
@@ -42,7 +43,6 @@ const obstacleLateral=(o:{lateral:number;type:string;id:number},time:number)=>o.
 
 export function Race3D({animal,hero,difficulty,sound,haptics,reducedMotion,onFinish}:Props){
   const canvasRef=useRef<HTMLCanvasElement>(null);
-  const keys=useRef<Record<string,boolean>>({});
   const [view,setView]=useState({rank:25,time:0,speed:0,progress:0,skillCd:5,item:null as ItemKey,flash:"출발 보호 · 스킬 5초 잠금",section:SECTIONS[0].name as string});
   const seed=useRef(Math.floor(Math.random()*9999));
   const game=useRef({
@@ -80,10 +80,7 @@ export function Race3D({animal,hero,difficulty,sound,haptics,reducedMotion,onFin
 
   const jump=useCallback(()=>{const g=game.current;if(g.jump<=1){g.vJump=285;feedback(640,.07)}else if(animal==="rabbit"&&g.jump<75&&g.vJump<80){g.vJump=245;g.s+=150;g.flash="🐰 이단 점프 +150m";feedback(850,.07)}},[animal,feedback]);
 
-  useEffect(()=>{
-    const down=(e:KeyboardEvent)=>{keys.current[e.key.toLowerCase()]=true;if(e.key===" "){e.preventDefault();jump()}if(e.key.toLowerCase()==="e")activateSkill();if(e.key.toLowerCase()==="q")activateItem()};
-    const up=(e:KeyboardEvent)=>{keys.current[e.key.toLowerCase()]=false};window.addEventListener("keydown",down);window.addEventListener("keyup",up);return()=>{window.removeEventListener("keydown",down);window.removeEventListener("keyup",up)};
-  },[jump,activateItem,activateSkill]);
+  useEffect(()=>inputManager.activate("race3d",{onJump:jump,onSkill:activateSkill,onItem:activateItem}),[jump,activateItem,activateSkill]);
 
   useEffect(()=>{
     const canvas=canvasRef.current;if(!canvas)return;const ctx=canvas.getContext("2d");if(!ctx)return;
@@ -109,7 +106,7 @@ export function Race3D({animal,hero,difficulty,sound,haptics,reducedMotion,onFin
       const fog=ctx.createLinearGradient(0,h*.22,0,h*.55);fog.addColorStop(0,"rgba(255,255,255,.48)");fog.addColorStop(1,"rgba(255,255,255,0)");ctx.fillStyle=fog;ctx.fillRect(0,h*.2,w,h*.38);
     };
     const loop=(now:number)=>{const g=game.current;const dt=Math.min(.035,(now-last)/1000);last=now;if(g.finished)return;g.time+=dt;g.skillCd=Math.max(0,g.skillCd-dt);g.boost=Math.max(0,g.boost-dt);g.shield=Math.max(0,g.shield-dt);g.phase=Math.max(0,g.phase-dt);g.hit=Math.max(0,g.hit-dt);
-      const steer=(keys.current["d"]||keys.current["arrowright"]?1:0)-(keys.current["a"]||keys.current["arrowleft"]?1:0);g.lateral+=steer*850*dt;g.lateral=Math.max(-TRACK_WIDTH*.46,Math.min(TRACK_WIDTH*.46,g.lateral));const accelerate=keys.current["w"]||keys.current["arrowup"];const brake=keys.current["s"]||keys.current["arrowdown"];let target=accelerate?SPRINT_SPEED:CRUISE_SPEED;if(brake)target=BRAKE_SPEED;if(g.boost>0)target*=1.1;if(g.hit>0)target*=.72;g.speed+=(target-g.speed)*dt*4.4;g.s+=g.speed*dt;
+      const steer=(inputManager.isPressed("right")?1:0)-(inputManager.isPressed("left")?1:0);g.lateral+=steer*850*dt;g.lateral=Math.max(-TRACK_WIDTH*.46,Math.min(TRACK_WIDTH*.46,g.lateral));const accelerate=inputManager.isPressed("up");const brake=inputManager.isPressed("down");let target=accelerate?SPRINT_SPEED:CRUISE_SPEED;if(brake)target=BRAKE_SPEED;if(g.boost>0)target*=1.1;if(g.hit>0)target*=.72;g.speed+=(target-g.speed)*dt*4.4;g.s+=g.speed*dt;
       g.vJump-=620*dt;g.jump=Math.max(0,g.jump+g.vJump*dt);if(g.jump===0&&g.vJump<0)g.vJump=0;
       g.obstacles.forEach(o=>{if(g.crossed.has(o.id))return;if(Math.abs(g.s-o.s)<90&&Math.abs(g.lateral-obstacleLateral(o,g.time))<52){g.crossed.add(o.id);if(o.type==="ramp"){g.vJump=310;g.flash="🔺 램프 점프!"}else if(g.jump<26&&g.phase<=0){if(g.shield>0){g.shield=0;g.flash="방어 성공!"}else{g.hit=.65;g.speed*=.72;g.bumps++;g.flash=`${o.type==="mud"?"진흙탕":"장애물"} 충돌!`;feedback(130,.16)}}}});
       g.boxes.forEach((b,i)=>{if(!b.taken&&Math.abs(g.s-b.s)<90&&Math.abs(g.lateral-b.lateral)<54){b.taken=true;const pool:Exclude<ItemKey,null>[]=g.ai.filter(a=>a.s>g.s).length>30?["shield","magnet","ink","magnet"]:["banana","shield","ink","magnet"];g.item=pool[i%pool.length];g.flash=`${ITEMS[g.item]} 아이템 획득`;feedback(920,.08)}});
@@ -121,13 +118,13 @@ export function Race3D({animal,hero,difficulty,sound,haptics,reducedMotion,onFin
     frame=requestAnimationFrame(loop);return()=>cancelAnimationFrame(frame);
   },[animal,difficulty,feedback,hero,onFinish,reducedMotion]);
 
-  const press=(key:string,value:boolean)=>{keys.current[key]=value};
+  const press=(action:InputAction,value:boolean)=>inputManager.setExternalAction("race3d-touch",action,value);
   return <section className="race3d-page">
     <canvas ref={canvasRef} className="race3d-canvas" aria-label="위에서 내려다보는 3D 파티 동물 레이싱 경기장"/>
     <div className="race3d-hud"><div className="race3d-rank"><small>POSITION</small><b>{view.rank}<sup>위</sup></b><span>/ 50</span></div><div className="race3d-progress"><span>{view.section}</span><i><em style={{width:`${view.progress*100}%`}}/></i><small>넓은 플랫폼 · 장애물 건틀릿 · 복수 경로</small></div><div className="race3d-speed"><b>{Math.round(view.speed)}</b><small>5X SPEED</small></div></div>
     <div className="camera-badge">🎥 OVERHEAD PARTY CAM · 5X</div>
     {view.flash&&<div className="race3d-flash">{view.flash}</div>}
-    <div className="race3d-bottom"><div className="race3d-skill"><span>{animal==="dog"?"🐶":animal==="rabbit"?"🐰":animal==="elephant"?"🐘":"🐱"}</span><div><small>E · {view.skillCd>0&&view.time<5?"START LOCK":"ACTIVE"}</small><b>{SKILLS[animal].name}</b><i><em style={{width:`${Math.max(0,100-view.skillCd/SKILLS[animal].cooldown*100)}%`}}/></i></div><strong>{view.skillCd>0?view.skillCd.toFixed(1):"READY"}</strong></div><button className="race3d-item" onClick={activateItem}><small>Q · ITEM</small><b>{view.item?ITEMS[view.item]:"?"}</b></button></div>
-    <div className="race3d-controls"><div><button onPointerDown={()=>press("a",true)} onPointerUp={()=>press("a",false)} onPointerCancel={()=>press("a",false)}>◀</button><button onPointerDown={()=>press("d",true)} onPointerUp={()=>press("d",false)} onPointerCancel={()=>press("d",false)}>▶</button></div><button onPointerDown={()=>press("w",true)} onPointerUp={()=>press("w",false)} onPointerCancel={()=>press("w",false)}>가속</button><button onClick={jump}>점프</button><button onClick={activateSkill}>스킬</button><button onClick={activateItem}>아이템</button></div>
+    <div className="race3d-bottom"><div className="race3d-skill"><span>{animal==="dog"?"🐶":animal==="rabbit"?"🐰":animal==="elephant"?"🐘":"🐱"}</span><div><small>E · {view.skillCd>0&&view.time<5?"START LOCK":"ACTIVE"}</small><b>{SKILLS[animal].name}</b><i><em style={{width:`${Math.max(0,100-view.skillCd/SKILLS[animal].cooldown*100)}%`}}/></i></div><strong>{view.skillCd>0?view.skillCd.toFixed(1):"READY"}</strong></div><button className="race3d-item" onClick={()=>inputManager.trigger("item")}><small>Q · ITEM</small><b>{view.item?ITEMS[view.item]:"?"}</b></button></div>
+    <div className="race3d-controls"><div><button onPointerDown={()=>press("left",true)} onPointerUp={()=>press("left",false)} onPointerCancel={()=>press("left",false)}>◀</button><button onPointerDown={()=>press("right",true)} onPointerUp={()=>press("right",false)} onPointerCancel={()=>press("right",false)}>▶</button></div><button onPointerDown={()=>press("up",true)} onPointerUp={()=>press("up",false)} onPointerCancel={()=>press("up",false)}>가속</button><button onClick={()=>inputManager.trigger("jump")}>점프</button><button onClick={()=>inputManager.trigger("skill")}>스킬</button><button onClick={()=>inputManager.trigger("item")}>아이템</button></div>
   </section>;
 }

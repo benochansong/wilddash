@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArenaRound, type ArenaMode } from "./ArenaRound";
 import { Tutorial } from "./Tutorial";
 import { Race3D } from "./Race3D";
+import { inputManager } from "../game/input/InputManager";
 
 type Screen = "lobby" | "tutorial" | "lab" | "pick" | "countdown" | "race" | "roundBreak" | "fruit" | "survival" | "final" | "result";
 type AnimalKey = "dog" | "rabbit" | "elephant" | "cat";
@@ -123,7 +124,6 @@ export default function Home() {
   const [countdown, setCountdown] = useState(3);
   const [snapshot, setSnapshot] = useState({ x: 0, y: 176, z: 0, speed: 0, rank: 50, time: 0, item: null as ItemKey, cooldown: 0, boost: 0, shield: 0, hit: 0, confused: 0, danger: 0, bumps: 0, flash: "" });
   const [result, setResult] = useState({ rank: 1, time: 0, bumps: 0 });
-  const keys = useRef<Record<string, boolean>>({});
   const game = useRef(createRace(difficulty));
 
   useEffect(() => {
@@ -205,17 +205,9 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const down = (e: KeyboardEvent) => {
-      keys.current[e.key.toLowerCase()] = true;
-      if ([" ", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(e.key.toLowerCase())) e.preventDefault();
-      if (e.key === " ") doJump();
-      if (e.key.toLowerCase() === "e") activateSkill();
-      if (e.key.toLowerCase() === "q") activateItem();
-    };
-    const up = (e: KeyboardEvent) => { keys.current[e.key.toLowerCase()] = false; };
-    window.addEventListener("keydown", down); window.addEventListener("keyup", up);
-    return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); };
-  }, [doJump, activateItem, activateSkill]);
+    if (screen !== "race" || ENABLE_3D_RACE) return;
+    return inputManager.activate("legacy-race", { onJump: doJump, onSkill: activateSkill, onItem: activateItem });
+  }, [screen, doJump, activateItem, activateSkill]);
 
   useEffect(() => {
     if (screen !== "race" || ENABLE_3D_RACE) return;
@@ -224,15 +216,15 @@ export default function Home() {
       const dt = Math.min((now - last) / 1000, 0.035); last = now;
       const g = game.current; const config = DIFFICULTIES[difficulty]; const ramp = 1 + (g.x / TRACK_LENGTH) * .2;
       g.time += dt; g.cooldown = Math.max(0, g.cooldown - dt); g.boost = Math.max(0, g.boost - dt); g.shield = Math.max(0, g.shield - dt); g.hit = Math.max(0, g.hit - dt); g.confused = Math.max(0, g.confused - dt); g.collisionLock = Math.max(0, g.collisionLock - dt);
-      const forward = keys.current["d"] || keys.current["arrowright"];
-      const brake = keys.current["a"] || keys.current["arrowleft"];
+      const forward = inputManager.isPressed("right");
+      const brake = inputManager.isPressed("left");
       const baseTarget = forward ? 4.65 : 3.0;
       const target = baseTarget * (1 + (g.boost>0 ? g.boostPower : 0));
       g.speed += (target - g.speed) * dt * 3.8;
       if (brake) g.speed *= 0.97;
       g.speed=Math.min(5.55,g.speed);
       if (g.hit > 0) g.speed *= 0.94;
-      let vertical = (keys.current["s"] || keys.current["arrowdown"] ? 1 : 0) - (keys.current["w"] || keys.current["arrowup"] ? 1 : 0);
+      let vertical = (inputManager.isPressed("down") ? 1 : 0) - (inputManager.isPressed("up") ? 1 : 0);
       if (g.confused > 0) vertical *= -1;
       g.y = Math.max(85, Math.min(267, g.y + vertical * 150 * dt));
       g.vz -= 25 * dt; g.z = Math.max(0, g.z + g.vz * 10 * dt); if (g.z === 0 && g.vz < 0) g.vz = 0;
@@ -342,7 +334,7 @@ export default function Home() {
         <div className="race-hud"><div className="rank-box"><small>CURRENT</small><b>{snapshot.rank}<sup>위</sup></b><span>/ 50</span></div><div className="progress-wrap"><span>START</span><div className="progress"><i style={{width:`${Math.min(100,snapshot.x/TRACK_LENGTH*100)}%`}}/><em style={{left:`${Math.min(98,snapshot.x/TRACK_LENGTH*100)}%`}}>{ANIMALS[animal].emoji}</em></div><span>FINISH</span></div><div className="timer">⏱ <b>{snapshot.time.toFixed(1)}</b></div><div className={`danger-meter ${snapshot.danger>=4?"hot":""}`}><small>주변 위협</small><b>{"!".repeat(Math.min(5,snapshot.danger)) || "안전"}</b></div></div>
         <div className="track-window"><div className="speed-lines"/><div className="sky"><i/><i/><i/></div><div className="track" style={{transform:`translateX(${-camera}px)`}}><div className="lane-lines"><i/><i/></div>{Array.from({length:12},(_,i)=><div className="track-sign" key={i} style={{left:i*400+180}}>{i%3===0?"⚡":i%3===1?"🌴":"⭐"}</div>)}{game.current.course.map((o,i)=><div key={i} className={`obstacle ${o.kind}`} style={{left:o.x,top:LANES[o.lane]-25}}>{o.kind==="log"?"🪵":"🟤"}</div>)}{ROUTES.map((r,i)=><div key={r.x} className={`route-gate route-${r.animal} ${game.current.crossed.has(500+i)?"used":""}`} style={{left:r.x,top:LANES[r.lane]-33}}><b>{r.icon}</b><span>{r.label}</span></div>)}{SWEEPERS.map((x,i)=><div key={x} className="sweeper" style={{left:x,top:176+Math.sin(snapshot.time*(1.7+i*.18)+i)*86}}>🌀</div>)}{game.current.bananas.map((b,i)=><div key={`${b.x}-${i}`} className={`banana-trap ${b.owner}`} style={{left:b.x,top:b.y}}>🍌</div>)}{game.current.boxes.map((x,i)=><div key={x} className={`item-box ${game.current.crossed.has(100+i)?"taken":""}`} style={{left:x,top:LANES[(i+1+game.current.variant)%3]-25}}>?</div>)}<div className="finish-line" style={{left:TRACK_LENGTH}}><span>FINISH</span></div>{game.current.ai.map((a,i)=><div className={`ai-racer ${a.attacking?"attacking":""} ${a.stun>0?"stunned":""}`} key={i} style={{left:a.x,top:a.y,transform:`translateY(-50%) scale(${.72+(a.y/900)})`}}><span>{a.emoji}</span><i>{a.attacking?"⚠ ATTACK":i+2}</i>{a.attacking&&<em className="attack-telegraph"/>}</div>)}<div className={`player-racer ${snapshot.hit>0?"hit":""} ${snapshot.confused>0?"confused":""}`} style={{left:snapshot.x,top:snapshot.y,transform:`translateY(calc(-50% - ${snapshot.z}px))`}}><div className="player-shadow" style={{transform:`translateY(${snapshot.z}px) scale(${Math.max(.5,1-snapshot.z/130)})`}}/><Chimera {...parts} small/><b>YOU</b>{snapshot.shield>0&&<span className="shield-aura"/>}</div></div>{snapshot.flash&&<div className="game-flash">{snapshot.flash}</div>}{snapshot.confused>0&&<div className="confused-alert">↔ 조작 반전!</div>}</div>
         <div className="race-bottom"><div className="skill-card"><span>{ANIMALS[animal].emoji}</span><div><small>E · ACTIVE SKILL</small><b>{ANIMALS[animal].skill}</b><i><em style={{width:`${Math.max(0,100-snapshot.cooldown/ANIMALS[animal].cooldown*100)}%`}}/></i></div><strong>{snapshot.cooldown>0?Math.ceil(snapshot.cooldown):"READY"}</strong></div><button className={`item-slot ${snapshot.item?"ready":""}`} onClick={activateItem}><small>Q · {snapshot.item?ITEM_INFO[snapshot.item].level:"ITEM"}</small><b>{snapshot.item?ITEM_INFO[snapshot.item].emoji:"?"}</b><span>{snapshot.item?ITEM_INFO[snapshot.item].description:"비어 있음"}</span></button></div>
-        <div className="mobile-controls"><div className="mobile-steer"><small>AUTO RUN</small><button onPointerDown={()=>keys.current["w"]=true} onPointerUp={()=>keys.current["w"]=false} onPointerCancel={()=>keys.current["w"]=false}>▲</button><button onPointerDown={()=>keys.current["s"]=true} onPointerUp={()=>keys.current["s"]=false} onPointerCancel={()=>keys.current["s"]=false}>▼</button></div><button onPointerDown={()=>keys.current["d"]=true} onPointerUp={()=>keys.current["d"]=false} onPointerCancel={()=>keys.current["d"]=false}>BOOST</button><button onClick={doJump}>JUMP</button><button onClick={activateSkill}>SKILL</button><button onClick={activateItem}>ITEM</button></div>
+        <div className="mobile-controls"><div className="mobile-steer"><small>AUTO RUN</small><button onPointerDown={()=>inputManager.setExternalAction("legacy-race-touch","up",true)} onPointerUp={()=>inputManager.setExternalAction("legacy-race-touch","up",false)} onPointerCancel={()=>inputManager.setExternalAction("legacy-race-touch","up",false)}>▲</button><button onPointerDown={()=>inputManager.setExternalAction("legacy-race-touch","down",true)} onPointerUp={()=>inputManager.setExternalAction("legacy-race-touch","down",false)} onPointerCancel={()=>inputManager.setExternalAction("legacy-race-touch","down",false)}>▼</button></div><button onPointerDown={()=>inputManager.setExternalAction("legacy-race-touch","right",true)} onPointerUp={()=>inputManager.setExternalAction("legacy-race-touch","right",false)} onPointerCancel={()=>inputManager.setExternalAction("legacy-race-touch","right",false)}>BOOST</button><button onClick={doJump}>JUMP</button><button onClick={activateSkill}>SKILL</button><button onClick={activateItem}>ITEM</button></div>
       </section>}
 
       {ENABLE_3D_RACE && screen === "race" && <Race3D animal={animal} hero={HEADS[parts.head]} difficulty={difficulty} sound={settings.sound} haptics={settings.haptics} reducedMotion={settings.reducedMotion} onFinish={handleRace3DFinish}/>} 
