@@ -47,10 +47,15 @@ jobs:
           grep -q "GRAND PRIX COMPLETE racers=5 finishers=5" /tmp/wilddash-godot-4.log
           grep -q "MODE COMPLETE id=grand_prix" /tmp/wilddash-godot-4.log
           grep -q "MODE START id=fruit_collection ai=4" /tmp/wilddash-godot-4.log
+          grep -q "FRUIT AI PICKUP" /tmp/wilddash-godot-4.log
+          grep -q "FRUIT COMPLETE" /tmp/wilddash-godot-4.log
           grep -q "MODE COMPLETE id=fruit_collection" /tmp/wilddash-godot-4.log
           grep -q "MODE START id=floor_collapse ai=4" /tmp/wilddash-godot-4.log
+          grep -q "FLOOR PHASE 1" /tmp/wilddash-godot-4.log
           grep -q "MODE COMPLETE id=floor_collapse" /tmp/wilddash-godot-4.log
           grep -q "MODE START id=push_out ai=4" /tmp/wilddash-godot-4.log
+          grep -q "PUSH OUT AI BODY CHECK" /tmp/wilddash-godot-4.log
+          grep -q "PUSH OUT COMPLETE" /tmp/wilddash-godot-4.log
           grep -q "MODE COMPLETE id=push_out" /tmp/wilddash-godot-4.log
           grep -q "CAMPAIGN COMPLETE rounds=4" /tmp/wilddash-godot-4.log
           grep -q "HEADLESS RESULT rounds=4" /tmp/wilddash-godot-4.log
@@ -67,10 +72,15 @@ jobs:
           grep -q "GRAND PRIX COMPLETE racers=11 finishers=11" /tmp/wilddash-godot-10.log
           grep -q "MODE COMPLETE id=grand_prix" /tmp/wilddash-godot-10.log
           grep -q "MODE START id=fruit_collection ai=10" /tmp/wilddash-godot-10.log
+          grep -q "FRUIT AI PICKUP" /tmp/wilddash-godot-10.log
+          grep -q "FRUIT COMPLETE" /tmp/wilddash-godot-10.log
           grep -q "MODE COMPLETE id=fruit_collection" /tmp/wilddash-godot-10.log
           grep -q "MODE START id=floor_collapse ai=10" /tmp/wilddash-godot-10.log
+          grep -q "FLOOR PHASE 1" /tmp/wilddash-godot-10.log
           grep -q "MODE COMPLETE id=floor_collapse" /tmp/wilddash-godot-10.log
           grep -q "MODE START id=push_out ai=10" /tmp/wilddash-godot-10.log
+          grep -q "PUSH OUT AI BODY CHECK" /tmp/wilddash-godot-10.log
+          grep -q "PUSH OUT COMPLETE" /tmp/wilddash-godot-10.log
           grep -q "MODE COMPLETE id=push_out" /tmp/wilddash-godot-10.log
           grep -q "CAMPAIGN COMPLETE rounds=4" /tmp/wilddash-godot-10.log
           grep -q "HEADLESS RESULT rounds=4" /tmp/wilddash-godot-10.log
