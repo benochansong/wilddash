@@ -104,7 +104,7 @@ func _process_race_ai_baseline(delta: float) -> void:
 		return
 	if _race_route.size() >= 2:
 		_update_route_brain(delta, true)
-		_racer.rotation.y = lerp_angle(_racer.rotation.y, _cached_target_yaw, clampf(steering_strength * delta, 0.0, 1.0))
+		_racer.rotation.y = lerp_angle(_racer.rotation.y, _cached_target_yaw, clampf(steering_strength * _racer.get_active_handling_scale() * delta, 0.0, 1.0))
 		_move_racer(delta, true)
 		return
 
@@ -130,7 +130,7 @@ func _process_race_ai_baseline(delta: float) -> void:
 	var error_x := desired_x - _racer.global_position.x
 	var desired_direction := Vector3(clampf(error_x * 0.2, -0.8, 0.8), 0.0, -1.0).normalized()
 	var target_yaw := atan2(-desired_direction.x, -desired_direction.z)
-	_racer.rotation.y = lerp_angle(_racer.rotation.y, target_yaw, clampf(steering_strength * delta, 0.0, 1.0))
+	_racer.rotation.y = lerp_angle(_racer.rotation.y, target_yaw, clampf(steering_strength * _racer.get_active_handling_scale() * delta, 0.0, 1.0))
 	_move_racer(delta, true)
 
 func _process_race_ai_optimized(delta: float) -> void:
@@ -152,7 +152,7 @@ func _process_race_ai_optimized(delta: float) -> void:
 			_update_straight_race_brain(_brain_elapsed, _lod_level < 2)
 		_brain_elapsed = 0.0
 
-	_racer.rotation.y = lerp_angle(_racer.rotation.y, _cached_target_yaw, clampf(steering_strength * delta, 0.0, 1.0))
+	_racer.rotation.y = lerp_angle(_racer.rotation.y, _cached_target_yaw, clampf(steering_strength * _racer.get_active_handling_scale() * delta, 0.0, 1.0))
 	_move_racer(delta, _lod_level <= 1)
 
 func _update_straight_race_brain(elapsed: float, allow_raycast: bool) -> void:
@@ -300,14 +300,19 @@ func _find_nearest_route_index(position: Vector3) -> int:
 	return best_index
 
 func _move_racer(delta: float, inspect_blocking_collision: bool) -> void:
-	_racer.current_speed = move_toward(_racer.current_speed, target_speed, acceleration * delta)
+	var skill_target_speed := target_speed * _racer.get_active_speed_scale()
+	var skill_acceleration := acceleration * _racer.get_active_acceleration_scale()
+	_racer.current_speed = move_toward(_racer.current_speed, skill_target_speed, skill_acceleration * delta)
 	var forward := -_racer.global_transform.basis.z.normalized()
-	_racer.velocity.x = forward.x * _racer.current_speed
-	_racer.velocity.z = forward.z * _racer.current_speed
+	var knockback := _racer.get_knockback_velocity()
+	_racer.velocity.x = forward.x * _racer.current_speed + knockback.x
+	_racer.velocity.z = forward.z * _racer.current_speed + knockback.z
 	_apply_gravity(delta)
 	_racer.move_and_slide()
+	_racer.resolve_skill_contacts()
 	if inspect_blocking_collision and _racer.has_blocking_collision():
-		_racer.current_speed *= 0.9
+		_racer.current_speed *= _racer.get_collision_speed_retention()
+	_racer.decay_knockback(delta)
 
 func _process_arena_ai(delta: float) -> void:
 	if not GameManager.round_active or not _arena_enabled:
@@ -317,11 +322,13 @@ func _process_arena_ai(delta: float) -> void:
 	var direction := Vector3.ZERO
 	if offset.length_squared() > 0.04:
 		direction = offset.normalized()
-	var desired := direction * target_speed + _racer.get_knockback_velocity()
-	_racer.velocity.x = move_toward(_racer.velocity.x, desired.x, acceleration * delta)
-	_racer.velocity.z = move_toward(_racer.velocity.z, desired.z, acceleration * delta)
+	var desired := direction * target_speed * _racer.get_active_speed_scale() + _racer.get_knockback_velocity()
+	var active_acceleration := acceleration * _racer.get_active_acceleration_scale()
+	_racer.velocity.x = move_toward(_racer.velocity.x, desired.x, active_acceleration * delta)
+	_racer.velocity.z = move_toward(_racer.velocity.z, desired.z, active_acceleration * delta)
 	_apply_gravity(delta)
 	_racer.move_and_slide()
+	_racer.resolve_skill_contacts()
 	_racer.current_speed = Vector2(_racer.velocity.x, _racer.velocity.z).length()
 	_racer.decay_knockback(delta)
 
