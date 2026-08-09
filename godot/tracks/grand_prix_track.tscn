@@ -1,6 +1,17 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://tracks/grand_prix_track.gd" id="1_track"]
 
+[sub_resource type="StandardMaterial3D" id="RunoffMaterial"]
+albedo_color = Color(0.105, 0.145, 0.2, 1)
+roughness = 0.95
+
 [node name="GrandPrixTrack" type="Node3D"]
 script = ExtResource("1_track")
+
+[node name="FinishRunoff" type="CSGBox3D" parent="."]
+position = Vector3(-4.743, -0.22, -1094.23)
+rotation = Vector3(0, 0.321751, 0)
+size = Vector3(20, 0.5, 30)
+use_collision = true
+material = SubResource("RunoffMaterial")
