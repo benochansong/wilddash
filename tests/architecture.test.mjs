@@ -1,8 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 
 const read = (path) => readFileSync(path, "utf8");
+
+function sourceFiles(root) {
+  if (!existsSync(root)) return [];
+  return readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(root, entry.name);
+    if (entry.isDirectory()) return sourceFiles(path);
+    return /\.(ts|tsx)$/.test(entry.name) ? [path] : [];
+  });
+}
 
 test("game architecture modules exist", () => {
   for (const path of [
@@ -28,6 +38,12 @@ test("page delegates configuration and save responsibilities", () => {
   assert.equal(page.includes("../game/config/animals"), true);
   assert.equal(page.includes("../game/save/SaveManager"), true);
   assert.equal(page.includes("../ui/components/Chimera"), true);
+});
+
+test("UI source does not access localStorage directly", () => {
+  for (const path of [...sourceFiles("app"), ...sourceFiles("ui")]) {
+    assert.equal(read(path).includes("localStorage."), false, `${path} should delegate persistence to SaveManager`);
+  }
 });
 
 test("Race3D delegates pure race calculations", () => {
