@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { inputManager, type InputAction } from "../game/input/InputManager";
+import { audio } from "../game/audio/AudioManager";
 
 export type ArenaMode = "fruit" | "survival" | "final";
 
@@ -39,7 +40,7 @@ export function ArenaRound({ mode, hero, difficulty, sound, haptics, onComplete 
     s.shove = 2.2;
     s.flash = "💥 밀치기!";
     if(haptics&&navigator.vibrate)navigator.vibrate(28);
-    if(sound){const ctx=new AudioContext();const osc=ctx.createOscillator();const gain=ctx.createGain();osc.frequency.value=180;gain.gain.setValueAtTime(.04,ctx.currentTime);gain.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.1);osc.connect(gain);gain.connect(ctx.destination);osc.start();osc.stop(ctx.currentTime+.1);}
+    if(sound)audio.playSfx({frequency:180,duration:.1,volume:.04,waveform:"sine"});
     s.bots.forEach((b) => {
       const d = Math.hypot(b.x - s.x, b.y - s.y);
       if (d < 18) { const push = 18 / Math.max(4, d); b.x += (b.x - s.x) * push; b.y += (b.y - s.y) * push; b.stun = .8; }

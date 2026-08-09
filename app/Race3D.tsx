@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { inputManager, type InputAction } from "../game/input/InputManager";
+import { audio } from "../game/audio/AudioManager";
 
 type AnimalKey = "dog" | "rabbit" | "elephant" | "cat";
 type DifficultyKey = "wild" | "chaos" | "nightmare";
@@ -57,7 +58,7 @@ export function Race3D({animal,hero,difficulty,sound,haptics,reducedMotion,onFin
   const feedback=useCallback((frequency:number,duration=.1)=>{
     if(haptics&&frequency<220&&navigator.vibrate)navigator.vibrate(Math.round(duration*220));
     if(!sound)return;
-    const ctx=new AudioContext();const osc=ctx.createOscillator();const gain=ctx.createGain();osc.type="square";osc.frequency.value=frequency;gain.gain.setValueAtTime(.035,ctx.currentTime);gain.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+duration);osc.connect(gain);gain.connect(ctx.destination);osc.start();osc.stop(ctx.currentTime+duration);
+    audio.playSfx({frequency,duration,volume:.035,waveform:"square"});
   },[haptics,sound]);
 
   const activateSkill=useCallback(()=>{

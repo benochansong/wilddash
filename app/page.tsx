@@ -5,6 +5,7 @@ import { ArenaRound, type ArenaMode } from "./ArenaRound";
 import { Tutorial } from "./Tutorial";
 import { Race3D } from "./Race3D";
 import { inputManager } from "../game/input/InputManager";
+import { audio } from "../game/audio/AudioManager";
 
 type Screen = "lobby" | "tutorial" | "lab" | "pick" | "countdown" | "race" | "roundBreak" | "fruit" | "survival" | "final" | "result";
 type AnimalKey = "dog" | "rabbit" | "elephant" | "cat";
@@ -94,22 +95,10 @@ function Chimera({ head, body, tail, small = false }: { head: number; body: numb
   );
 }
 
-let soundEnabled = true;
 let hapticsEnabled = true;
 function playTone(frequency = 440, duration = 0.08) {
   if (hapticsEnabled && frequency < 200 && navigator.vibrate) navigator.vibrate(Math.min(45, Math.round(duration*180)));
-  if (!soundEnabled) return;
-  if (typeof window === "undefined") return;
-  const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-  if (!AudioCtx) return;
-  const ctx = new AudioCtx();
-  const oscillator = ctx.createOscillator();
-  const gain = ctx.createGain();
-  oscillator.type = "square";
-  oscillator.frequency.value = frequency;
-  gain.gain.setValueAtTime(0.05, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-  oscillator.connect(gain); gain.connect(ctx.destination); oscillator.start(); oscillator.stop(ctx.currentTime + duration);
+  audio.playSfx({ frequency, duration, volume: 0.05, waveform: "square" });
 }
 
 export default function Home() {
@@ -127,11 +116,11 @@ export default function Home() {
   const game = useRef(createRace(difficulty));
 
   useEffect(() => {
-    try { const saved = localStorage.getItem("wild-dash-profile"); if (saved) setProfile(JSON.parse(saved)); const savedSettings=localStorage.getItem("wild-dash-settings"); if(savedSettings){const next=JSON.parse(savedSettings);setSettings(next);soundEnabled=next.sound;hapticsEnabled=next.haptics;} } catch { /* device-local progress is optional */ }
+    try { const saved = localStorage.getItem("wild-dash-profile"); if (saved) setProfile(JSON.parse(saved)); const savedSettings=localStorage.getItem("wild-dash-settings"); if(savedSettings){const next=JSON.parse(savedSettings);setSettings(next);audio.setMuted(!next.sound);hapticsEnabled=next.haptics;} } catch { /* device-local progress is optional */ }
   }, []);
 
   const updateSetting = <K extends keyof typeof settings,>(key: K, value: (typeof settings)[K]) => {
-    const next={...settings,[key]:value}; setSettings(next); soundEnabled=next.sound; hapticsEnabled=next.haptics;
+    const next={...settings,[key]:value}; setSettings(next); audio.setMuted(!next.sound); hapticsEnabled=next.haptics;
     try { localStorage.setItem("wild-dash-settings",JSON.stringify(next)); } catch { /* optional */ }
   };
 
