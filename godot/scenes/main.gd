@@ -40,6 +40,8 @@ func _on_race_completed() -> void:
 	var average_fps := 0.0 if _fps_samples == 0 else _fps_sum / _fps_samples
 	print("RACE COMPLETE order=%s" % ", ".join(labels))
 	print("FPS SAMPLE min=%d avg=%.1f max=%d (headless/CI values are not GPU benchmark data)" % [_fps_min, average_fps, _fps_max])
+	if DisplayServer.get_name() == "headless":
+		get_tree().quit(0)
 
 func _exit_tree() -> void:
 	if player != null:
