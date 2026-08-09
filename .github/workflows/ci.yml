@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-      - stabilization/wilddash-prototype
   workflow_dispatch:
 
 permissions:
@@ -19,6 +18,7 @@ jobs:
   quality:
     name: Typecheck, lint, unit test, build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -51,6 +51,7 @@ jobs:
     name: Windows installer
     needs: quality
     runs-on: windows-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
