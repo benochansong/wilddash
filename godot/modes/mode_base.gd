@@ -72,6 +72,7 @@ func spawn_ai_driver(
 	speed: float,
 	lane := 0.0,
 	wander := 0.15,
+	preserve_player_identity := false,
 ) -> WildDashAIController:
 	var driver := WildDashAIController.new()
 	driver.name = "%sAI" % racer.name
@@ -80,6 +81,7 @@ func spawn_ai_driver(
 	driver.target_speed = speed
 	driver.preferred_lane = lane
 	driver.lane_wander = wander
+	driver.preserve_player_identity = preserve_player_identity
 	add_child(driver)
 	ai_drivers.append(driver)
 	return driver
