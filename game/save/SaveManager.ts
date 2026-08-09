@@ -183,6 +183,11 @@ export class SaveManager {
       return current;
     }
 
+    if (isObject(currentRaw) && typeof currentRaw.version === "number" && currentRaw.version > SAVE_VERSION) {
+      // A newer app may have written this data. Do not destructively downgrade it.
+      return createDefaultSave();
+    }
+
     return this.migrateLegacyOrRecover(storage);
   }
 
@@ -200,7 +205,11 @@ export class SaveManager {
     }
 
     const hasLegacyData = legacyProfileRaw !== null || legacySettingsRaw !== null || legacyTutorialRaw !== null;
-    if (!hasLegacyData) return createDefaultSave();
+    if (!hasLegacyData) {
+      const defaults = createDefaultSave();
+      writeJson(storage, SAVE_KEY, defaults);
+      return defaults;
+    }
 
     let profile: unknown = null;
     let settings: unknown = null;
