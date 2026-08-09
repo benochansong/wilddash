@@ -10,6 +10,7 @@ const MAX_RACERS := 50
 const MAX_AI_RACERS := 49
 const QUALIFYING_RANK := 25
 const VERTICAL_SLICE_RACERS := 4
+const CHECKPOINT_ASSIST_RADIUS := 14.0
 
 var racers: Array[Node3D] = []
 var finish_order: Array[Node3D] = []
@@ -99,6 +100,26 @@ func record_checkpoint(racer: Node3D, checkpoint_index: int) -> bool:
 	checkpoint_reached.emit(racer, checkpoint_index, _checkpoint_positions.size())
 	print("CHECKPOINT PASS racer=%s checkpoint=%d/%d" % [get_racer_label(racer), checkpoint_index + 1, _checkpoint_positions.size()])
 	return true
+
+func sync_checkpoint_from_position(racer: Node3D) -> bool:
+	# Area3D is the primary trigger. This proximity seam makes high-speed racers
+	# and low-FPS machines robust against tunneling through a thin checkpoint.
+	# Only the next ordered checkpoint can be granted, so shortcuts cannot skip
+	# gates or jump straight to the finish.
+	if racer == null or _checkpoint_positions.is_empty():
+		return false
+	var expected := get_checkpoint_progress(racer)
+	if expected >= _checkpoint_positions.size():
+		return false
+	var checkpoint := _checkpoint_positions[expected]
+	var planar_delta := racer.global_position - checkpoint
+	planar_delta.y = 0.0
+	if planar_delta.length() > CHECKPOINT_ASSIST_RADIUS:
+		return false
+	var vertical_delta := absf(racer.global_position.y - checkpoint.y)
+	if vertical_delta > 8.0:
+		return false
+	return record_checkpoint(racer, expected)
 
 func get_checkpoint_progress(racer: Node3D) -> int:
 	if racer == null:
