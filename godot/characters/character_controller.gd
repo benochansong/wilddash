@@ -71,9 +71,18 @@ func _physics_process(delta: float) -> void:
 	velocity.z = forward.z * current_speed
 	move_and_slide()
 
-	if get_slide_collision_count() > 0:
+	if has_blocking_collision():
 		current_speed = maxf(cruise_speed * 0.55, current_speed * 0.92)
 	_sync_visual()
+
+func has_blocking_collision() -> bool:
+	for i in range(get_slide_collision_count()):
+		var collision := get_slide_collision(i)
+		# Floor and walkable ramp normals point mostly upward. Only side-facing
+		# contacts should penalize racer speed.
+		if collision.get_normal().y < 0.55:
+			return true
+	return false
 
 func set_finished(rank: int) -> void:
 	if finished:
