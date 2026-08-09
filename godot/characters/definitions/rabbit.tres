@@ -1,0 +1,41 @@
+[gd_resource type="Resource" script_class="WildDashAnimalDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://characters/animal_definition.gd" id="1_def"]
+[ext_resource type="PackedScene" path="res://characters/visuals/rabbit_visual.tscn" id="2_visual"]
+
+[resource]
+script = ExtResource("1_def")
+animal_id = &"rabbit"
+display_name = "Rabbit"
+nickname = "깡총이"
+role = "Agile Jumper"
+accent_color = Color(1, 0.40, 0.68, 1)
+visual_scene = ExtResource("2_visual")
+max_speed = 14.0
+cruise_speed = 8.6
+acceleration = 25.5
+turn_speed = 2.35
+jump_velocity = 9.2
+gravity = 21.0
+ai_race_speed = 10.8
+arena_move_speed = 10.0
+arena_acceleration = 30.0
+knockback_decay = 17.0
+ai_arena_speed = 7.2
+collision_radius = 0.52
+collision_height = 1.75
+collision_center_y = 0.875
+camera_follow_distance = 8.8
+camera_follow_height = 5.0
+camera_look_ahead = 4.8
+camera_smoothing = 8.0
+camera_fov = 72.0
+skill_id = &"leap"
+skill_name = "도약 추진"
+skill_description = "높이 도약하며 짧은 전진 가속을 얻습니다."
+skill_cooldown = 8.0
+skill_duration = 1.2
+skill_speed_multiplier = 1.08
+skill_turn_multiplier = 1.08
+skill_jump_multiplier = 1.35
+skill_knockback_multiplier = 0.9
