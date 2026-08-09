@@ -1,0 +1,43 @@
+extends Node
+
+const ACTION_LEFT: StringName = &"move_left"
+const ACTION_RIGHT: StringName = &"move_right"
+const ACTION_ACCELERATE: StringName = &"accelerate"
+const ACTION_BRAKE: StringName = &"brake"
+const ACTION_JUMP: StringName = &"jump"
+const ACTION_SKILL: StringName = &"skill"
+const ACTION_ITEM: StringName = &"item"
+
+func _ready() -> void:
+	_ensure_action(ACTION_LEFT, [KEY_A, KEY_LEFT])
+	_ensure_action(ACTION_RIGHT, [KEY_D, KEY_RIGHT])
+	_ensure_action(ACTION_ACCELERATE, [KEY_W, KEY_UP])
+	_ensure_action(ACTION_BRAKE, [KEY_S, KEY_DOWN])
+	_ensure_action(ACTION_JUMP, [KEY_SPACE])
+	_ensure_action(ACTION_SKILL, [KEY_E])
+	_ensure_action(ACTION_ITEM, [KEY_Q])
+
+func get_steer_axis() -> float:
+	return Input.get_axis(ACTION_LEFT, ACTION_RIGHT)
+
+func get_throttle_axis() -> float:
+	return Input.get_action_strength(ACTION_ACCELERATE) - Input.get_action_strength(ACTION_BRAKE)
+
+func consume_jump() -> bool:
+	return Input.is_action_just_pressed(ACTION_JUMP)
+
+func consume_skill() -> bool:
+	return Input.is_action_just_pressed(ACTION_SKILL)
+
+func consume_item() -> bool:
+	return Input.is_action_just_pressed(ACTION_ITEM)
+
+func _ensure_action(action: StringName, physical_keys: Array) -> void:
+	if not InputMap.has_action(action):
+		InputMap.add_action(action)
+	if not InputMap.action_get_events(action).is_empty():
+		return
+	for key_code in physical_keys:
+		var event := InputEventKey.new()
+		event.physical_keycode = key_code
+		InputMap.action_add_event(action, event)

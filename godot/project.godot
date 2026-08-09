@@ -1,0 +1,25 @@
+; WILD DASH 3D - Godot project
+; This project lives beside the React/Electron Prototype V1 and does not replace it.
+config_version=5
+
+[application]
+config/name="WILD DASH 3D"
+run/main_scene="res://scenes/main.tscn"
+
+[autoload]
+GameManager="*res://scripts/game_manager.gd"
+RaceManager="*res://scripts/race_manager.gd"
+InputManager="*res://scripts/input_manager.gd"
+AudioManager="*res://scripts/audio_manager.gd"
+SaveManager="*res://scripts/save_manager.gd"
+ItemSystem="*res://systems/item_system.gd"
+
+[display]
+window/size/viewport_width=1440
+window/size/viewport_height=900
+window/size/window_width_override=1440
+window/size/window_height_override=900
+window/stretch/mode="canvas_items"
+
+[rendering]
+renderer/rendering_method="gl_compatibility"

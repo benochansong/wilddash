@@ -1,0 +1,18 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scenes/main.gd" id="1_main"]
+[ext_resource type="PackedScene" path="res://tracks/test_track.tscn" id="2_track"]
+[ext_resource type="PackedScene" path="res://characters/test_racer.tscn" id="3_racer"]
+
+[node name="Main" type="Node3D"]
+script = ExtResource("1_main")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-52, -28, 0)
+light_energy = 1.35
+shadow_enabled = true
+
+[node name="TestTrack" parent="." instance=ExtResource("2_track")]
+
+[node name="TestRacer" parent="." instance=ExtResource("3_racer")]
+position = Vector3(0, 0.1, 40)

@@ -1,0 +1,69 @@
+[gd_scene load_steps=5 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Material_track"]
+albedo_color = Color(0.15, 0.19, 0.27, 1)
+roughness = 0.92
+
+[sub_resource type="StandardMaterial3D" id="Material_wall"]
+albedo_color = Color(0.18, 0.78, 0.86, 1)
+roughness = 0.65
+
+[sub_resource type="StandardMaterial3D" id="Material_obstacle"]
+albedo_color = Color(1, 0.33, 0.48, 1)
+roughness = 0.7
+
+[sub_resource type="StandardMaterial3D" id="Material_marker"]
+albedo_color = Color(0.88, 1, 0.22, 1)
+emission_enabled = true
+emission = Color(0.35, 0.5, 0.05, 1)
+
+[node name="TestTrack" type="Node3D"]
+
+[node name="Road" type="CSGBox3D" parent="."]
+position = Vector3(0, -0.25, -15)
+size = Vector3(18, 0.5, 120)
+use_collision = true
+material = SubResource("Material_track")
+
+[node name="LeftWall" type="CSGBox3D" parent="."]
+position = Vector3(-9.25, 1, -15)
+size = Vector3(0.5, 2, 120)
+use_collision = true
+material = SubResource("Material_wall")
+
+[node name="RightWall" type="CSGBox3D" parent="."]
+position = Vector3(9.25, 1, -15)
+size = Vector3(0.5, 2, 120)
+use_collision = true
+material = SubResource("Material_wall")
+
+[node name="ObstacleA" type="CSGBox3D" parent="."]
+position = Vector3(-3.2, 0.9, 15)
+size = Vector3(2.2, 1.8, 2.2)
+use_collision = true
+material = SubResource("Material_obstacle")
+
+[node name="ObstacleB" type="CSGBox3D" parent="."]
+position = Vector3(3.1, 0.65, -5)
+size = Vector3(3.2, 1.3, 1.8)
+use_collision = true
+material = SubResource("Material_obstacle")
+
+[node name="Ramp" type="CSGBox3D" parent="."]
+position = Vector3(0, 0.55, -28)
+rotation_degrees = Vector3(-12, 0, 0)
+size = Vector3(4.4, 0.5, 5.5)
+use_collision = true
+material = SubResource("Material_obstacle")
+
+[node name="StartLine" type="CSGBox3D" parent="."]
+position = Vector3(0, 0.03, 37)
+size = Vector3(18, 0.06, 0.7)
+use_collision = false
+material = SubResource("Material_marker")
+
+[node name="FinishLine" type="CSGBox3D" parent="."]
+position = Vector3(0, 0.03, -70)
+size = Vector3(18, 0.06, 0.7)
+use_collision = false
+material = SubResource("Material_marker")
