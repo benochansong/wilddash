@@ -12,6 +12,7 @@ import { ITEM_INFO } from "../game/config/items";
 import { AI_EMOJIS, ENABLE_3D_RACE, LANES, ROUTES, SWEEPERS, TRACK_LENGTH } from "../game/config/race";
 import { saveManager } from "../game/save/SaveManager";
 import { createRace } from "../game/systems/raceSystem";
+import { arenaFlowOutcome, entryScreen, nextRoundAfterBreak, roundClearedAfterRace, screenAfterRace } from "../game/systems/flowSystem";
 import type { AnimalKey, DifficultyKey, ItemKey, Screen } from "../game/types/game";
 import { Chimera } from "../ui/components/Chimera";
 
@@ -68,22 +69,32 @@ export default function Home() {
     resetGame(); setRoundCleared(0); setCountdown(3); setScreen("countdown"); playTone(520, 0.1);
   };
   const beginPlay = () => {
-    setScreen(saveManager.hasCompletedTutorial() ? "pick" : "tutorial");
+    setScreen(entryScreen(saveManager.hasCompletedTutorial()));
   };
 
   const handleArenaComplete = useCallback((mode: ArenaMode, success: boolean, score: number) => {
+    const outcome = arenaFlowOutcome(mode, success);
     if (!success) {
-      const rank = mode === "fruit" ? 26 : mode === "survival" ? 11 : 2;
-      setResult({ rank, time: snapshot.time, bumps: snapshot.bumps }); awardProgress(rank); setScreen("result"); return;
+      const rank = outcome.failureRank ?? 50;
+      setResult({ rank, time: result.time, bumps: result.bumps });
+      awardProgress(rank);
+      setScreen(outcome.screen);
+      return;
     }
-    if (mode === "fruit") { setRoundCleared(2); setScreen("roundBreak"); }
-    else if (mode === "survival") { setRoundCleared(3); setScreen("roundBreak"); }
-    else { setRoundCleared(4); setResult({rank:1,time:snapshot.time,bumps:snapshot.bumps+score}); awardProgress(1,true); setScreen("result"); }
-  }, [awardProgress, snapshot.bumps, snapshot.time]);
+
+    setRoundCleared(outcome.roundCleared);
+    if (outcome.champion) {
+      setResult({ rank: 1, time: result.time, bumps: result.bumps + score });
+      awardProgress(1, true);
+    }
+    setScreen(outcome.screen);
+  }, [awardProgress, result.bumps, result.time]);
   const handleRace3DFinish = useCallback((rank:number,time:number,bumps:number) => {
+    const nextScreen = screenAfterRace(rank);
     setResult({rank,time,bumps});
-    if(rank<=25){setRoundCleared(1);setScreen("roundBreak");}
-    else{awardProgress(rank);setScreen("result");}
+    setRoundCleared(roundClearedAfterRace(rank));
+    if (nextScreen === "result") awardProgress(rank);
+    setScreen(nextScreen);
   },[awardProgress]);
 
   useEffect(() => {
@@ -254,7 +265,7 @@ export default function Home() {
 
       {ENABLE_3D_RACE && screen === "race" && <Race3D animal={animal} hero={HEADS[parts.head]} difficulty={difficulty} sound={settings.sound} haptics={settings.haptics} reducedMotion={settings.reducedMotion} onFinish={handleRace3DFinish}/>} 
 
-      {screen === "roundBreak" && <section className="round-break"><p className="eyebrow">QUALIFIED · TOP {roundCleared===1?25:roundCleared===2?10:5}</p><h2>{roundCleared===1?"레이스 통과!":roundCleared===2?"과일 확보 완료!":"최후의 5마리 생존!"}</h2><div className="survivor-showcase">{AI_EMOJIS.slice(0,roundCleared===1?8:roundCleared===2?5:3).map((e,i)=><span key={i}>{e}</span>)}</div><div className="next-mission"><small>NEXT MISSION</small><b>{roundCleared===1?"🍎 과일 바구니 쟁탈전":roundCleared===2?"🧊 바닥 붕괴 생존 지대":"🥊 끝장 밀어내기 아레나"}</b><p>{roundCleared===1?"과일 8개를 먼저 모으세요":roundCleared===2?"붉게 경고되는 타일을 피하세요":"상대를 링 밖으로 밀어내면 우승!"}</p></div><button className="primary" onClick={()=>setScreen(roundCleared===1?"fruit":roundCleared===2?"survival":"final")}>다음 라운드 시작 →</button></section>}
+      {screen === "roundBreak" && <section className="round-break"><p className="eyebrow">QUALIFIED · TOP {roundCleared===1?25:roundCleared===2?10:5}</p><h2>{roundCleared===1?"레이스 통과!":roundCleared===2?"과일 확보 완료!":"최후의 5마리 생존!"}</h2><div className="survivor-showcase">{AI_EMOJIS.slice(0,roundCleared===1?8:roundCleared===2?5:3).map((e,i)=><span key={i}>{e}</span>)}</div><div className="next-mission"><small>NEXT MISSION</small><b>{roundCleared===1?"🍎 과일 바구니 쟁탈전":roundCleared===2?"🧊 바닥 붕괴 생존 지대":"🥊 끝장 밀어내기 아레나"}</b><p>{roundCleared===1?"과일 8개를 먼저 모으세요":roundCleared===2?"붉게 경고되는 타일을 피하세요":"상대를 링 밖으로 밀어내면 우승!"}</p></div><button className="primary" onClick={()=>setScreen(nextRoundAfterBreak(roundCleared))}>다음 라운드 시작 →</button></section>}
 
       {(screen === "fruit" || screen === "survival" || screen === "final") && <ArenaRound mode={screen} hero={HEADS[parts.head]} difficulty={difficulty} sound={settings.sound} haptics={settings.haptics} onComplete={(success,score)=>handleArenaComplete(screen,success,score)}/>}
 
