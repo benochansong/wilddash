@@ -41,16 +41,36 @@ jobs:
           set -o pipefail
           timeout 55s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot \
-            | tee /tmp/wilddash-godot.log
-          grep -q "WILD DASH 3D four-round campaign ready: ai=4" /tmp/wilddash-godot.log
-          grep -q "MODE START id=grand_prix ai=4" /tmp/wilddash-godot.log
-          grep -q "GRAND PRIX COMPLETE racers=5 finishers=5" /tmp/wilddash-godot.log
-          grep -q "MODE COMPLETE id=grand_prix" /tmp/wilddash-godot.log
-          grep -q "MODE START id=fruit_collection ai=4" /tmp/wilddash-godot.log
-          grep -q "MODE COMPLETE id=fruit_collection" /tmp/wilddash-godot.log
-          grep -q "MODE START id=floor_collapse ai=4" /tmp/wilddash-godot.log
-          grep -q "MODE COMPLETE id=floor_collapse" /tmp/wilddash-godot.log
-          grep -q "MODE START id=push_out ai=4" /tmp/wilddash-godot.log
-          grep -q "MODE COMPLETE id=push_out" /tmp/wilddash-godot.log
-          grep -q "CAMPAIGN COMPLETE rounds=4" /tmp/wilddash-godot.log
-          grep -q "HEADLESS RESULT rounds=4" /tmp/wilddash-godot.log
+            | tee /tmp/wilddash-godot-4.log
+          grep -q "WILD DASH 3D four-round campaign ready: ai=4" /tmp/wilddash-godot-4.log
+          grep -q "MODE START id=grand_prix ai=4" /tmp/wilddash-godot-4.log
+          grep -q "GRAND PRIX COMPLETE racers=5 finishers=5" /tmp/wilddash-godot-4.log
+          grep -q "MODE COMPLETE id=grand_prix" /tmp/wilddash-godot-4.log
+          grep -q "MODE START id=fruit_collection ai=4" /tmp/wilddash-godot-4.log
+          grep -q "MODE COMPLETE id=fruit_collection" /tmp/wilddash-godot-4.log
+          grep -q "MODE START id=floor_collapse ai=4" /tmp/wilddash-godot-4.log
+          grep -q "MODE COMPLETE id=floor_collapse" /tmp/wilddash-godot-4.log
+          grep -q "MODE START id=push_out ai=4" /tmp/wilddash-godot-4.log
+          grep -q "MODE COMPLETE id=push_out" /tmp/wilddash-godot-4.log
+          grep -q "CAMPAIGN COMPLETE rounds=4" /tmp/wilddash-godot-4.log
+          grep -q "HEADLESS RESULT rounds=4" /tmp/wilddash-godot-4.log
+
+      - name: Stress four-round campaign with ten AI
+        run: |
+          set -o pipefail
+          export WILDDASH_AI_COUNT=10
+          timeout 65s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot \
+            | tee /tmp/wilddash-godot-10.log
+          grep -q "WILD DASH 3D four-round campaign ready: ai=10" /tmp/wilddash-godot-10.log
+          grep -q "MODE START id=grand_prix ai=10" /tmp/wilddash-godot-10.log
+          grep -q "GRAND PRIX COMPLETE racers=11 finishers=11" /tmp/wilddash-godot-10.log
+          grep -q "MODE COMPLETE id=grand_prix" /tmp/wilddash-godot-10.log
+          grep -q "MODE START id=fruit_collection ai=10" /tmp/wilddash-godot-10.log
+          grep -q "MODE COMPLETE id=fruit_collection" /tmp/wilddash-godot-10.log
+          grep -q "MODE START id=floor_collapse ai=10" /tmp/wilddash-godot-10.log
+          grep -q "MODE COMPLETE id=floor_collapse" /tmp/wilddash-godot-10.log
+          grep -q "MODE START id=push_out ai=10" /tmp/wilddash-godot-10.log
+          grep -q "MODE COMPLETE id=push_out" /tmp/wilddash-godot-10.log
+          grep -q "CAMPAIGN COMPLETE rounds=4" /tmp/wilddash-godot-10.log
+          grep -q "HEADLESS RESULT rounds=4" /tmp/wilddash-godot-10.log
