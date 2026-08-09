@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export type ArenaMode = "fruit" | "survival" | "final";
 
@@ -33,7 +33,7 @@ export function ArenaRound({ mode, hero, difficulty, sound, haptics, onComplete 
     bots: RIVALS.slice(0, mode === "final" ? 2 : 8).map((emoji, i) => ({ emoji, x: 16 + (i * 19) % 70, y: 18 + (i * 27) % 62, tx: 50, ty: 50, stun: 0, windup: 1 + i * .35 })),
   });
 
-  const shove = () => {
+  const shove = useCallback(() => {
     const s = state.current;
     if (s.shove > 0) return;
     s.shove = 2.2;
@@ -44,14 +44,14 @@ export function ArenaRound({ mode, hero, difficulty, sound, haptics, onComplete 
       const d = Math.hypot(b.x - s.x, b.y - s.y);
       if (d < 18) { const push = 18 / Math.max(4, d); b.x += (b.x - s.x) * push; b.y += (b.y - s.y) * push; b.stun = .8; }
     });
-  };
+  }, [haptics, sound]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => { keys.current[e.key.toLowerCase()] = true; if (e.key.toLowerCase() === "e" || e.key === " ") shove(); };
     const up = (e: KeyboardEvent) => { keys.current[e.key.toLowerCase()] = false; };
     window.addEventListener("keydown", down); window.addEventListener("keyup", up);
     return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); };
-  }, []);
+  }, [shove]);
 
   useEffect(() => {
     let frame = 0; let last = performance.now();
