@@ -57,7 +57,7 @@ material = SubResource("Material_obstacle")
 [node name="Ramp" type="CSGBox3D" parent="."]
 position = Vector3(0, 0.55, -28)
 rotation_degrees = Vector3(-12, 0, 0)
-size = Vector3(4.4, 0.5, 5.5)
+size = Vector3(2.8, 0.5, 5.5)
 use_collision = true
 material = SubResource("Material_obstacle")
 
