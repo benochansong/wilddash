@@ -62,7 +62,7 @@ use_collision = true
 material = SubResource("Material_obstacle")
 
 [node name="ObstacleC" type="CSGBox3D" parent="."]
-position = Vector3(-5.0, 0.75, -45)
+position = Vector3(-3.6, 0.75, -45)
 size = Vector3(2.5, 1.5, 2.2)
 use_collision = true
 material = SubResource("Material_obstacle")
