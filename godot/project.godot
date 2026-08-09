@@ -1,5 +1,5 @@
 ; WILD DASH 3D - Godot project
-; This project lives beside the React/Electron Prototype V1 and does not replace it.
+; Four-round prototype lives beside the React/Electron Prototype V1.
 config_version=5
 
 [application]
@@ -8,6 +8,7 @@ run/main_scene="res://scenes/main.tscn"
 
 [autoload]
 GameManager="*res://scripts/game_manager.gd"
+ResultManager="*res://scripts/result_manager.gd"
 RaceManager="*res://scripts/race_manager.gd"
 InputManager="*res://scripts/input_manager.gd"
 AudioManager="*res://scripts/audio_manager.gd"
@@ -20,6 +21,9 @@ window/size/viewport_height=900
 window/size/window_width_override=1440
 window/size/window_height_override=900
 window/stretch/mode="canvas_items"
+
+[physics]
+common/physics_ticks_per_second=60
 
 [rendering]
 renderer/rendering_method="gl_compatibility"

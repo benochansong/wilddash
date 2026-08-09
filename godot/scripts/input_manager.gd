@@ -23,6 +23,12 @@ func get_steer_axis() -> float:
 func get_throttle_axis() -> float:
 	return Input.get_action_strength(ACTION_ACCELERATE) - Input.get_action_strength(ACTION_BRAKE)
 
+func get_move_vector() -> Vector2:
+	var x := Input.get_action_strength(ACTION_RIGHT) - Input.get_action_strength(ACTION_LEFT)
+	var y := Input.get_action_strength(ACTION_BRAKE) - Input.get_action_strength(ACTION_ACCELERATE)
+	var vector := Vector2(x, y)
+	return vector.normalized() if vector.length_squared() > 1.0 else vector
+
 func consume_jump() -> bool:
 	return Input.is_action_just_pressed(ACTION_JUMP)
 

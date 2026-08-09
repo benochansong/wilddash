@@ -33,16 +33,24 @@ jobs:
           chmod +x /tmp/godot/Godot_v4.7.1-stable_linux.x86_64
           /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --version
 
-      - name: Import project headlessly
+      - name: Import all four round scenes headlessly
         run: /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --editor --path godot --quit
 
-      - name: Run four-racer physics race headlessly
+      - name: Run four-round campaign with four AI
         run: |
           set -o pipefail
-          timeout 25s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+          timeout 55s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot \
             | tee /tmp/wilddash-godot.log
-          grep -q "WILD DASH 3D Vertical Slice 01 ready" /tmp/wilddash-godot.log
-          grep -q "RACE START racers=4" /tmp/wilddash-godot.log
-          grep -q "PLAYER FINISH" /tmp/wilddash-godot.log
-          grep -q "RACE COMPLETE" /tmp/wilddash-godot.log
+          grep -q "WILD DASH 3D four-round campaign ready: ai=4" /tmp/wilddash-godot.log
+          grep -q "MODE START id=grand_prix ai=4" /tmp/wilddash-godot.log
+          grep -q "GRAND PRIX COMPLETE racers=5 finishers=5" /tmp/wilddash-godot.log
+          grep -q "MODE COMPLETE id=grand_prix" /tmp/wilddash-godot.log
+          grep -q "MODE START id=fruit_collection ai=4" /tmp/wilddash-godot.log
+          grep -q "MODE COMPLETE id=fruit_collection" /tmp/wilddash-godot.log
+          grep -q "MODE START id=floor_collapse ai=4" /tmp/wilddash-godot.log
+          grep -q "MODE COMPLETE id=floor_collapse" /tmp/wilddash-godot.log
+          grep -q "MODE START id=push_out ai=4" /tmp/wilddash-godot.log
+          grep -q "MODE COMPLETE id=push_out" /tmp/wilddash-godot.log
+          grep -q "CAMPAIGN COMPLETE rounds=4" /tmp/wilddash-godot.log
+          grep -q "HEADLESS RESULT rounds=4" /tmp/wilddash-godot.log

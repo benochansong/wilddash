@@ -1,0 +1,75 @@
+extends WildDashModeController
+
+const TRACK_SCENE: PackedScene = preload("res://tracks/test_track.tscn")
+const CHASE_CAMERA_SCRIPT: Script = preload("res://camera/chase_camera.gd")
+const AI_ANIMALS: Array[StringName] = [&"rabbit", &"elephant", &"cat", &"dog"]
+const AI_SPEEDS: Array[float] = [10.8, 9.9, 10.5, 10.1]
+
+var _player_rank := 0
+var _fps_sum := 0.0
+var _fps_samples := 0
+
+func _ready() -> void:
+	setup_mode(&"grand_prix", "ROUND 1 — Wild World Grand Prix", "W/↑ 가속 · A/D 조향 · Space 점프", false)
+	RaceManager.clear_racers()
+	var track := TRACK_SCENE.instantiate()
+	track.name = "TestTrack"
+	add_child(track)
+
+	player = spawn_racer("Dog", &"dog", Vector3(-5.8, 0.1, 40.0), true, WildDashCharacterController.MovementMode.RACE)
+	var ai_total: int = GameManager.ai_count
+	for i in range(ai_total):
+		var t := 0.5 if ai_total <= 1 else float(i) / float(ai_total - 1)
+		var lane := lerpf(-7.2, 7.2, t)
+		var animal: StringName = AI_ANIMALS[i % AI_ANIMALS.size()]
+		var speed: float = AI_SPEEDS[i % AI_SPEEDS.size()] - float(i / AI_SPEEDS.size()) * 0.12
+		var racer := spawn_racer("AI_%02d" % (i + 1), animal, Vector3(lane, 0.1, 40.0), false, WildDashCharacterController.MovementMode.RACE)
+		spawn_ai_driver(racer, WildDashAIController.AIMode.RACE, speed, lane, 0.12)
+
+	var camera := CHASE_CAMERA_SCRIPT.new() as Camera3D
+	if camera != null:
+		camera.name = "ChaseCamera"
+		camera.current = true
+		camera.fov = 70.0
+		add_child(camera)
+		camera.call("set_target", player)
+
+	RaceManager.race_finished.connect(_on_player_finished)
+	RaceManager.race_completed.connect(_on_race_completed)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	if DisplayServer.get_name() != "headless":
+		await get_tree().create_timer(1.0).timeout
+	GameManager.begin_round(&"grand_prix")
+	RaceManager.start_race()
+	print("GRAND PRIX START racers=%d ai=%d" % [RaceManager.racers.size(), ai_racers.size()])
+
+func _process(_delta: float) -> void:
+	if player == null:
+		return
+	var fps: int = Engine.get_frames_per_second()
+	if fps > 0:
+		_fps_sum += float(fps)
+		_fps_samples += 1
+	var rank: int = RaceManager.get_rank(player)
+	hud.set_metrics("Rank %d/%d   Speed %.1f   FPS %d" % [rank, RaceManager.racers.size(), player.current_speed, fps])
+
+func _on_player_finished(rank: int) -> void:
+	_player_rank = rank
+	print("GRAND PRIX PLAYER FINISH rank=%d elapsed=%.2fs" % [rank, RaceManager.get_elapsed_seconds()])
+
+func _on_race_completed() -> void:
+	var labels: Array[String] = []
+	for racer: Node3D in RaceManager.finish_order:
+		labels.append(RaceManager.get_racer_label(racer))
+	var average_fps := 0.0 if _fps_samples == 0 else _fps_sum / float(_fps_samples)
+	var qualifying_rank := ceili(float(RaceManager.racers.size()) * 0.5)
+	var success := _player_rank > 0 and _player_rank <= qualifying_rank
+	print("GRAND PRIX COMPLETE racers=%d finishers=%d order=%s" % [RaceManager.racers.size(), RaceManager.finish_order.size(), ", ".join(labels)])
+	print("GRAND PRIX FPS avg=%.1f headless=%s" % [average_fps, str(DisplayServer.get_name() == "headless")])
+	finish_mode(success, _player_rank, {
+		"rank": _player_rank,
+		"racers": RaceManager.racers.size(),
+		"finishers": RaceManager.finish_order.size(),
+		"order": labels,
+	})

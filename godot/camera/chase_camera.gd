@@ -9,7 +9,14 @@ extends Camera3D
 var _target: Node3D
 
 func _ready() -> void:
-	_target = get_node_or_null(target_path) as Node3D
+	if not target_path.is_empty():
+		_target = get_node_or_null(target_path) as Node3D
+
+func set_target(target: Node3D) -> void:
+	_target = target
+	if _target != null:
+		var forward := -_target.global_transform.basis.z.normalized()
+		global_position = _target.global_position - forward * follow_distance + Vector3.UP * follow_height
 
 func _process(delta: float) -> void:
 	if _target == null:

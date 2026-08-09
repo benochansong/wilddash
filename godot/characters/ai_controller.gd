@@ -1,7 +1,13 @@
 class_name WildDashAIController
 extends Node
 
+enum AIMode {
+	RACE,
+	ARENA,
+}
+
 @export var racer_path: NodePath
+@export var ai_mode: AIMode = AIMode.RACE
 @export var target_speed := 10.4
 @export var preferred_lane := 0.0
 @export var lane_wander := 0.2
@@ -14,17 +20,40 @@ var _phase := 0.0
 var _avoidance_sign := 1.0
 var _stuck_seconds := 0.0
 var _last_progress := 0.0
+var _arena_target := Vector3.ZERO
+var _arena_enabled := true
 
 func _ready() -> void:
 	_racer = get_node_or_null(racer_path) as WildDashCharacterController
 	if _racer == null:
 		return
 	_racer.is_player = false
-	_last_progress = RaceManager.get_test_track_progress(_racer)
 	_configure_deterministic_personality(_racer.animal_id)
+	if ai_mode == AIMode.RACE:
+		_last_progress = RaceManager.get_test_track_progress(_racer)
 
 func _physics_process(delta: float) -> void:
-	if _racer == null or _racer.finished or not RaceManager.active:
+	if _racer == null or _racer.finished:
+		return
+	if ai_mode == AIMode.ARENA:
+		_process_arena_ai(delta)
+		return
+	_process_race_ai(delta)
+
+func set_arena_target(target: Vector3) -> void:
+	_arena_target = target
+
+func set_arena_enabled(value: bool) -> void:
+	_arena_enabled = value
+	if not value and _racer != null:
+		_racer.velocity = Vector3.ZERO
+		_racer.current_speed = 0.0
+
+func get_racer() -> WildDashCharacterController:
+	return _racer
+
+func _process_race_ai(delta: float) -> void:
+	if not RaceManager.active:
 		return
 
 	var obstacle_ahead := _has_obstacle_ahead()
@@ -58,14 +87,32 @@ func _physics_process(delta: float) -> void:
 	var forward := -_racer.global_transform.basis.z.normalized()
 	_racer.velocity.x = forward.x * _racer.current_speed
 	_racer.velocity.z = forward.z * _racer.current_speed
+	_apply_gravity(delta)
+	_racer.move_and_slide()
+	if _racer.has_blocking_collision():
+		_racer.current_speed *= 0.9
+
+func _process_arena_ai(delta: float) -> void:
+	if not GameManager.round_active or not _arena_enabled:
+		return
+	var offset := _arena_target - _racer.global_position
+	offset.y = 0.0
+	var direction := Vector3.ZERO
+	if offset.length_squared() > 0.04:
+		direction = offset.normalized()
+	var desired := direction * target_speed + _racer.get_knockback_velocity()
+	_racer.velocity.x = move_toward(_racer.velocity.x, desired.x, acceleration * delta)
+	_racer.velocity.z = move_toward(_racer.velocity.z, desired.z, acceleration * delta)
+	_apply_gravity(delta)
+	_racer.move_and_slide()
+	_racer.current_speed = Vector2(_racer.velocity.x, _racer.velocity.z).length()
+	_racer.decay_knockback(delta)
+
+func _apply_gravity(delta: float) -> void:
 	if not _racer.is_on_floor():
 		_racer.velocity.y -= _racer.gravity * delta
 	elif _racer.velocity.y < 0.0:
 		_racer.velocity.y = 0.0
-	_racer.move_and_slide()
-
-	if _racer.has_blocking_collision():
-		_racer.current_speed *= 0.9
 
 func _configure_deterministic_personality(id: StringName) -> void:
 	match id:
@@ -90,5 +137,5 @@ func _has_obstacle_ahead() -> bool:
 	var query := PhysicsRayQueryParameters3D.create(from, from + forward * avoidance_distance)
 	query.exclude = [_racer.get_rid()]
 	query.collision_mask = 1
-	var hit := _racer.get_world_3d().direct_space_state.intersect_ray(query)
+	var hit: Dictionary = _racer.get_world_3d().direct_space_state.intersect_ray(query)
 	return not hit.is_empty()

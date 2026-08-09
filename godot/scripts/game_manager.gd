@@ -1,6 +1,8 @@
 extends Node
 
 signal game_state_changed(previous_state: GameState, next_state: GameState)
+signal round_changed(round_index: int, mode_id: StringName)
+signal round_activity_changed(active: bool)
 
 enum GameState {
 	BOOT,
@@ -14,10 +16,31 @@ enum GameState {
 	RESULT,
 }
 
+const ROUND_IDS: Array[StringName] = [
+	&"grand_prix",
+	&"fruit_collection",
+	&"floor_collapse",
+	&"push_out",
+]
+const ROUND_SCENES: Array[String] = [
+	"res://modes/grand_prix/grand_prix.tscn",
+	"res://modes/fruit_collection/fruit_collection.tscn",
+	"res://modes/floor_collapse/floor_collapse.tscn",
+	"res://modes/push_out/push_out.tscn",
+]
+const RESULT_SCENE := "res://scenes/result.tscn"
+const MIN_AI_COUNT := 4
+const MAX_AI_COUNT := 10
+
 var state: GameState = GameState.BOOT
 var selected_animal: StringName = &"dog"
 var difficulty: StringName = &"chaos"
-var chimera_parts := {"head": 0, "body": 0, "tail": 0}
+var chimera_parts: Dictionary = {"head": 0, "body": 0, "tail": 0}
+var ai_count := MIN_AI_COUNT
+var current_round_index := -1
+var round_active := false
+var campaign_running := false
+var _transition_pending := false
 
 func _ready() -> void:
 	set_state(GameState.LOBBY)
@@ -25,14 +48,92 @@ func _ready() -> void:
 func set_state(next_state: GameState) -> void:
 	if state == next_state:
 		return
-	var previous_state := state
+	var previous_state: GameState = state
 	state = next_state
 	game_state_changed.emit(previous_state, next_state)
 
-func configure_run(animal: StringName, difficulty_id: StringName, parts: Dictionary) -> void:
+func configure_run(
+	animal: StringName,
+	difficulty_id: StringName,
+	parts: Dictionary,
+	requested_ai_count: int = MIN_AI_COUNT,
+) -> void:
 	selected_animal = animal
 	difficulty = difficulty_id
 	chimera_parts = parts.duplicate(true)
+	ai_count = clampi(requested_ai_count, MIN_AI_COUNT, MAX_AI_COUNT)
+
+func set_ai_count(value: int) -> void:
+	ai_count = clampi(value, MIN_AI_COUNT, MAX_AI_COUNT)
+
+func start_campaign() -> void:
+	if campaign_running:
+		return
+	ResultManager.reset_campaign()
+	campaign_running = true
+	current_round_index = 0
+	_transition_pending = false
+	call_deferred("_load_current_round")
+
+func begin_round(mode_id: StringName) -> void:
+	if current_round_index < 0 or current_round_index >= ROUND_IDS.size():
+		return
+	if ROUND_IDS[current_round_index] != mode_id:
+		push_warning("Round scene mismatch: expected %s, got %s" % [ROUND_IDS[current_round_index], mode_id])
+	round_active = true
+	round_activity_changed.emit(true)
+	match mode_id:
+		&"grand_prix": set_state(GameState.RACE)
+		&"push_out": set_state(GameState.FINAL)
+		_: set_state(GameState.ARENA)
+	round_changed.emit(current_round_index, mode_id)
+
+func complete_round(mode_id: StringName, success: bool, score: int, details: Dictionary = {}) -> void:
+	if _transition_pending:
+		return
+	_transition_pending = true
+	round_active = false
+	round_activity_changed.emit(false)
+	ResultManager.record_round_result(mode_id, success, score, details)
+	print("MODE COMPLETE id=%s success=%s score=%d" % [mode_id, str(success), score])
+	call_deferred("_transition_after_round")
+
+func get_current_round_id() -> StringName:
+	if current_round_index < 0 or current_round_index >= ROUND_IDS.size():
+		return &""
+	return ROUND_IDS[current_round_index]
 
 func reset_run() -> void:
+	campaign_running = false
+	current_round_index = -1
+	_transition_pending = false
+	round_active = false
+	ResultManager.reset_campaign()
 	set_state(GameState.LOBBY)
+
+func _load_current_round() -> void:
+	if current_round_index < 0 or current_round_index >= ROUND_SCENES.size():
+		return
+	var scene_path: String = ROUND_SCENES[current_round_index]
+	var mode_id: StringName = ROUND_IDS[current_round_index]
+	print("LOAD MODE index=%d id=%s ai=%d" % [current_round_index + 1, mode_id, ai_count])
+	var error: Error = get_tree().change_scene_to_file(scene_path)
+	if error != OK:
+		push_error("Failed to load round scene %s: %s" % [scene_path, error_string(error)])
+
+func _transition_after_round() -> void:
+	var delay := 0.05 if DisplayServer.get_name() == "headless" else 1.2
+	await get_tree().create_timer(delay).timeout
+	_transition_pending = false
+	if current_round_index + 1 < ROUND_SCENES.size():
+		current_round_index += 1
+		set_state(GameState.ROUND_BREAK)
+		_load_current_round()
+		return
+
+	campaign_running = false
+	set_state(GameState.RESULT)
+	print("CAMPAIGN COMPLETE rounds=%d clears=%d" % [ResultManager.round_results.size(), ResultManager.get_success_count()])
+	var error: Error = get_tree().change_scene_to_file(RESULT_SCENE)
+	if error != OK:
+		push_error("Failed to load result scene: %s" % error_string(error))
