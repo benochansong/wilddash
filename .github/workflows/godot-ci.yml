@@ -38,6 +38,18 @@ jobs:
       - name: Import project and benchmark scene headlessly
         run: /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --editor --path godot --quit
 
+      - name: Verify four-animal character system
+        run: |
+          set -o pipefail
+          timeout 20s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot res://tests/character_system_smoke.tscn \
+            | tee /tmp/wilddash-characters.log
+          grep -q "CHARACTER PROFILE id=dog" /tmp/wilddash-characters.log
+          grep -q "CHARACTER PROFILE id=rabbit" /tmp/wilddash-characters.log
+          grep -q "CHARACTER PROFILE id=elephant" /tmp/wilddash-characters.log
+          grep -q "CHARACTER PROFILE id=cat" /tmp/wilddash-characters.log
+          grep -q "CHARACTER SYSTEM PASS animals=4 states=7" /tmp/wilddash-characters.log
+
       - name: Run four-round campaign with four AI
         run: |
           set -o pipefail
