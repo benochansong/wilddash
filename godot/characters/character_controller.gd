@@ -17,6 +17,8 @@ var current_speed := 0.0
 var skill_cooldown_remaining := 0.0
 var _held_item: StringName = &""
 
+@onready var _visual := get_node_or_null("VisualModel") as WildDashCharacterVisual
+
 func _ready() -> void:
 	RaceManager.register_racer(self)
 
@@ -26,6 +28,7 @@ func _exit_tree() -> void:
 func _physics_process(delta: float) -> void:
 	skill_cooldown_remaining = maxf(0.0, skill_cooldown_remaining - delta)
 	if not is_player:
+		_sync_visual()
 		return
 
 	var steer := InputManager.get_steer_axis()
@@ -55,11 +58,14 @@ func _physics_process(delta: float) -> void:
 	velocity.x = forward.x * current_speed
 	velocity.z = forward.z * current_speed
 	move_and_slide()
+	_sync_visual()
 
 func try_use_skill() -> bool:
 	if skill_cooldown_remaining > 0.0:
 		return false
 	skill_cooldown_remaining = _cooldown_for_animal(animal_id)
+	if _visual:
+		_visual.play_action(&"Skill")
 	# Effects are intentionally not implemented in the scaffold. The signal is
 	# the seam for dog/rabbit/elephant/cat skill scenes or systems later.
 	skill_requested.emit(animal_id)
@@ -71,6 +77,10 @@ func set_held_item(item_id: StringName) -> void:
 
 func get_held_item() -> StringName:
 	return _held_item
+
+func _sync_visual() -> void:
+	if _visual:
+		_visual.update_locomotion(current_speed, is_on_floor())
 
 func _cooldown_for_animal(id: StringName) -> float:
 	match id:
