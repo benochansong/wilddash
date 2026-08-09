@@ -97,7 +97,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Godot 4.7.1 editor and export templates
+      - name: Install Godot 4.7.1 console editor and export templates
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
@@ -108,9 +108,11 @@ jobs:
           $templateDir = "$env:APPDATA\Godot\export_templates\4.7.1.stable"
           New-Item -ItemType Directory -Force $templateDir | Out-Null
           Copy-Item "$env:RUNNER_TEMP\templates\templates\*" $templateDir -Recurse -Force
-          $godot = (Get-ChildItem "$env:RUNNER_TEMP\godot\Godot_v4.7.1-stable_win64.exe").FullName
+          $godot = (Get-ChildItem "$env:RUNNER_TEMP\godot\Godot_v4.7.1-stable_win64_console.exe").FullName
+          if (-not (Test-Path $godot)) { throw "Godot console executable was not found" }
           "GODOT_EXE=$godot" | Out-File -FilePath $env:GITHUB_ENV -Append
           & $godot --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Import RC2 project on Windows
         shell: pwsh
@@ -126,13 +128,14 @@ jobs:
           $ErrorActionPreference = "Stop"
           $outDir = Join-Path $PWD "godot\build\windows"
           New-Item -ItemType Directory -Force $outDir | Out-Null
+
           & $env:GODOT_EXE --headless --path godot --export-release "Windows Desktop" "build/windows/WILD_DASH_3D_RC2.exe"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($LASTEXITCODE -ne 0) { throw "Godot RC2 export failed with code $LASTEXITCODE" }
 
           $exe = Join-Path $outDir "WILD_DASH_3D_RC2.exe"
           if (-not (Test-Path $exe)) { throw "RC2 Windows executable was not generated" }
           $item = Get-Item $exe
-          Write-Host "RC2 EXE: $($item.FullName) bytes=$($item.Length)"
+          Write-Host "RC2_EXE_READY path=$($item.FullName) bytes=$($item.Length)"
 
           $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
           $shaFile = Join-Path $outDir "WILD_DASH_3D_RC2.sha256"
@@ -174,4 +177,7 @@ jobs:
             gh release create $tag $zip --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --prerelease --title $title --notes $notes
             if ($LASTEXITCODE -ne 0) { throw "Failed to create RC2 pre-release" }
           }
-          Write-Host "RC2_RELEASE_PUBLISHED tag=$tag asset=$(Split-Path $zip -Leaf)"
+
+          $releaseUrl = gh release view $tag --repo $env:GITHUB_REPOSITORY --json url --jq .url
+          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($releaseUrl)) { throw "RC2 release verification failed" }
+          Write-Host "RC2_RELEASE_PUBLISHED tag=$tag url=$releaseUrl asset=$(Split-Path $zip -Leaf)"
