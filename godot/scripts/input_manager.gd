@@ -14,7 +14,7 @@ func _ready() -> void:
 	_ensure_action(ACTION_ACCELERATE, [KEY_W, KEY_UP])
 	_ensure_action(ACTION_BRAKE, [KEY_S, KEY_DOWN])
 	_ensure_action(ACTION_JUMP, [KEY_SPACE])
-	_ensure_action(ACTION_SKILL, [KEY_E])
+	_ensure_action(ACTION_SKILL, [KEY_E], [JOY_BUTTON_X])
 	_ensure_action(ACTION_ITEM, [KEY_Q], [JOY_BUTTON_B])
 
 func get_steer_axis() -> float:
