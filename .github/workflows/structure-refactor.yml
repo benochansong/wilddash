@@ -28,6 +28,7 @@ jobs:
         run: |
           node scripts/structure-refactor.cjs
           sed -i 's/AI_EMOJIS, BOXES, LANES, OBSTACLES, ROUTES/AI_EMOJIS, LANES, ROUTES/' app/page.tsx
+          sed -i 's/{ AI_EMOJIS, LANES, ROUTES, SWEEPERS, TRACK_LENGTH }/{ AI_EMOJIS, ENABLE_3D_RACE, LANES, ROUTES, SWEEPERS, TRACK_LENGTH }/' app/page.tsx
 
       - name: Lint
         run: npm run lint
