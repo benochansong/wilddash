@@ -144,7 +144,7 @@ func _build_ui() -> void:
 	box.add_child(title)
 
 	var subtitle := Label.new()
-	subtitle.text = "기본 동물 또는 직접 만든 키메라로 4라운드에 출전하세요."
+	subtitle.text = "기본 동물 또는 직접 설계한 Chimera 플레이스타일로 4라운드에 출전하세요."
 	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(subtitle)
 
@@ -180,12 +180,12 @@ func _build_ui() -> void:
 	box.add_child(divider)
 
 	var chimera_title := Label.new()
-	chimera_title.text = "CHIMERA PARTS"
+	chimera_title.text = "CHIMERA PLAYSTYLE PARTS"
 	chimera_title.add_theme_font_size_override("font_size", 18)
 	box.add_child(chimera_title)
-	_add_slot_row(box, &"head", "HEAD · Passive")
-	_add_slot_row(box, &"body", "BODY · Movement/Defense")
-	_add_slot_row(box, &"tail", "TAIL · Active Skill")
+	_add_slot_row(box, &"head", "HEAD · Active Skill")
+	_add_slot_row(box, &"body", "BODY · Passive Trait")
+	_add_slot_row(box, &"tail", "TAIL · Utility Bonus")
 
 	var style_row := HBoxContainer.new()
 	box.add_child(style_row)
@@ -262,24 +262,24 @@ func _refresh_preview() -> void:
 		_loadout.normalize()
 		_preview_racer.configure_chimera(_loadout)
 		var description := WildDashChimeraSystem.describe(_loadout)
-		_mode_label.text = "MODE: CHIMERA"
-		_summary_label.text = "Head %s · %s\nBody %s · %s\nTail %s · %s\nColor %s · Pattern %s" % [
-			description.head, description.passive.name,
-			description.body, description.body_role,
-			description.tail, description.skill_name,
+		_mode_label.text = "MODE: CHIMERA PLAYSTYLE BUILD"
+		_summary_label.text = "HEAD %s → %s\nBODY %s → %s\nTAIL %s → %s\nColor %s · Pattern %s" % [
+			description.head, description.skill_name,
+			description.body, description.body_passive.name,
+			description.tail, description.tail_utility.name,
 			description.palette, description.pattern,
 		]
 		_slot_labels[&"head"].text = String(_loadout.head_id).to_upper()
 		_slot_labels[&"body"].text = String(_loadout.body_id).to_upper()
 		_slot_labels[&"tail"].text = String(_loadout.tail_id).to_upper()
-		_start_button.text = "SAVE CHIMERA & START"
+		_start_button.text = "SAVE BUILD & START"
 	else:
 		_preview_racer.configure_animal(_selected_animal)
 		var definition := WildDashAnimalCatalog.get_definition(_selected_animal)
 		_mode_label.text = "MODE: BASIC ANIMAL"
-		_summary_label.text = "%s · %s\nMax %.1f · Jump %.1f · Collision %.2f\nSkill: %s · Cooldown %.0fs" % [
+		_summary_label.text = "%s · %s\nMax %.1f · Jump %.1f · Handling %.2f\nSkill: %s · Cooldown %.0fs" % [
 			definition.display_name, definition.role,
-			definition.max_speed, definition.jump_velocity, definition.collision_radius,
+			definition.max_speed, definition.jump_velocity, definition.turn_speed,
 			definition.skill_name, definition.skill_cooldown,
 		]
 		_start_button.text = "START AS %s" % definition.display_name.to_upper()
