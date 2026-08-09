@@ -35,7 +35,8 @@ const MAX_AI_COUNT := 10
 var state: GameState = GameState.BOOT
 var selected_animal: StringName = &"dog"
 var difficulty: StringName = &"chaos"
-var chimera_parts: Dictionary = {"head": 0, "body": 0, "tail": 0}
+var chimera_enabled := false
+var chimera_parts: Dictionary = WildDashChimeraSystem.default_loadout().to_dictionary()
 var ai_count := MIN_AI_COUNT
 var current_round_index := -1
 var round_active := false
@@ -58,10 +59,21 @@ func configure_run(
 	parts: Dictionary,
 	requested_ai_count: int = MIN_AI_COUNT,
 ) -> void:
-	selected_animal = animal
+	selected_animal = animal if WildDashAnimalCatalog.is_valid(animal) else &"dog"
 	difficulty = difficulty_id
-	chimera_parts = parts.duplicate(true)
+	if not parts.is_empty():
+		chimera_parts = WildDashChimeraLoadout.from_dictionary(parts).to_dictionary()
 	ai_count = clampi(requested_ai_count, MIN_AI_COUNT, MAX_AI_COUNT)
+
+func configure_chimera(parts: Dictionary, enabled := true) -> void:
+	chimera_parts = WildDashChimeraLoadout.from_dictionary(parts).to_dictionary()
+	chimera_enabled = enabled
+
+func disable_chimera() -> void:
+	chimera_enabled = false
+
+func get_chimera_loadout() -> WildDashChimeraLoadout:
+	return WildDashChimeraLoadout.from_dictionary(chimera_parts)
 
 func set_ai_count(value: int) -> void:
 	ai_count = clampi(value, MIN_AI_COUNT, MAX_AI_COUNT)
