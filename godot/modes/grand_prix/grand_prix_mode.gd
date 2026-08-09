@@ -1,10 +1,14 @@
 extends WildDashModeController
 
 const TRACK_SCENE: PackedScene = preload("res://tracks/grand_prix_track.tscn")
+const ITEM_BOX_SCENE: PackedScene = preload("res://items/item_box.tscn")
 const CHASE_CAMERA_SCRIPT: Script = preload("res://camera/chase_camera.gd")
+const AI_ITEM_BRAIN_SCRIPT: Script = preload("res://items/ai_item_brain.gd")
 const AI_ANIMALS: Array[StringName] = [&"rabbit", &"elephant", &"cat", &"dog"]
 const AI_SPEEDS: Array[float] = [13.2, 12.5, 13.0, 12.8]
 const ROUTE_LANES: Array[float] = [-2.4, 2.4, -0.8, 0.8, -1.7, 1.7, -0.2, 0.2, -2.8, 2.8]
+const ITEM_BOX_ROUTE_INDICES: Array[int] = [2, 4, 6, 8, 10, 12, 15]
+const ITEM_BOX_LANE_OFFSETS: Array[float] = [-3.2, 0.0, 3.2]
 
 var _player_rank := 0
 var _fps_sum := 0.0
@@ -12,11 +16,14 @@ var _fps_samples := 0
 var _headless_debug_elapsed := 0.0
 var _track: WildDashGrandPrixTrack
 var _route_points: Array[Vector3] = []
+var _item_boxes: Array[WildDashItemBox] = []
+var _ai_item_brains: Array[WildDashAIItemBrain] = []
 
 func _ready() -> void:
-	setup_mode(&"grand_prix", "ROUND 1 — Wild World Grand Prix", "W/↑ 가속 · A/D 조향 · Space 점프 · 7개 체크포인트를 순서대로 통과하세요", false)
+	setup_mode(&"grand_prix", "ROUND 1 — Wild World Grand Prix", "W/↑ 가속 · A/D 조향 · Space 점프 · Q/B 아이템 · 7개 체크포인트를 순서대로 통과하세요", false)
 	RaceManager.clear_racers()
 	RaceManager.clear_track()
+	ItemSystem.reset_runtime()
 	_track = TRACK_SCENE.instantiate() as WildDashGrandPrixTrack
 	if _track == null:
 		push_error("Failed to instantiate extended Grand Prix track")
@@ -41,10 +48,17 @@ func _ready() -> void:
 		driver.acceleration = 22.0
 		driver.avoidance_distance = 7.5
 		driver.set_race_route(_route_points)
+		var item_brain := AI_ITEM_BRAIN_SCRIPT.new() as WildDashAIItemBrain
+		item_brain.name = "%sItemBrain" % racer.name
+		item_brain.configure(racer, driver)
+		add_child(item_brain)
+		_ai_item_brains.append(item_brain)
+
+	_spawn_item_boxes()
 
 	# CI validates the same full route, but at a moderate accelerated pace.
 	# Keeping this below extreme tunneling speeds makes turns, checkpoint gates,
-	# obstacle avoidance and recovery exercise the production path reliably.
+	# obstacle avoidance, item boxes and recovery exercise the production path.
 	if headless:
 		var headless_driver := spawn_ai_driver(player, WildDashAIController.AIMode.RACE, 36.0, 0.0, 0.0)
 		headless_driver.steering_strength = 10.0
@@ -75,7 +89,7 @@ func _ready() -> void:
 	GameManager.begin_round(&"grand_prix")
 	RaceManager.start_race()
 	print("MODE START id=grand_prix ai=%d" % ai_racers.size())
-	print("GRAND PRIX START racers=%d ai=%d checkpoints=%d length=%.1fm" % [RaceManager.racers.size(), ai_racers.size(), RaceManager.get_checkpoint_count(), RaceManager.get_track_length()])
+	print("GRAND PRIX START racers=%d ai=%d checkpoints=%d length=%.1fm item_boxes=%d" % [RaceManager.racers.size(), ai_racers.size(), RaceManager.get_checkpoint_count(), RaceManager.get_track_length(), _item_boxes.size()])
 
 func _process(_delta: float) -> void:
 	if player == null:
@@ -89,6 +103,7 @@ func _process(_delta: float) -> void:
 	var checkpoint_total := RaceManager.get_checkpoint_count()
 	var progress_percent := RaceManager.get_progress_percent(player)
 	hud.set_metrics("Rank %d/%d   CP %d/%d   Progress %d%%   Speed %.1f   FPS %d" % [rank, RaceManager.racers.size(), checkpoint_progress, checkpoint_total, roundi(progress_percent), player.current_speed, fps])
+	hud.set_item_state(ItemSystem.get_display_name(player.get_held_item()), ItemSystem.get_status_text(player))
 
 func _physics_process(delta: float) -> void:
 	if RaceManager.active:
@@ -111,15 +126,38 @@ func _physics_process(delta: float) -> void:
 	for racer: Node3D in RaceManager.racers:
 		if racer is WildDashCharacterController:
 			var controller := racer as WildDashCharacterController
-			parts.append("%s cp=%d/%d progress=%.0f%% speed=%.1f finished=%s" % [
+			parts.append("%s cp=%d/%d progress=%.0f%% speed=%.1f item=%s finished=%s" % [
 				RaceManager.get_racer_label(racer),
 				RaceManager.get_checkpoint_progress(racer),
 				RaceManager.get_checkpoint_count(),
 				RaceManager.get_progress_percent(racer),
 				controller.current_speed,
+				ItemSystem.get_display_name(controller.get_held_item()),
 				str(controller.finished),
 			])
 	print("GRAND PRIX PROGRESS " + " | ".join(parts))
+
+func _spawn_item_boxes() -> void:
+	for route_index in ITEM_BOX_ROUTE_INDICES:
+		if route_index <= 0 or route_index >= _route_points.size() - 1:
+			continue
+		var point := _route_points[route_index]
+		var tangent := _route_points[route_index + 1] - _route_points[route_index - 1]
+		tangent.y = 0.0
+		if tangent.length_squared() <= 0.001:
+			tangent = Vector3.FORWARD
+		else:
+			tangent = tangent.normalized()
+		var right := Vector3(-tangent.z, 0.0, tangent.x)
+		for lane_offset in ITEM_BOX_LANE_OFFSETS:
+			var box := ITEM_BOX_SCENE.instantiate() as WildDashItemBox
+			if box == null:
+				continue
+			box.name = "ItemBox_R%02d_L%s" % [route_index, str(lane_offset).replace("-", "N").replace(".", "_")]
+			box.position = point + right * lane_offset + Vector3.UP * 1.35
+			add_child(box)
+			_item_boxes.append(box)
+	print("GRAND PRIX ITEM BOXES READY count=%d stations=%d respawn=5s" % [_item_boxes.size(), ITEM_BOX_ROUTE_INDICES.size()])
 
 func _orient_to_route(racer: WildDashCharacterController) -> void:
 	if _route_points.size() < 2:
@@ -141,9 +179,6 @@ func _on_player_finished(rank: int) -> void:
 	print("GRAND PRIX PLAYER FINISH rank=%d elapsed=%.2fs checkpoints=%d/%d" % [rank, RaceManager.get_elapsed_seconds(), RaceManager.get_checkpoint_progress(player), RaceManager.get_checkpoint_count()])
 
 func _on_race_completed() -> void:
-	# Headless CI uses an AI driver on the player node, so RaceManager's
-	# player-only signal is intentionally bypassed. Recover the rank from the
-	# authoritative finish order in that case.
 	if _player_rank <= 0 and player != null:
 		var index := RaceManager.finish_order.find(player)
 		if index >= 0:
@@ -163,5 +198,6 @@ func _on_race_completed() -> void:
 		"finishers": RaceManager.finish_order.size(),
 		"checkpoints": RaceManager.get_checkpoint_count(),
 		"track_length_m": RaceManager.get_track_length(),
+		"item_boxes": _item_boxes.size(),
 		"order": labels,
 	})
