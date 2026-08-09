@@ -43,7 +43,7 @@ const obstacleLateral=(o:{lateral:number;type:string;id:number},time:number)=>o.
 export function Race3D({animal,hero,difficulty,sound,haptics,reducedMotion,onFinish}:Props){
   const canvasRef=useRef<HTMLCanvasElement>(null);
   const keys=useRef<Record<string,boolean>>({});
-  const [view,setView]=useState({rank:25,time:0,speed:0,progress:0,skillCd:5,item:null as ItemKey,flash:"출발 보호 · 스킬 5초 잠금",section:SECTIONS[0].name});
+  const [view,setView]=useState({rank:25,time:0,speed:0,progress:0,skillCd:5,item:null as ItemKey,flash:"출발 보호 · 스킬 5초 잠금",section:SECTIONS[0].name as string});
   const seed=useRef(Math.floor(Math.random()*9999));
   const game=useRef({
     s:0,lateral:0,speed:CRUISE_SPEED,jump:0,vJump:0,time:0,skillCd:5,boost:0,shield:0,phase:0,hit:0,bumps:0,item:null as ItemKey,flash:"출발 보호 · 스킬 5초 잠금",finished:false,

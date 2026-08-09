@@ -25,10 +25,10 @@ const RIVALS = ["🦊", "🐼", "🐸", "🦁", "🐷", "🐵", "🐯", "🦝"];
 export function ArenaRound({ mode, hero, difficulty, sound, haptics, onComplete }: Props) {
   const info = MODE_INFO[mode];
   const scale = difficulty === "wild" ? .9 : difficulty === "chaos" ? 1 : 1.15;
-  const [view, setView] = useState({ x: 50, y: 72, time: info.time, score: 0, hearts: 3, flash: "", shove: 0 });
+  const [view, setView] = useState({ x: 50, y: 72, time: Number(info.time), score: 0, hearts: 3, flash: "", shove: 0 });
   const keys = useRef<Record<string, boolean>>({});
   const state = useRef({
-    x: 50, y: 72, time: info.time, score: 0, hearts: 3, immune: 0, shove: 0, flash: "", done: false,
+    x: 50, y: 72, time: Number(info.time), score: 0, hearts: 3, immune: 0, shove: 0, flash: "", done: false,
     fruit: Array.from({ length: 12 }, (_, i) => ({ id: i, x: 10 + ((i * 31) % 80), y: 12 + ((i * 47) % 70), active: true, respawn: 0, emoji: FRUIT[i % FRUIT.length] })),
     bots: RIVALS.slice(0, mode === "final" ? 2 : 8).map((emoji, i) => ({ emoji, x: 16 + (i * 19) % 70, y: 18 + (i * 27) % 62, tx: 50, ty: 50, stun: 0, windup: 1 + i * .35 })),
   });

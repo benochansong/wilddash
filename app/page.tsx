@@ -9,7 +9,6 @@ type Screen = "lobby" | "tutorial" | "lab" | "pick" | "countdown" | "race" | "ro
 type AnimalKey = "dog" | "rabbit" | "elephant" | "cat";
 type ItemKey = "banana" | "shield" | "magnet" | "ink" | null;
 type DifficultyKey = "wild" | "chaos" | "nightmare";
-interface InstallPromptEvent extends Event { prompt: () => Promise<void>; }
 const ENABLE_3D_RACE = true;
 
 type Animal = {
@@ -119,7 +118,6 @@ export default function Home() {
   const [difficulty, setDifficulty] = useState<DifficultyKey>("chaos");
   const [roundCleared, setRoundCleared] = useState(0);
   const [profile, setProfile] = useState({ fans: 0, wins: 0, best: 50 });
-  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settings, setSettings] = useState({ sound: true, haptics: true, reducedMotion: false, highContrast: false, largeTouch: false });
   const [countdown, setCountdown] = useState(3);
@@ -130,10 +128,6 @@ export default function Home() {
 
   useEffect(() => {
     try { const saved = localStorage.getItem("wild-dash-profile"); if (saved) setProfile(JSON.parse(saved)); const savedSettings=localStorage.getItem("wild-dash-settings"); if(savedSettings){const next=JSON.parse(savedSettings);setSettings(next);soundEnabled=next.sound;hapticsEnabled=next.haptics;} } catch { /* device-local progress is optional */ }
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => undefined);
-    const capture = (event: Event) => { event.preventDefault(); setInstallPrompt(event as InstallPromptEvent); };
-    window.addEventListener("beforeinstallprompt", capture);
-    return () => window.removeEventListener("beforeinstallprompt", capture);
   }, []);
 
   const updateSetting = <K extends keyof typeof settings,>(key: K, value: (typeof settings)[K]) => {
@@ -325,8 +319,8 @@ export default function Home() {
       {settingsOpen&&<div className="settings-backdrop" onClick={()=>setSettingsOpen(false)}><section className="settings-panel" onClick={(e)=>e.stopPropagation()}><button className="settings-close" onClick={()=>setSettingsOpen(false)}>×</button><p>GAME SETTINGS</p><h2>플레이 설정</h2><SettingRow label="사운드" note="효과음과 간단한 배경 리듬" checked={settings.sound} onChange={(v)=>updateSetting("sound",v)}/><SettingRow label="모바일 진동" note="충돌과 스킬 사용 시 햅틱" checked={settings.haptics} onChange={(v)=>updateSetting("haptics",v)}/><SettingRow label="화면 움직임 줄이기" note="흔들림과 반복 애니메이션 최소화" checked={settings.reducedMotion} onChange={(v)=>updateSetting("reducedMotion",v)}/><SettingRow label="고대비 모드" note="경고와 조작 요소를 더 선명하게" checked={settings.highContrast} onChange={(v)=>updateSetting("highContrast",v)}/><SettingRow label="큰 터치 버튼" note="모바일 조작 버튼을 20% 확대" checked={settings.largeTouch} onChange={(v)=>updateSetting("largeTouch",v)}/><button className="primary compact" onClick={()=>setSettingsOpen(false)}>저장하고 돌아가기</button></section></div>}
 
       {screen === "lobby" && <section className="lobby">
-        <div className="ticker"><span>● LIVE</span> 오늘의 코스: 우당탕탕 사파리 고속도로 · 수로 비중 20% · 낭떠러지 주의!</div>
-        <div className="lobby-copy"><p className="eyebrow">50-PLAYER PARTY ROYALE</p><h1>엉뚱한 동물들의<br/><em>미친 질주!</em></h1><p className="subcopy">나만의 키메라를 만들고, 장애물을 돌파하고,<br/>마지막 결승선까지 살아남으세요.</p><div className="lobby-actions"><button className="primary" onClick={beginPlay}>PLAY! <span>→</span></button><button className="secondary" onClick={() => setScreen("lab")}>🧪 키메라 연구소</button><button className="install-button" onClick={()=>setScreen("tutorial")}>🎓 훈련소</button>{installPrompt&&<button className="install-button" onClick={async()=>{await installPrompt.prompt();setInstallPrompt(null)}}>＋ 기기에 설치</button>}</div><div className="profile-strip"><span>⭐ 팬 <b>{profile.fans.toLocaleString()}</b></span><span>🏆 우승 <b>{profile.wins}</b></span><span>🥇 최고 <b>{profile.best}위</b></span></div><div className="online"><b>● 12,481</b>마리 지금 우당탕탕 중</div></div>
+        <div className="ticker"><span>● OFFLINE</span> 오늘의 코스: 우당탕탕 사파리 고속도로 · 인터넷 연결 없이 바로 플레이!</div>
+        <div className="lobby-copy"><p className="eyebrow">50-PLAYER PARTY ROYALE</p><h1>엉뚱한 동물들의<br/><em>미친 질주!</em></h1><p className="subcopy">나만의 키메라를 만들고, 장애물을 돌파하고,<br/>마지막 결승선까지 살아남으세요.</p><div className="lobby-actions"><button className="primary" onClick={beginPlay}>PLAY! <span>→</span></button><button className="secondary" onClick={() => setScreen("lab")}>🧪 키메라 연구소</button><button className="install-button" onClick={()=>setScreen("tutorial")}>🎓 훈련소</button></div><div className="profile-strip"><span>⭐ 팬 <b>{profile.fans.toLocaleString()}</b></span><span>🏆 우승 <b>{profile.wins}</b></span><span>🥇 최고 <b>{profile.best}위</b></span></div><div className="online"><b>● LOCAL</b>진행 기록은 이 PC에 자동 저장됩니다</div></div>
         <div className="hero-stage"><div className="spotlight"/><div className="crown">오늘의 엉뚱왕</div><Chimera {...parts}/><div className="nameplate"><b>{ANIMALS[animal].name}</b><span>베이스: {ANIMALS[animal].name.replace("멍대시","강아지").replace("깡총이","토끼").replace("코뿜이","코끼리").replace("냥쏘","고양이")}</span></div><div className="float-sticker sticker-a">WOW!</div><div className="float-sticker sticker-b">⚡</div></div>
         <div className="news-card"><span>WILD NEWS</span><b>🍌 바나나 대란 발생!</b><small>고속도로 3구간이 미끄러워요</small></div>
       </section>}

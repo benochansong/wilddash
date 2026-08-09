@@ -1,41 +1,72 @@
 {
   "name": "wild-dash-50",
-  "version": "0.1.0",
+  "version": "1.0.0",
+  "description": "WILD DASH 50 동물 서바이벌 레이싱 데스크톱 게임",
+  "author": "WILD DASH 50",
   "private": true,
+  "type": "module",
+  "main": "electron/main.cjs",
   "engines": {
     "node": ">=22.13.0"
   },
   "scripts": {
-    "dev": "vinext dev",
-    "build": "vinext build",
-    "start": "vinext start",
-    "test": "npm run build && node --test tests/rendered-html.test.mjs",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "drizzle-kit generate"
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "desktop": "electron .",
+    "desktop:dev": "concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && cross-env DESKTOP_DEV_URL=http://127.0.0.1:5173 electron .\"",
+    "dist:win": "npm run build && electron-builder --win nsis",
+    "test": "npm run build && node --test tests/desktop-build.test.mjs",
+    "lint": "eslint app src --ignore-pattern dist"
   },
   "dependencies": {
-    "drizzle-orm": "0.45.2",
-    "next": "16.2.6",
     "react": "19.2.6",
     "react-dom": "19.2.6"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "1.37.1",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.2",
-    "@vitejs/plugin-rsc": "0.5.26",
-    "drizzle-kit": "0.31.10",
+    "concurrently": "9.2.1",
+    "cross-env": "10.1.0",
+    "electron": "39.8.3",
+    "electron-builder": "26.0.12",
     "eslint": "9.39.4",
-    "eslint-config-next": "16.2.6",
-    "react-server-dom-webpack": "19.2.6",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3",
-    "vinext": "0.0.50",
     "vite": "8.0.13",
-    "wrangler": "4.92.0"
+    "wait-on": "9.0.4"
   },
-  "type": "module"
+  "build": {
+    "appId": "com.wilddash50.game",
+    "productName": "WILD DASH 50",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "public/app-icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "WILD DASH 50"
+    },
+    "artifactName": "WILD-DASH-50-Setup-${version}.${ext}"
+  }
 }
