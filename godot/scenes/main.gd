@@ -16,8 +16,10 @@ func _ready() -> void:
 	# Let all CharacterBody3D instances settle onto the real collision floor before GO.
 	await get_tree().physics_frame
 	await get_tree().physics_frame
-	await get_tree().create_timer(1.2).timeout
+	if DisplayServer.get_name() != "headless":
+		await get_tree().create_timer(1.2).timeout
 	RaceManager.start_race()
+	print("RACE START racers=%d" % RaceManager.racers.size())
 
 func _process(_delta: float) -> void:
 	var fps := Engine.get_frames_per_second()
