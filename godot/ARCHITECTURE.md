@@ -7,6 +7,7 @@
 - 게임 규칙과 수치만 가져와 Godot Scene/Node/Resource 방식으로 재구현한다.
 - 첫 vertical slice는 플레이어 1명 + 임시 트랙 + 소수 AI만 사용한다.
 - 49 AI는 프로파일링 후 10 → 25 → 50 단계로 확장한다.
+- **3D 모델과 게임 로직을 분리해 모델 교체가 CharacterController 수정으로 이어지지 않게 한다.**
 
 ## 폴더 책임
 
@@ -25,10 +26,27 @@
 ### characters/
 
 - `character_controller.gd`: CharacterBody3D 플레이어 물리 이동, 점프, skill/item 요청
+- `character_visual.gd`: GLB/Skeleton/AnimationPlayer/AnimationTree와 gameplay 사이의 visual adapter
 - `ai_controller.gd`: 첫 단계 단순 AI 이동 스켈레톤
-- `test_racer.tscn`: Capsule primitive 임시 플레이어
+- `test_racer.tscn`: CharacterRoot + collision + replaceable VisualModel 조합
+- `visuals/`: imported model을 감싸는 visual wrapper scenes
 
-향후 실제 동물 GLB를 `CharacterBody3D` 아래 visual child로 교체합니다. 물리 body와 visual model을 분리해 모델 교체가 게임 규칙에 영향을 덜 주게 합니다.
+캐릭터 scene 계약:
+
+```text
+CharacterRoot (CharacterBody3D + CharacterController)
+├─ CollisionShape3D
+├─ VisualModel (character_visual.gd)
+│  └─ ImportedModel (GLB/glTF)
+│     ├─ Skeleton3D
+│     ├─ skinned MeshInstance3D
+│     └─ AnimationPlayer / AnimationTree
+└─ CameraRig / gameplay helpers
+```
+
+`CharacterController`는 imported GLB 내부 NodePath, bone 이름, material, animation track을 직접 알지 않습니다.
+게임플레이는 `VisualModel`에 `Idle`, `Run`, `Jump`, `Skill`, `Win`, `Lose`와 같은 semantic state만 전달합니다.
+모델별 보정과 animation implementation은 VisualModel wrapper가 담당합니다.
 
 ### tracks/
 현재 `test_track.tscn`은 CSGBox3D 기반 직선 테스트 코스입니다. 실제 트랙은 checkpoint 또는 curve/spline 기반 진행률을 가져야 합니다.
@@ -38,6 +56,13 @@
 - `prototype_rules.gd`: Prototype V1에서 재사용할 엔진 독립 규칙 상수
 - `item_system.gd`: 아이템 지급/소모 경계. 실제 아이템 효과는 이후 별도 Scene/Resource로 확장
 
+### assets/
+
+- `source/`: Blender/Maya 작업 원본. `.gdignore`로 runtime import 제외
+- `characters/`: Godot runtime용 GLB/glTF
+- `tracks/`, `props/`, `items/`, `textures/`: 실제 3D 리소스
+- `CHARACTER_PIPELINE.md`: 캐릭터 제작/LOD/export/import 표준
+
 ## 데이터 흐름
 
 ```text
@@ -46,10 +71,10 @@ Godot Input
 InputManager
    ↓
 CharacterController ──→ ItemSystem / skill signal
-   ↓
-CharacterBody3D physics
-   ↓
-Track collision / obstacle physics
+   ↓                        ↓
+CharacterBody3D physics   VisualModel semantic animation
+   ↓                        ↓
+Track collision          GLB / Skeleton / Animation
    ↓
 RaceManager
    ↓
@@ -57,6 +82,7 @@ GameManager state / future UI
 ```
 
 AI는 player input을 사용하지 않고 `AIController`가 동일한 CharacterBody3D 이동 계층을 제어하는 방향으로 확장합니다.
+AI 캐릭터 역시 플레이어와 같은 VisualModel contract를 사용합니다.
 
 ## Prototype V1 → Godot 매핑
 
@@ -70,6 +96,7 @@ AI는 player input을 사용하지 않고 `AIController`가 동일한 CharacterB
 | localStorage SaveManager | `user://` SaveManager |
 | TS config objects | GDScript constants → later Resource `.tres` |
 | flowSystem/roundSystem | Godot systems/state machine |
+| Canvas/emoji character | GLB visual wrapper + Skeleton3D |
 
 ## 다음 vertical slice의 기준
 
@@ -79,5 +106,7 @@ AI는 player input을 사용하지 않고 `AIController`가 동일한 CharacterB
 2. 카메라가 플레이어를 안정적으로 추적한다.
 3. 임시 AI 3~5마리가 같은 트랙을 달린다.
 4. checkpoint 기반 진행률과 순위가 동작한다.
-5. 한 동물 스킬과 한 아이템이 실제 3D 환경에서 동작한다.
-6. Windows에서 안정적으로 60 FPS를 확인한 뒤 AI 수를 늘린다.
+5. 실제 GLB 캐릭터 1종이 VisualModel wrapper로 교체된다.
+6. Idle/Run/Jump/Hit/Skill/Win/Lose animation contract가 연결된다.
+7. 한 동물 스킬과 한 아이템이 실제 3D 환경에서 동작한다.
+8. Windows에서 안정적으로 60 FPS를 확인한 뒤 AI 수를 늘린다.
