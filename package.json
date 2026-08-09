@@ -16,7 +16,8 @@
     "desktop": "electron .",
     "desktop:dev": "concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && cross-env DESKTOP_DEV_URL=http://127.0.0.1:5173 electron .\"",
     "dist:win": "npm run build && electron-builder --win nsis",
-    "test": "npm run build && node --test tests/*.test.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:desktop": "node --test tests/desktop-build.verify.mjs",
     "lint": "eslint app src game ui electron"
   },
   "dependencies": {
