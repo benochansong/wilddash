@@ -4,7 +4,7 @@ const TRACK_SCENE: PackedScene = preload("res://tracks/test_track.tscn")
 const CHASE_CAMERA_SCRIPT: Script = preload("res://camera/chase_camera.gd")
 const AI_ANIMALS: Array[StringName] = [&"rabbit", &"elephant", &"cat", &"dog"]
 const AI_SPEEDS: Array[float] = [10.8, 9.9, 10.5, 10.1]
-const SAFE_LANES: Array[float] = [-7.2, 7.2, 5.5, -0.8, -5.8, 0.8, 6.4, -6.4, 4.9, -1.8]
+const SAFE_LANES: Array[float] = [-7.2, 7.2, 5.5, -8.0, -5.8, 6.2, 7.8, -7.8, 4.9, -6.6]
 
 var _player_rank := 0
 var _fps_sum := 0.0
@@ -24,7 +24,10 @@ func _ready() -> void:
 		var lane: float = SAFE_LANES[i % SAFE_LANES.size()]
 		var animal: StringName = AI_ANIMALS[i % AI_ANIMALS.size()]
 		var speed: float = AI_SPEEDS[i % AI_SPEEDS.size()] - float(i / AI_SPEEDS.size()) * 0.12
-		var start_z := 40.0 + float(i / SAFE_LANES.size()) * 1.6
+		# Keep extra racers in a staggered second row so capsule bodies never
+		# overlap when multiple safe outer lanes are reused.
+		var start_row: int = 1 if i >= 3 else 0
+		var start_z := 40.0 + float(start_row) * 3.2 + float(i / SAFE_LANES.size()) * 1.6
 		var racer := spawn_racer("AI_%02d" % (i + 1), animal, Vector3(lane, 0.1, start_z), false, WildDashCharacterController.MovementMode.RACE)
 		spawn_ai_driver(racer, WildDashAIController.AIMode.RACE, speed, lane, 0.12)
 
