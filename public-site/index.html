@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#08131f" />
+  <meta name="description" content="WILD DASH 3D - Windows PC 오프라인 싱글플레이 파티 레이싱 게임 Release Candidate" />
+  <title>WILD DASH 3D — Windows RC1</title>
+  <style>
+    :root{--bg:#07111d;--panel:#0d1c2b;--line:#1c3850;--text:#edf7ff;--muted:#9bb4c7;--a:#52f0b5;--b:#67a6ff;--warn:#ffd56a}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;background:radial-gradient(circle at 20% 0,#12314a 0,transparent 35%),radial-gradient(circle at 85% 15%,#12332d 0,transparent 28%),var(--bg);color:var(--text);line-height:1.6}
+    a{color:inherit}.wrap{width:min(1120px,calc(100% - 32px));margin:auto}.nav{height:72px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ffffff14}.brand{font-weight:900;letter-spacing:.08em}.pill{font-size:12px;padding:6px 10px;border:1px solid #ffffff22;border-radius:999px;color:var(--muted)}
+    .hero{padding:92px 0 64px;display:grid;grid-template-columns:1.15fr .85fr;gap:42px;align-items:center}.eyebrow{color:var(--a);font-weight:800;letter-spacing:.12em;font-size:13px}.hero h1{font-size:clamp(48px,8vw,92px);line-height:.92;margin:14px 0 22px;letter-spacing:-.055em}.lead{font-size:clamp(18px,2.4vw,24px);color:#c8dbea;max-width:760px}.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:52px;padding:0 20px;border-radius:14px;text-decoration:none;font-weight:850}.primary{background:linear-gradient(135deg,var(--a),#28cba3);color:#032219;box-shadow:0 12px 40px #35e4b12e}.secondary{border:1px solid #ffffff26;background:#ffffff0b}.note{margin-top:15px;color:var(--muted);font-size:13px}
+    .racecard{min-height:390px;border:1px solid #ffffff1f;border-radius:28px;background:linear-gradient(160deg,#102a3dcc,#0c1724e8);padding:28px;position:relative;overflow:hidden;box-shadow:0 30px 100px #0008}.track{position:absolute;left:16%;right:16%;top:-10%;bottom:-10%;transform:perspective(650px) rotateX(58deg);background:repeating-linear-gradient(90deg,#20384a 0 2px,transparent 2px 68px),linear-gradient(#15293a,#0b1925);border-left:3px solid #52f0b566;border-right:3px solid #67a6ff66}.animals{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:14px;font-size:48px;filter:drop-shadow(0 8px 12px #0009)}.animal{animation:bob 1.5s ease-in-out infinite alternate}.animal:nth-child(2){animation-delay:.2s}.animal:nth-child(3){animation-delay:.4s}.animal:nth-child(4){animation-delay:.6s}@keyframes bob{to{transform:translateY(-14px)}}.cardlabel{position:absolute;left:28px;bottom:24px}.cardlabel b{font-size:22px;display:block}.cardlabel span{color:var(--muted)}
+    section{padding:68px 0}.sectionhead{margin-bottom:24px}.sectionhead h2{font-size:34px;margin:0 0 8px}.sectionhead p{margin:0;color:var(--muted)}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.card{padding:22px;border-radius:20px;border:1px solid #ffffff17;background:#ffffff08}.card .num{color:var(--a);font-size:12px;font-weight:900;letter-spacing:.1em}.card h3{margin:10px 0 7px;font-size:19px}.card p{margin:0;color:var(--muted);font-size:14px}.features{grid-template-columns:repeat(3,1fr)}
+    .download{padding:34px;border:1px solid #52f0b544;background:linear-gradient(135deg,#102d2b,#102238);border-radius:26px;display:flex;justify-content:space-between;gap:28px;align-items:center}.download h2{margin:0 0 8px;font-size:30px}.download p{margin:0;color:#bed3df}.meta{font-size:13px;color:var(--muted);margin-top:10px}.warning{margin-top:18px;padding:14px 16px;border-left:3px solid var(--warn);background:#ffd56a0d;color:#d6c691;font-size:14px}.controls{display:grid;grid-template-columns:1fr 1fr;gap:18px}.keys{display:flex;gap:8px;flex-wrap:wrap}.key{padding:7px 10px;background:#fff0;border:1px solid #ffffff28;border-radius:8px;font-family:ui-monospace,monospace;font-size:12px}.status{display:flex;gap:9px;flex-wrap:wrap}.status span{padding:7px 10px;border-radius:999px;background:#52f0b512;border:1px solid #52f0b535;color:#aef8db;font-size:12px}
+    footer{padding:42px 0 64px;color:#7897aa;border-top:1px solid #ffffff14;font-size:13px}.small{font-size:12px;color:#7791a3}
+    @media(max-width:820px){.hero{grid-template-columns:1fr;padding-top:58px}.racecard{min-height:280px}.grid,.features{grid-template-columns:1fr 1fr}.download{align-items:flex-start;flex-direction:column}.controls{grid-template-columns:1fr}}
+    @media(max-width:520px){.grid,.features{grid-template-columns:1fr}.hero h1{font-size:52px}.animals{font-size:38px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <nav class="nav"><div class="brand">WILD DASH 3D</div><div class="pill">Windows RC1 · 0.9.0-rc1</div></nav>
+    <main>
+      <div class="hero">
+        <div>
+          <div class="eyebrow">3D ANIMAL PARTY RACING</div>
+          <h1>RUN WILD.<br>DASH HARD.</h1>
+          <p class="lead">Dog, Rabbit, Elephant, Cat과 함께 달리고, 모으고, 살아남고, 밀어내는 4라운드 3D 파티 레이싱 게임.</p>
+          <div class="actions">
+            <a class="btn primary" href="downloads/WILD_DASH_3D_RC1.exe" download>Windows RC1 다운로드</a>
+            <a class="btn secondary" href="#rounds">게임 보기</a>
+          </div>
+          <div class="note">Windows 10/11 · 64-bit · 오프라인 싱글플레이 · 키보드/게임패드</div>
+        </div>
+        <div class="racecard" aria-label="WILD DASH animal racers illustration">
+          <div class="track"></div>
+          <div class="animals"><span class="animal">🐶</span><span class="animal">🐰</span><span class="animal">🐘</span><span class="animal">🐱</span></div>
+          <div class="cardlabel"><b>WILD WORLD GRAND PRIX</b><span>Godot 3D Technical Release Candidate</span></div>
+        </div>
+      </div>
+
+      <section id="rounds">
+        <div class="sectionhead"><h2>4개의 라운드, 하나의 생존 레이스</h2><p>각 라운드는 독립 3D Scene으로 구성됩니다.</p></div>
+        <div class="grid">
+          <article class="card"><div class="num">ROUND 01</div><h3>Wild World Grand Prix</h3><p>실제 3D 트랙에서 장애물을 피하고 결승선을 향해 질주합니다.</p></article>
+          <article class="card"><div class="num">ROUND 02</div><h3>Fruit Collection</h3><p>아레나를 돌아다니며 상대보다 빠르게 과일을 수집합니다.</p></article>
+          <article class="card"><div class="num">ROUND 03</div><h3>Floor Collapse Survival</h3><p>무너지는 바닥 위에서 끝까지 살아남아야 합니다.</p></article>
+          <article class="card"><div class="num">FINAL</div><h3>Push-Out Arena</h3><p>원형 아레나에서 상대를 밀어내고 마지막 생존자가 됩니다.</p></article>
+        </div>
+      </section>
+
+      <section>
+        <div class="sectionhead"><h2>RC1에 포함된 것</h2><p>실제 Windows 배포 검증을 위한 핵심 시스템이 연결되어 있습니다.</p></div>
+        <div class="grid features">
+          <article class="card"><h3>🎮 Keyboard + Gamepad</h3><p>WASD/방향키와 Xbox 호환 패드 InputMap을 공유합니다. 키보드 리맵도 저장됩니다.</p></article>
+          <article class="card"><h3>🔊 Audio & Settings</h3><p>Master/Music/SFX Audio Bus, 볼륨, 음소거, 해상도, Fullscreen, FPS 제한을 지원합니다.</p></article>
+          <article class="card"><h3>💾 Save & Restart</h3><p>버전형 Save v2와 재실행 Save Load 검증이 포함되어 있습니다.</p></article>
+          <article class="card"><h3>♿ Accessibility</h3><p>Reduced Motion과 High Contrast 옵션을 유지합니다.</p></article>
+          <article class="card"><h3>🐾 3D Physics</h3><p>CharacterBody3D 이동, 점프, 충돌, AI 주행과 장애물 회피를 사용합니다.</p></article>
+          <article class="card"><h3>⚡ Performance Path</h3><p>10→25→50 Racer 성능 벤치마크와 거리 기반 AI LOD 경로를 갖추고 있습니다.</p></article>
+        </div>
+      </section>
+
+      <section>
+        <div class="controls">
+          <div class="card"><div class="num">KEYBOARD</div><h3>기본 조작</h3><div class="keys"><span class="key">W / ↑ 가속</span><span class="key">S / ↓ 감속</span><span class="key">A D 조향</span><span class="key">Space 점프</span><span class="key">E 스킬</span><span class="key">Q 아이템</span><span class="key">Esc / P 일시정지</span></div></div>
+          <div class="card"><div class="num">GAMEPAD</div><h3>Xbox 호환 패드</h3><div class="keys"><span class="key">Left Stick / D-Pad</span><span class="key">A 점프</span><span class="key">X 스킬</span><span class="key">B 아이템</span><span class="key">Start 일시정지</span></div></div>
+        </div>
+      </section>
+
+      <section id="download">
+        <div class="download">
+          <div>
+            <div class="eyebrow">PUBLIC PLAYTEST BUILD</div>
+            <h2>WILD DASH 3D · Windows RC1</h2>
+            <p>기술적 Release Candidate입니다. 다운로드 후 압축 없이 EXE를 실행할 수 있습니다.</p>
+            <div class="meta">Version 0.9.0-rc1 · Godot 4.7.1 · Windows x86_64 · Offline</div>
+          </div>
+          <a class="btn primary" href="downloads/WILD_DASH_3D_RC1.exe" download>게임 다운로드</a>
+        </div>
+        <div class="warning">현재 RC1은 코드 서명이 없는 테스트 빌드라 Windows SmartScreen 경고가 나타날 수 있습니다. 최종 상용/Steam 릴리스가 아니라 공개 플레이테스트용 기술 RC입니다.</div>
+      </section>
+
+      <section>
+        <div class="sectionhead"><h2>현재 상태</h2><p>자동화된 기술 검증은 통과했고, 실제 Windows PC 플레이테스트를 진행하는 단계입니다.</p></div>
+        <div class="status"><span>Godot Import PASS</span><span>4-Round Flow PASS</span><span>Save/Restart PASS</span><span>Windows Export PASS</span><span>EXE Smoke Launch PASS</span><span>Steam SDK 분리</span></div>
+      </section>
+    </main>
+    <footer>© 2026 WILD DASH. Technical RC playtest build.<br><span class="small">Production animal art, final audio, code signing and Steam integration are separate release steps.</span></footer>
+  </div>
+</body>
+</html>
