@@ -1,0 +1,178 @@
+name: Input Refactor Verify
+
+on:
+  push:
+    branches:
+      - stabilization/wilddash-prototype
+
+permissions:
+  contents: write
+
+jobs:
+  refactor-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Apply centralized input refactor
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+
+          function edit(path, transform) {
+            const before = fs.readFileSync(path, 'utf8');
+            const after = transform(before);
+            if (before === after) throw new Error(`No changes applied to ${path}`);
+            fs.writeFileSync(path, after);
+          }
+
+          function replaceOrThrow(text, from, to, label) {
+            if (!text.includes(from)) throw new Error(`Missing expected input block: ${label}`);
+            return text.replace(from, to);
+          }
+
+          edit('app/page.tsx', (text) => {
+            text = replaceOrThrow(
+              text,
+              'import { Race3D } from "./Race3D";\n',
+              'import { Race3D } from "./Race3D";\nimport { inputManager } from "../game/input/InputManager";\n',
+              'page import'
+            );
+            text = replaceOrThrow(text, '  const keys = useRef<Record<string, boolean>>({});\n', '', 'page keys ref');
+            const oldEffect = `  useEffect(() => {\n    const down = (e: KeyboardEvent) => {\n      keys.current[e.key.toLowerCase()] = true;\n      if ([" ", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(e.key.toLowerCase())) e.preventDefault();\n      if (e.key === " ") doJump();\n      if (e.key.toLowerCase() === "e") activateSkill();\n      if (e.key.toLowerCase() === "q") activateItem();\n    };\n    const up = (e: KeyboardEvent) => { keys.current[e.key.toLowerCase()] = false; };\n    window.addEventListener("keydown", down); window.addEventListener("keyup", up);\n    return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); };\n  }, [doJump, activateItem, activateSkill]);`;
+            const newEffect = `  useEffect(() => {\n    if (screen !== "race" || ENABLE_3D_RACE) return;\n    return inputManager.activate("legacy-race", {\n      onJump: doJump,\n      onSkill: activateSkill,\n      onItem: activateItem,\n    });\n  }, [screen, doJump, activateItem, activateSkill]);`;
+            text = replaceOrThrow(text, oldEffect, newEffect, 'page keyboard effect');
+            text = text
+              .replaceAll('keys.current["d"] || keys.current["arrowright"]', 'inputManager.isPressed("right")')
+              .replaceAll('keys.current["a"] || keys.current["arrowleft"]', 'inputManager.isPressed("left")')
+              .replaceAll('keys.current["s"] || keys.current["arrowdown"]', 'inputManager.isPressed("down")')
+              .replaceAll('keys.current["w"] || keys.current["arrowup"]', 'inputManager.isPressed("up")')
+              .replaceAll('onPointerDown={()=>keys.current["w"]=true}', 'onPointerDown={()=>inputManager.setExternalAction("legacy-race-touch","up",true)}')
+              .replaceAll('onPointerUp={()=>keys.current["w"]=false}', 'onPointerUp={()=>inputManager.setExternalAction("legacy-race-touch","up",false)}')
+              .replaceAll('onPointerCancel={()=>keys.current["w"]=false}', 'onPointerCancel={()=>inputManager.setExternalAction("legacy-race-touch","up",false)}')
+              .replaceAll('onPointerDown={()=>keys.current["s"]=true}', 'onPointerDown={()=>inputManager.setExternalAction("legacy-race-touch","down",true)}')
+              .replaceAll('onPointerUp={()=>keys.current["s"]=false}', 'onPointerUp={()=>inputManager.setExternalAction("legacy-race-touch","down",false)}')
+              .replaceAll('onPointerCancel={()=>keys.current["s"]=false}', 'onPointerCancel={()=>inputManager.setExternalAction("legacy-race-touch","down",false)}')
+              .replaceAll('onPointerDown={()=>keys.current["d"]=true}', 'onPointerDown={()=>inputManager.setExternalAction("legacy-race-touch","right",true)}')
+              .replaceAll('onPointerUp={()=>keys.current["d"]=false}', 'onPointerUp={()=>inputManager.setExternalAction("legacy-race-touch","right",false)}')
+              .replaceAll('onPointerCancel={()=>keys.current["d"]=false}', 'onPointerCancel={()=>inputManager.setExternalAction("legacy-race-touch","right",false)}');
+            if (text.includes('keys.current')) throw new Error('page.tsx still contains direct key state');
+            if (text.includes('window.addEventListener("keydown"')) throw new Error('page.tsx still contains direct keyboard listener');
+            return text;
+          });
+
+          edit('app/Race3D.tsx', (text) => {
+            text = replaceOrThrow(
+              text,
+              'import { useCallback, useEffect, useRef, useState } from "react";\n',
+              'import { useCallback, useEffect, useRef, useState } from "react";\nimport { inputManager, type InputAction } from "../game/input/InputManager";\n',
+              'Race3D import'
+            );
+            text = replaceOrThrow(text, '  const keys=useRef<Record<string,boolean>>({});\n', '', 'Race3D keys ref');
+            const oldEffect = `  useEffect(()=>{\n    const down=(e:KeyboardEvent)=>{keys.current[e.key.toLowerCase()]=true;if(e.key===" "){e.preventDefault();jump()}if(e.key.toLowerCase()==="e")activateSkill();if(e.key.toLowerCase()==="q")activateItem()};\n    const up=(e:KeyboardEvent)=>{keys.current[e.key.toLowerCase()]=false};window.addEventListener("keydown",down);window.addEventListener("keyup",up);return()=>{window.removeEventListener("keydown",down);window.removeEventListener("keyup",up)};\n  },[jump,activateItem,activateSkill]);`;
+            const newEffect = `  useEffect(()=>inputManager.activate("race3d",{onJump:jump,onSkill:activateSkill,onItem:activateItem}),[jump,activateItem,activateSkill]);`;
+            text = replaceOrThrow(text, oldEffect, newEffect, 'Race3D keyboard effect');
+            text = text
+              .replaceAll('keys.current["d"]||keys.current["arrowright"]', 'inputManager.isPressed("right")')
+              .replaceAll('keys.current["a"]||keys.current["arrowleft"]', 'inputManager.isPressed("left")')
+              .replaceAll('keys.current["w"]||keys.current["arrowup"]', 'inputManager.isPressed("up")')
+              .replaceAll('keys.current["s"]||keys.current["arrowdown"]', 'inputManager.isPressed("down")')
+              .replace('  const press=(key:string,value:boolean)=>{keys.current[key]=value};', '  const press=(action:InputAction,value:boolean)=>inputManager.setExternalAction("race3d-touch",action,value);')
+              .replaceAll('press("a",', 'press("left",')
+              .replaceAll('press("d",', 'press("right",')
+              .replaceAll('press("w",', 'press("up",')
+              .replaceAll('press("s",', 'press("down",')
+              .replaceAll('onClick={jump}', 'onClick={()=>inputManager.trigger("jump")}')
+              .replaceAll('onClick={activateSkill}', 'onClick={()=>inputManager.trigger("skill")}')
+              .replaceAll('onClick={activateItem}', 'onClick={()=>inputManager.trigger("item")}');
+            if (text.includes('keys.current')) throw new Error('Race3D.tsx still contains direct key state');
+            if (text.includes('window.addEventListener("keydown"')) throw new Error('Race3D.tsx still contains direct keyboard listener');
+            return text;
+          });
+
+          edit('app/ArenaRound.tsx', (text) => {
+            text = replaceOrThrow(
+              text,
+              'import { useCallback, useEffect, useRef, useState } from "react";\n',
+              'import { useCallback, useEffect, useRef, useState } from "react";\nimport { inputManager, type InputAction } from "../game/input/InputManager";\n',
+              'Arena import'
+            );
+            text = replaceOrThrow(text, '  const keys = useRef<Record<string, boolean>>({});\n', '', 'Arena keys ref');
+            const oldEffect = `  useEffect(() => {\n    const down = (e: KeyboardEvent) => { keys.current[e.key.toLowerCase()] = true; if (e.key.toLowerCase() === "e" || e.key === " ") shove(); };\n    const up = (e: KeyboardEvent) => { keys.current[e.key.toLowerCase()] = false; };\n    window.addEventListener("keydown", down); window.addEventListener("keyup", up);\n    return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); };\n  }, [shove]);`;
+            const newEffect = `  useEffect(() => inputManager.activate(\`arena:${mode}\`, { onJump: shove, onSkill: shove }), [mode, shove]);`;
+            text = replaceOrThrow(text, oldEffect, newEffect, 'Arena keyboard effect');
+            text = text
+              .replaceAll('keys.current["d"] || keys.current["arrowright"]', 'inputManager.isPressed("right")')
+              .replaceAll('keys.current["a"] || keys.current["arrowleft"]', 'inputManager.isPressed("left")')
+              .replaceAll('keys.current["s"] || keys.current["arrowdown"]', 'inputManager.isPressed("down")')
+              .replaceAll('keys.current["w"] || keys.current["arrowup"]', 'inputManager.isPressed("up")')
+              .replace('  const press=(key:string,value:boolean)=>{keys.current[key]=value};', '  const press=(action:InputAction,value:boolean)=>inputManager.setExternalAction("arena-touch",action,value);')
+              .replaceAll('press("w",', 'press("up",')
+              .replaceAll('press("a",', 'press("left",')
+              .replaceAll('press("s",', 'press("down",')
+              .replaceAll('press("d",', 'press("right",')
+              .replace('onPointerDown={shove}', 'onPointerDown={()=>inputManager.trigger("skill")}');
+            if (text.includes('keys.current')) throw new Error('ArenaRound.tsx still contains direct key state');
+            if (text.includes('window.addEventListener("keydown"')) throw new Error('ArenaRound.tsx still contains direct keyboard listener');
+            return text;
+          });
+
+          const tutorial = fs.readFileSync('app/Tutorial.tsx', 'utf8');
+          if (tutorial.includes('window.addEventListener("keydown"')) throw new Error('Tutorial.tsx still contains direct keyboard listener');
+
+          const tsconfig = JSON.parse(fs.readFileSync('tsconfig.json', 'utf8'));
+          for (const entry of ['game/**/*.ts', 'game/**/*.tsx']) {
+            if (!tsconfig.include.includes(entry)) tsconfig.include.push(entry);
+          }
+          fs.writeFileSync('tsconfig.json', `${JSON.stringify(tsconfig, null, 2)}\n`);
+
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          pkg.scripts.lint = 'eslint app src game electron';
+          pkg.scripts.test = 'npm run build && node --test tests/*.test.mjs';
+          fs.writeFileSync('package.json', `${JSON.stringify(pkg, null, 2)}\n`);
+          NODE
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      - name: Verify no component keyboard listeners remain
+        run: |
+          if grep -R 'window.addEventListener("keydown"' app --include='*.tsx'; then
+            echo 'Direct component keyboard listener remains.'
+            exit 1
+          fi
+          if grep -R 'keys.current' app --include='*.tsx'; then
+            echo 'Direct component key-state access remains.'
+            exit 1
+          fi
+
+      - name: Persist refactor
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/page.tsx app/Race3D.tsx app/ArenaRound.tsx package.json tsconfig.json
+          if git diff --cached --quiet; then
+            echo 'No refactor changes to commit.'
+            exit 0
+          fi
+          git commit -m "refactor: centralize gameplay input [skip ci]"
+          git push
