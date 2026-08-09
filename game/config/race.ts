@@ -1,7 +1,8 @@
 import type { AnimalKey } from "../types/game";
 
+export const ENABLE_3D_RACE = true;
 export const TRACK_LENGTH = 4400;
-export const LANES = [96, 176, 256] as const;
+export const LANES: number[] = [96, 176, 256];
 export const AI_EMOJIS = ["🦊", "🐼", "🐷", "🐸", "🦁", "🐵", "🐯", "🦝", "🐻", "🐨", "🦄", "🐮", "🐹", "🦓", "🦒", "🐺", "🦔", "🐲", "🦧", "🐙", "🦈", "🦖"] as const;
 
 export const OBSTACLES = [
