@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { inputManager, type InputAction } from "../game/input/InputManager";
 import { saveManager } from "../game/save/SaveManager";
 
@@ -14,10 +14,16 @@ const STEPS = [
 export function Tutorial({ hero, onDone }: { hero: string; onDone: () => void }) {
   const [step, setStep] = useState(0);
   const [flash, setFlash] = useState(false);
+  const timerRef = useRef<number | null>(null);
+  const advancingRef = useRef(false);
 
   const advance = useCallback(() => {
+    if (advancingRef.current) return;
+    advancingRef.current = true;
     setFlash(true);
-    setTimeout(() => {
+    timerRef.current = window.setTimeout(() => {
+      timerRef.current = null;
+      advancingRef.current = false;
       setFlash(false);
       if (step >= STEPS.length - 1) {
         saveManager.markTutorialComplete();
@@ -27,6 +33,12 @@ export function Tutorial({ hero, onDone }: { hero: string; onDone: () => void })
       }
     }, 350);
   }, [onDone, step]);
+
+  useEffect(() => () => {
+    if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+    timerRef.current = null;
+    advancingRef.current = false;
+  }, []);
 
   useEffect(() => inputManager.activate("tutorial", {
     onAction: (action) => {
