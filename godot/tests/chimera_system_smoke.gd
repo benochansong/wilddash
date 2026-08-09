@@ -1,6 +1,7 @@
 extends Node
 
 const RACER_SCENE: PackedScene = preload("res://characters/test_racer.tscn")
+var _failed := false
 
 func _ready() -> void:
 	await get_tree().process_frame
@@ -20,6 +21,9 @@ func _ready() -> void:
 
 	var racer := RACER_SCENE.instantiate() as WildDashCharacterController
 	_assert(racer != null, "racer scene")
+	if racer == null:
+		get_tree().quit(1)
+		return
 	racer.is_player = false
 	racer.movement_mode = WildDashCharacterController.MovementMode.ARENA
 	add_child(racer)
@@ -42,13 +46,14 @@ func _ready() -> void:
 	print("CHIMERA TAIL BONUS PASS utility=REFLEX TAIL handling=%.3f" % racer.get_active_handling_scale())
 
 	var collision := racer.get_node("CollisionShape3D") as CollisionShape3D
-	var capsule := collision.shape as CapsuleShape3D
+	var capsule := collision.shape as CapsuleShape3D if collision != null else null
 	_assert(capsule != null and is_equal_approx(capsule.radius, 0.80), "body collision source")
 	var visual := racer.get_visual() as WildDashChimeraVisual
 	_assert(visual != null, "chimera visual installed")
-	_assert(visual.find_child("HeadSlot", true, false) != null, "head visual slot")
-	_assert(visual.find_child("BodySlot", true, false) != null, "body visual slot")
-	_assert(visual.find_child("TailSlot", true, false) != null, "tail visual slot")
+	if visual != null:
+		_assert(visual.find_child("HeadSlot", true, false) != null, "head visual slot")
+		_assert(visual.find_child("BodySlot", true, false) != null, "body visual slot")
+		_assert(visual.find_child("TailSlot", true, false) != null, "tail visual slot")
 	_assert(racer.try_use_skill(), "head skill activation")
 	_assert(is_equal_approx(racer.skill_cooldown_remaining, 8.0), "head cooldown")
 
@@ -60,6 +65,9 @@ func _ready() -> void:
 	_assert(GameManager.get_chimera_loadout().body_id == &"elephant", "game manager loadout")
 	GameManager.disable_chimera()
 
+	if _failed:
+		get_tree().quit(1)
+		return
 	print("CHIMERA PROFILE head=%s body=%s tail=%s passive=%s utility=%s skill=%s" % [
 		restored.head_id, restored.body_id, restored.tail_id,
 		racer.get_passive_name(), racer.get_utility_name(), racer.get_skill_name(),
@@ -72,6 +80,5 @@ func _ready() -> void:
 func _assert(condition: bool, label: String) -> void:
 	if condition:
 		return
+	_failed = true
 	push_error("CHIMERA ASSERT FAILED: %s" % label)
-	get_tree().quit(1)
-	await get_tree().process_frame
