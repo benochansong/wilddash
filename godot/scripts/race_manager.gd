@@ -11,6 +11,7 @@ const MAX_AI_RACERS := 49
 const QUALIFYING_RANK := 25
 const VERTICAL_SLICE_RACERS := 4
 const CHECKPOINT_ASSIST_RADIUS := 14.0
+const FINISH_ASSIST_RADIUS := 18.0
 
 var racers: Array[Node3D] = []
 var finish_order: Array[Node3D] = []
@@ -120,6 +121,22 @@ func sync_checkpoint_from_position(racer: Node3D) -> bool:
 	if vertical_delta > 8.0:
 		return false
 	return record_checkpoint(racer, expected)
+
+func sync_finish_from_position(racer: Node3D) -> bool:
+	# Like checkpoints, the finish Area3D remains authoritative in normal play.
+	# This seam prevents a fast racer from tunneling through the final trigger.
+	# All seven checkpoints must already be valid, so it cannot be used to cut
+	# the course or finish early.
+	if racer == null or finish_order.has(racer) or not can_finish(racer) or _route_points.is_empty():
+		return false
+	var finish := _route_points[_route_points.size() - 1]
+	var planar_delta := racer.global_position - finish
+	planar_delta.y = 0.0
+	if planar_delta.length() > FINISH_ASSIST_RADIUS:
+		return false
+	if absf(racer.global_position.y - finish.y) > 10.0:
+		return false
+	return record_finish(racer) < MAX_RACERS
 
 func get_checkpoint_progress(racer: Node3D) -> int:
 	if racer == null:
