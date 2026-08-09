@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { inputManager, type InputAction } from "../game/input/InputManager";
+import { saveManager } from "../game/save/SaveManager";
 
 const STEPS = [
   { icon: "↕", title: "차선을 바꿔보세요", copy: "PC는 W/S 또는 방향키, 모바일은 위·아래 버튼을 사용해요.", actions: ["up", "down"] as InputAction[], action: "MOVE" },
@@ -19,11 +20,7 @@ export function Tutorial({ hero, onDone }: { hero: string; onDone: () => void })
     setTimeout(() => {
       setFlash(false);
       if (step >= STEPS.length - 1) {
-        try {
-          localStorage.setItem("wild-dash-tutorial", "done");
-        } catch {
-          /* local storage is optional */
-        }
+        saveManager.markTutorialComplete();
         onDone();
       } else {
         setStep((value) => value + 1);

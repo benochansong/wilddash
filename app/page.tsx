@@ -6,94 +6,14 @@ import { Tutorial } from "./Tutorial";
 import { Race3D } from "./Race3D";
 import { inputManager } from "../game/input/InputManager";
 import { audio } from "../game/audio/AudioManager";
-
-type Screen = "lobby" | "tutorial" | "lab" | "pick" | "countdown" | "race" | "roundBreak" | "fruit" | "survival" | "final" | "result";
-type AnimalKey = "dog" | "rabbit" | "elephant" | "cat";
-type ItemKey = "banana" | "shield" | "magnet" | "ink" | null;
-type DifficultyKey = "wild" | "chaos" | "nightmare";
-const ENABLE_3D_RACE = true;
-
-type Animal = {
-  name: string;
-  emoji: string;
-  label: string;
-  skill: string;
-  description: string;
-  color: string;
-  cooldown: number;
-};
-
-const ANIMALS: Record<AnimalKey, Animal> = {
-  dog: { name: "멍대시", emoji: "🐶", label: "안정적인 러너", skill: "전력 질주", description: "2.5초 동안 속도 +18%", color: "#ff8a4c", cooldown: 10 },
-  rabbit: { name: "깡총이", emoji: "🐰", label: "지형 돌파형", skill: "도약 추진", description: "높이 뛰며 앞으로 80m 도약", color: "#ff66ad", cooldown: 7 },
-  elephant: { name: "코뿜이", emoji: "🐘", label: "탱커 · 방해형", skill: "코 휘두르기", description: "근접 경쟁자를 밀치고 1회 방어", color: "#6d7cff", cooldown: 9 },
-  cat: { name: "냥쏘", emoji: "🐱", label: "교란 · 회피형", skill: "하악질", description: "2.2초 충돌 회피 + 주변 경직", color: "#b565f5", cooldown: 8 },
-};
-
-const HEADS = ["🐶", "🐰", "🐊", "🦊", "🐱", "🐘"];
-const BODIES = ["🟠", "🟣", "🟢", "🔵", "🟡", "🔴"];
-const TAILS = ["〰️", "⚡", "🌈", "🪶", "🍤", "🎀"];
-const PART_UNLOCKS = [0, 0, 0, 300, 800, 1500];
-const ITEM_INFO: Record<Exclude<ItemKey, null>, { emoji: string; name: string; level: string; description: string }> = {
-  banana: { emoji: "🍌", name: "바나나", level: "방해 Lv.1", description: "뒤에 설치 · 짧은 미끄러짐" },
-  shield: { emoji: "🐢", name: "등껍질", level: "방어 Lv.2", description: "3.5초 동안 공격 1회 방어" },
-  ink: { emoji: "🦑", name: "먹물", level: "교란 Lv.2", description: "앞선 경쟁자를 1.2초 경직" },
-  magnet: { emoji: "🧲", name: "자석", level: "역전 Lv.3", description: "앞으로 130m 안전 견인" },
-};
-
-const TRACK_LENGTH = 4400;
-const LANES = [96, 176, 256];
-const AI_EMOJIS = ["🦊", "🐼", "🐷", "🐸", "🦁", "🐵", "🐯", "🦝", "🐻", "🐨", "🦄", "🐮", "🐹", "🦓", "🦒", "🐺", "🦔", "🐲", "🦧", "🐙", "🦈", "🦖"];
-const DIFFICULTIES: Record<DifficultyKey, { name: string; tag: string; aiSpeed: number; aggression: number; collision: number; count: number }> = {
-  wild: { name: "야생", tag: "치열한 몸싸움", aiSpeed: 1, aggression: .72, collision: .85, count: 16 },
-  chaos: { name: "난장판", tag: "추천 · 적극적인 방해", aiSpeed: 1.08, aggression: 1, collision: 1.05, count: 19 },
-  nightmare: { name: "생존지옥", tag: "고수용 · 자비 없음", aiSpeed: 1.16, aggression: 1.28, collision: 1.25, count: 22 },
-};
-const OBSTACLES = [
-  { x: 720, lane: 0, kind: "log" }, { x: 720, lane: 2, kind: "log" },
-  { x: 1190, lane: 1, kind: "mud" }, { x: 1600, lane: 0, kind: "log" },
-  { x: 1600, lane: 1, kind: "log" }, { x: 2140, lane: 2, kind: "mud" },
-  { x: 2530, lane: 0, kind: "log" }, { x: 2530, lane: 2, kind: "log" },
-  { x: 3110, lane: 1, kind: "mud" }, { x: 3570, lane: 0, kind: "log" },
-  { x: 3570, lane: 1, kind: "log" },
-];
-const BOXES = [930, 1880, 2780, 3770];
-const SWEEPERS = [1380, 2320, 3380, 4010];
-const ROUTES: { x: number; lane: number; animal: AnimalKey; icon: string; label: string }[] = [
-  { x: 1080, lane: 0, animal: "rabbit", icon: "☁️", label: "토끼 이단 점프 길" },
-  { x: 1970, lane: 2, animal: "dog", icon: "⚡", label: "강아지 질주 레인" },
-  { x: 2860, lane: 1, animal: "elephant", icon: "🧱", label: "코끼리 파괴 벽" },
-  { x: 3650, lane: 0, animal: "cat", icon: "🕳️", label: "고양이 비밀 통로" },
-];
-
-function createRace(difficulty: DifficultyKey) {
-  const config = DIFFICULTIES[difficulty];
-  const variant = Math.floor(Math.random()*3);
-  return {
-    x: 0, y: 176, z: 0, vz: 0, speed: 0, time: 0, item: null as ItemKey,
-    cooldown: 0, boost: 0, boostPower: 0, shield: 0, hit: 0, confused: 0, collisionLock: 0, variant,
-    flash: "", crossed: new Set<number>(), bumps: 0,
-    bananas: [] as { x: number; y: number; owner: "ai" | "player"; life: number }[],
-    course: OBSTACLES.map((o,i)=>({...o,x:o.x+(variant-1)*(i%3)*42,lane:(o.lane+variant+(i%2))%3})),
-    boxes: BOXES.map((x,i)=>x+(variant-1)*(45+i*12)),
-    ai: Array.from({ length: config.count }, (_, i) => ({
-      x: ((i % 7) - 3) * 34 - Math.floor(i / 7) * 46,
-      y: LANES[i % 3], targetY: LANES[i % 3],
-      pace: 3.15 + (i % 6) * .22, aggression: .55 + (i % 5) * .11,
-      shoveCd: .8 + i * .1, itemCd: 2.8 + (i % 6) * .75,
-      stun: 0, attacking: false, emoji: AI_EMOJIS[i % AI_EMOJIS.length],
-    })),
-  };
-}
-
-function Chimera({ head, body, tail, small = false }: { head: number; body: number; tail: number; small?: boolean }) {
-  return (
-    <div className={`chimera ${small ? "chimera-small" : ""}`} aria-label="조립한 키메라 동물">
-      <span className="tail">{TAILS[tail]}</span><span className="body-part">{BODIES[body]}</span><span className="head">{HEADS[head]}</span>
-      <span className="leg leg-a" /><span className="leg leg-b" />
-    </div>
-  );
-}
+import { ANIMALS, CHIMERA_BODIES as BODIES, CHIMERA_HEADS as HEADS, CHIMERA_TAILS as TAILS, PART_UNLOCKS } from "../game/config/animals";
+import { DIFFICULTIES } from "../game/config/difficulty";
+import { ITEM_INFO } from "../game/config/items";
+import { AI_EMOJIS, ENABLE_3D_RACE, LANES, ROUTES, SWEEPERS, TRACK_LENGTH } from "../game/config/race";
+import { saveManager } from "../game/save/SaveManager";
+import { createRace } from "../game/systems/raceSystem";
+import type { AnimalKey, DifficultyKey, ItemKey, Screen } from "../game/types/game";
+import { Chimera } from "../ui/components/Chimera";
 
 let hapticsEnabled = true;
 function playTone(frequency = 440, duration = 0.08) {
@@ -116,18 +36,25 @@ export default function Home() {
   const game = useRef(createRace(difficulty));
 
   useEffect(() => {
-    try { const saved = localStorage.getItem("wild-dash-profile"); if (saved) setProfile(JSON.parse(saved)); const savedSettings=localStorage.getItem("wild-dash-settings"); if(savedSettings){const next=JSON.parse(savedSettings);setSettings(next);audio.setMuted(!next.sound);hapticsEnabled=next.haptics;} } catch { /* device-local progress is optional */ }
+    const savedProfile = saveManager.loadProfile();
+    if (savedProfile) setProfile(savedProfile);
+    const savedSettings = saveManager.loadSettings();
+    if (savedSettings) {
+      setSettings(savedSettings);
+      audio.setMuted(!savedSettings.sound);
+      hapticsEnabled = savedSettings.haptics;
+    }
   }, []);
 
   const updateSetting = <K extends keyof typeof settings,>(key: K, value: (typeof settings)[K]) => {
     const next={...settings,[key]:value}; setSettings(next); audio.setMuted(!next.sound); hapticsEnabled=next.haptics;
-    try { localStorage.setItem("wild-dash-settings",JSON.stringify(next)); } catch { /* optional */ }
+    saveManager.saveSettings(next);
   };
 
   const awardProgress = useCallback((rank: number, champion = false) => {
     setProfile((previous) => {
       const next = { fans: previous.fans + Math.max(80, 620-rank*10) + (champion?500:0), wins: previous.wins + (champion?1:0), best: Math.min(previous.best,rank) };
-      try { localStorage.setItem("wild-dash-profile", JSON.stringify(next)); } catch { /* ignore private mode storage errors */ }
+      saveManager.saveProfile(next);
       return next;
     });
   }, []);
@@ -141,8 +68,7 @@ export default function Home() {
     resetGame(); setRoundCleared(0); setCountdown(3); setScreen("countdown"); playTone(520, 0.1);
   };
   const beginPlay = () => {
-    try { setScreen(localStorage.getItem("wild-dash-tutorial") ? "pick" : "tutorial"); }
-    catch { setScreen("pick"); }
+    setScreen(saveManager.hasCompletedTutorial() ? "pick" : "tutorial");
   };
 
   const handleArenaComplete = useCallback((mode: ArenaMode, success: boolean, score: number) => {

@@ -25,7 +25,9 @@
     "src/**/*.tsx",
     "vite.config.ts",
     "game/**/*.ts",
-    "game/**/*.tsx"
+    "game/**/*.tsx",
+    "ui/**/*.ts",
+    "ui/**/*.tsx"
   ],
   "exclude": [
     "node_modules",

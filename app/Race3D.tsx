@@ -3,10 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { inputManager, type InputAction } from "../game/input/InputManager";
 import { audio } from "../game/audio/AudioManager";
-
-type AnimalKey = "dog" | "rabbit" | "elephant" | "cat";
-type DifficultyKey = "wild" | "chaos" | "nightmare";
-type ItemKey = "banana" | "shield" | "magnet" | "ink" | null;
+import { RACE3D_SKILLS as SKILLS } from "../game/config/animals";
+import { RACE3D_ITEM_EMOJIS as ITEMS } from "../game/config/items";
+import { RACE3D_BRAKE_SPEED as BRAKE_SPEED, RACE3D_CRUISE_SPEED as CRUISE_SPEED, RACE3D_LENGTH as LENGTH, RACE3D_SECTIONS as SECTIONS, RACE3D_SPRINT_SPEED as SPRINT_SPEED, RACE3D_TRACK_WIDTH as TRACK_WIDTH } from "../game/config/race";
+import { seeded } from "../game/systems/aiSystem";
+import { obstacleLateral } from "../game/systems/collisionSystem";
+import { calculateRank } from "../game/systems/rankingSystem";
+import { createRace3DState, sectionFor, trackCenter as center, trackElevation as elevation } from "../game/systems/raceSystem";
+import type { AnimalKey, DifficultyKey, ItemKey } from "../game/types/game";
 
 type Props = {
   animal: AnimalKey;
@@ -18,43 +22,11 @@ type Props = {
   onFinish: (rank:number,time:number,bumps:number)=>void;
 };
 
-const LENGTH=24000;
-// Wide party-race arena: room for the full 50-animal pack to fan out.
-const TRACK_WIDTH=680;
-const CRUISE_SPEED=1525;
-const SPRINT_SPEED=1775;
-const BRAKE_SPEED=1025;
-const EMOJIS=["🦊","🐼","🐷","🐸","🦁","🐵","🐯","🦝","🐻","🐨","🦄","🐮","🐹","🦓","🦒","🐺","🦔","🐲","🦧","🐙","🦈","🦖"];
-const ITEMS: Record<Exclude<ItemKey,null>,string>={banana:"🍌",shield:"🐢",magnet:"🧲",ink:"🦑"};
-const SKILLS:Record<AnimalKey,{name:string,cooldown:number}>={dog:{name:"균형 질주 +10%",cooldown:12},rabbit:{name:"도약 추진",cooldown:8},elephant:{name:"코 방어",cooldown:10},cat:{name:"그림자 회피",cooldown:9}};
-const SECTIONS=[
-  {at:0,name:"초원 스타디움",sky:["#53d6ff","#d7fff1"],ground:"#59b96a"},
-  {at:4800,name:"구불구불 캐니언",sky:["#ff9e6b","#ffe2a9"],ground:"#d66f45"},
-  {at:9600,name:"빙글빙글 설산",sky:["#77cfff","#effcff"],ground:"#d7f6ff"},
-  {at:14400,name:"정글 터널",sky:["#42b887","#baf39f"],ground:"#237b55"},
-  {at:19200,name:"네온 결승 도시",sky:["#4b3fb7","#ef70b8"],ground:"#413584"},
-] as const;
-
-const center=(s:number)=>Math.sin(s/1600)*175+Math.sin(s/4100)*250+(s>13600?Math.sin((s-13600)/700)*70:0);
-const elevation=(s:number)=>Math.sin(s/1950)*42+(s>4900&&s<8700?Math.sin((s-4900)/3800*Math.PI)*150:0)+(s>9950&&s<13400?Math.sin((s-9950)/3450*Math.PI)*-90:0)+(s>16100&&s<19600?Math.sin((s-16100)/3500*Math.PI)*110:0);
-const sectionFor=(s:number)=>[...SECTIONS].reverse().find((section)=>s>=section.at)??SECTIONS[0];
-
-function seeded(index:number,seed:number){const x=Math.sin(index*9283.31+seed*77.1)*43758.5453;return x-Math.floor(x)}
-const obstacleLateral=(o:{lateral:number;type:string;id:number},time:number)=>o.lateral+(o.type==="ball"?Math.sin(time*2.6+o.id)*145:o.type==="spinner"?Math.sin(time*1.5+o.id)*35:0);
-
 export function Race3D({animal,hero,difficulty,sound,haptics,reducedMotion,onFinish}:Props){
   const canvasRef=useRef<HTMLCanvasElement>(null);
   const [view,setView]=useState({rank:25,time:0,speed:0,progress:0,skillCd:5,item:null as ItemKey,flash:"출발 보호 · 스킬 5초 잠금",section:SECTIONS[0].name as string});
   const seed=useRef(Math.floor(Math.random()*9999));
-  const game=useRef({
-    s:0,lateral:0,speed:CRUISE_SPEED,jump:0,vJump:0,time:0,skillCd:5,boost:0,shield:0,phase:0,hit:0,bumps:0,item:null as ItemKey,flash:"출발 보호 · 스킬 5초 잠금",finished:false,
-    crossed:new Set<number>(),
-    ai:Array.from({length:49},(_,i)=>({s:((i%10)-5)*34-Math.floor(i/10)*24,lateral:((i%7)-3)*86,speed:1490+seeded(i,seed.current)*90,stun:0,phase:seeded(i+80,seed.current)*6.28,itemCd:6+seeded(i+110,seed.current)*7,crossed:new Set<number>(),emoji:EMOJIS[i%EMOJIS.length]})),
-    // Four hazards share each arena row, leaving several readable escape routes.
-    obstacles:Array.from({length:116},(_,i)=>({id:i,s:900+Math.floor(i/4)*790+seeded(i,seed.current)*120,lateral:((i*3+Math.floor(seeded(i+30,seed.current)*3))%7-3)*90,type:["log","spinner","mud","ball","ramp"][Math.floor(seeded(i+90,seed.current)*5)]})),
-    boxes:Array.from({length:30},(_,i)=>({id:i,s:1050+Math.floor(i/3)*2300+seeded(i+4,seed.current)*150,lateral:((i*2)%7-3)*90,taken:false})),
-    bananas:[] as {s:number,lateral:number,life:number,owner:"player"|"ai"}[],
-  });
+  const game=useRef(createRace3DState(seed.current));
   const feedback=useCallback((frequency:number,duration=.1)=>{
     if(haptics&&frequency<220&&navigator.vibrate)navigator.vibrate(Math.round(duration*220));
     if(!sound)return;
@@ -113,7 +85,7 @@ export function Race3D({animal,hero,difficulty,sound,haptics,reducedMotion,onFin
       g.boxes.forEach((b,i)=>{if(!b.taken&&Math.abs(g.s-b.s)<90&&Math.abs(g.lateral-b.lateral)<54){b.taken=true;const pool:Exclude<ItemKey,null>[]=g.ai.filter(a=>a.s>g.s).length>30?["shield","magnet","ink","magnet"]:["banana","shield","ink","magnet"];g.item=pool[i%pool.length];g.flash=`${ITEMS[g.item]} 아이템 획득`;feedback(920,.08)}});
       g.ai.forEach((a,i)=>{a.stun=Math.max(0,a.stun-dt);a.itemCd=Math.max(0,a.itemCd-dt);const diff=difficulty==="wild"?.985:difficulty==="nightmare"?1.018:1;let pace=a.speed*diff;if(a.s<g.s-1800)pace*=1.035;if(a.s>g.s+1800)pace*=.97;if(a.stun>0)pace*=.45;a.s+=pace*dt;a.lateral+=Math.sin(g.time*.9+a.phase)*45*dt;g.obstacles.forEach(o=>{if(!a.crossed.has(o.id)&&Math.abs(a.s-o.s)<75){a.crossed.add(o.id);if(Math.abs(a.lateral-obstacleLateral(o,g.time))<48&&o.type!=="ramp")a.stun=.38+seeded(i+o.id,seed.current)*.28}});if(a.s>g.s+220&&a.s<g.s+900&&a.itemCd<=0&&i%5===0){g.bananas.push({s:a.s-160,lateral:a.lateral,life:6,owner:"ai"});a.itemCd=9+seeded(i+Math.floor(g.time),seed.current)*5;g.flash=`${a.emoji}가 앞에 바나나 설치!`;}if(Math.abs(a.s-g.s)<75&&Math.abs(a.lateral-g.lateral)<38&&g.jump<20&&g.phase<=0){g.lateral+=Math.sign(g.lateral-a.lateral||1)*28;g.speed*=.94;g.bumps++;if(i%8===0)g.flash=`${a.emoji}와 어깨 충돌!`}});
       g.bananas.forEach(b=>{b.life-=dt;if(b.owner==="player")g.ai.forEach(a=>{if(Math.abs(a.s-b.s)<70&&Math.abs(a.lateral-b.lateral)<35){a.stun=.65;b.life=0}});else if(Math.abs(g.s-b.s)<70&&Math.abs(g.lateral-b.lateral)<35&&g.jump<18&&g.phase<=0){b.life=0;if(g.shield>0){g.shield=0;g.flash="방어막으로 바나나 차단!"}else{g.hit=.5;g.speed*=.82;g.bumps++;g.flash="🍌 AI 바나나에 미끄러짐!";feedback(120,.14)}}});g.bananas=g.bananas.filter(b=>b.life>0);
-      const rank=1+g.ai.filter(a=>a.s>g.s).length;const canvasRect=canvas.getBoundingClientRect();const dpr=Math.min(2,window.devicePixelRatio||1);if(canvas.width!==Math.floor(canvasRect.width*dpr)||canvas.height!==Math.floor(canvasRect.height*dpr)){canvas.width=Math.floor(canvasRect.width*dpr);canvas.height=Math.floor(canvasRect.height*dpr)}ctx.setTransform(dpr,0,0,dpr,0,0);draw(canvasRect.width,canvasRect.height);
+      const rank=calculateRank(g.s,g.ai);const canvasRect=canvas.getBoundingClientRect();const dpr=Math.min(2,window.devicePixelRatio||1);if(canvas.width!==Math.floor(canvasRect.width*dpr)||canvas.height!==Math.floor(canvasRect.height*dpr)){canvas.width=Math.floor(canvasRect.width*dpr);canvas.height=Math.floor(canvasRect.height*dpr)}ctx.setTransform(dpr,0,0,dpr,0,0);draw(canvasRect.width,canvasRect.height);
       if(now-lastUi>60){lastUi=now;setView({rank,time:g.time,speed:g.speed,progress:Math.min(1,g.s/LENGTH),skillCd:g.skillCd,item:g.item,flash:g.flash,section:sectionFor(g.s).name});if(g.flash&&Math.floor(g.time*10)%25===0)g.flash=""}
       if(g.s>=LENGTH){g.finished=true;onFinish(rank,g.time,g.bumps);feedback(980,.25);return}frame=requestAnimationFrame(loop)};
     frame=requestAnimationFrame(loop);return()=>cancelAnimationFrame(frame);
