@@ -48,3 +48,41 @@ test("InputManager dispatches actions only to the active context", () => {
   assert.deepEqual(calls, ["race:jump", "race:skill", "arena:jump"]);
   input.reset();
 });
+
+test("InputManager keeps one keyboard listener pair across repeated screen changes", () => {
+  const listeners = new Map();
+  let added = 0;
+  let removed = 0;
+  const previousWindow = globalThis.window;
+
+  globalThis.window = {
+    addEventListener(type, handler) {
+      added += 1;
+      listeners.set(type, handler);
+    },
+    removeEventListener(type, handler) {
+      removed += 1;
+      if (listeners.get(type) === handler) listeners.delete(type);
+    },
+  };
+
+  try {
+    const input = new InputManager();
+    const cleanups = [];
+    for (let index = 0; index < 50; index += 1) {
+      cleanups.push(input.activate(`screen:${index}`));
+      assert.equal(listeners.size, 2);
+    }
+
+    assert.equal(added, 2, "keyboard listeners should only attach once while contexts rotate");
+    for (const cleanup of cleanups.slice(0, -1)) cleanup();
+    assert.equal(listeners.size, 2, "stale cleanup functions must not detach the active context");
+
+    cleanups.at(-1)();
+    assert.equal(listeners.size, 0);
+    assert.equal(removed, 2);
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
+});
