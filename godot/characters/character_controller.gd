@@ -31,6 +31,7 @@ var finish_rank := 0
 var _held_item: StringName = &""
 var _knockback_velocity := Vector3.ZERO
 var _performance_lod_level := 0
+var _hit_sfx_cooldown := 0.0
 
 @onready var _visual := get_node_or_null("VisualModel") as WildDashCharacterVisual
 
@@ -46,20 +47,18 @@ func _exit_tree() -> void:
 
 func _physics_process(delta: float) -> void:
 	skill_cooldown_remaining = maxf(0.0, skill_cooldown_remaining - delta)
+	_hit_sfx_cooldown = maxf(0.0, _hit_sfx_cooldown - delta)
 	if movement_mode == MovementMode.ARENA:
 		_process_arena_player(delta)
 		return
-
 	if finished:
 		_apply_finish_coast(delta)
 		_sync_visual()
 		return
-
 	if not RaceManager.active:
 		_settle_before_start(delta)
 		_sync_visual()
 		return
-
 	if not is_player:
 		_sync_visual()
 		return
@@ -71,25 +70,27 @@ func _physics_process(delta: float) -> void:
 		target_speed = max_speed
 	elif throttle < -0.05:
 		target_speed = max_speed * 0.25
-
 	current_speed = move_toward(current_speed, target_speed, acceleration * delta)
 	rotate_y(-steer * turn_speed * delta)
 
 	if InputManager.consume_jump() and is_on_floor():
 		velocity.y = jump_velocity
+		AudioManager.play_sfx_id("jump")
 	if InputManager.consume_skill():
 		try_use_skill()
-	if InputManager.consume_item():
-		ItemSystem.use_held_item(self)
+	if InputManager.consume_item() and ItemSystem.use_held_item(self):
+		AudioManager.play_sfx_id("item")
 
 	_apply_gravity(delta)
 	var forward := -global_transform.basis.z.normalized()
 	velocity.x = forward.x * current_speed
 	velocity.z = forward.z * current_speed
 	move_and_slide()
-
 	if has_blocking_collision():
 		current_speed = maxf(cruise_speed * 0.55, current_speed * 0.92)
+		if is_player and _hit_sfx_cooldown <= 0.0:
+			_hit_sfx_cooldown = 0.22
+			AudioManager.play_sfx_id("hit", 0.8)
 	_sync_visual()
 
 func _process_arena_player(delta: float) -> void:
@@ -100,14 +101,13 @@ func _process_arena_player(delta: float) -> void:
 	if not is_player:
 		_sync_visual()
 		return
-
 	var move_axis: Vector2 = InputManager.get_move_vector()
 	var desired := Vector3(move_axis.x, 0.0, move_axis.y) * arena_move_speed + _knockback_velocity
 	velocity.x = move_toward(velocity.x, desired.x, arena_acceleration * delta)
 	velocity.z = move_toward(velocity.z, desired.z, arena_acceleration * delta)
 	if InputManager.consume_jump() or InputManager.consume_skill():
+		AudioManager.play_sfx_id("skill")
 		arena_action_requested.emit()
-
 	_apply_gravity(delta)
 	move_and_slide()
 	current_speed = Vector2(velocity.x, velocity.z).length()
@@ -123,8 +123,6 @@ func has_blocking_collision() -> bool:
 
 func set_performance_lod(level: int) -> void:
 	_performance_lod_level = clampi(level, 0, 2)
-	# Layer 1 is world/track. Layer 2 is racers. Near racers keep crowd
-	# collision; mid/far racers collide only with the world to reduce pair cost.
 	collision_layer = 2
 	collision_mask = 3 if _performance_lod_level == 0 else 1
 	if _visual:
@@ -168,6 +166,8 @@ func try_use_skill() -> bool:
 	skill_cooldown_remaining = _cooldown_for_animal(animal_id)
 	if _visual:
 		_visual.play_action(&"Skill")
+	if is_player:
+		AudioManager.play_sfx_id("skill")
 	skill_requested.emit(animal_id)
 	return true
 
