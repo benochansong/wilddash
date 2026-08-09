@@ -1,0 +1,108 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://characters/character_visual.gd" id="1_visual"]
+
+[sub_resource type="StandardMaterial3D" id="MatFur"]
+albedo_color = Color(1, 0.50, 0.24, 1)
+roughness = 0.82
+
+[sub_resource type="StandardMaterial3D" id="MatCream"]
+albedo_color = Color(1, 0.86, 0.62, 1)
+roughness = 0.86
+
+[sub_resource type="StandardMaterial3D" id="MatDark"]
+albedo_color = Color(0.18, 0.11, 0.08, 1)
+roughness = 0.75
+
+[sub_resource type="CapsuleMesh" id="BodyMesh"]
+material = SubResource("MatFur")
+radius = 0.48
+height = 1.35
+radial_segments = 12
+rings = 4
+
+[sub_resource type="SphereMesh" id="HeadMesh"]
+material = SubResource("MatFur")
+radius = 0.46
+height = 0.92
+radial_segments = 12
+rings = 6
+
+[sub_resource type="BoxMesh" id="SnoutMesh"]
+material = SubResource("MatCream")
+size = Vector3(0.48, 0.28, 0.42)
+
+[sub_resource type="BoxMesh" id="EarMesh"]
+material = SubResource("MatDark")
+size = Vector3(0.20, 0.48, 0.18)
+
+[sub_resource type="CapsuleMesh" id="LegMesh"]
+material = SubResource("MatCream")
+radius = 0.11
+height = 0.62
+radial_segments = 8
+rings = 2
+
+[sub_resource type="CapsuleMesh" id="TailMesh"]
+material = SubResource("MatFur")
+radius = 0.10
+height = 0.72
+radial_segments = 8
+rings = 2
+
+[node name="VisualModel" type="Node3D"]
+script = ExtResource("1_visual")
+procedural_root_path = NodePath("ImportedModel")
+procedural_placeholder = true
+run_cycle_speed = 10.5
+run_bob_height = 0.09
+
+[node name="ImportedModel" type="Node3D" parent="."]
+
+[node name="Skeleton3D" type="Skeleton3D" parent="ImportedModel"]
+
+[node name="Body" type="MeshInstance3D" parent="ImportedModel"]
+position = Vector3(0, 0.88, 0.05)
+rotation = Vector3(1.5708, 0, 0)
+mesh = SubResource("BodyMesh")
+
+[node name="Head" type="MeshInstance3D" parent="ImportedModel"]
+position = Vector3(0, 1.18, -0.68)
+mesh = SubResource("HeadMesh")
+
+[node name="Snout" type="MeshInstance3D" parent="ImportedModel"]
+position = Vector3(0, 1.08, -1.05)
+mesh = SubResource("SnoutMesh")
+
+[node name="LeftEar" type="MeshInstance3D" parent="ImportedModel"]
+position = Vector3(-0.28, 1.55, -0.62)
+rotation = Vector3(0.18, 0, -0.22)
+mesh = SubResource("EarMesh")
+
+[node name="RightEar" type="MeshInstance3D" parent="ImportedModel"]
+position = Vector3(0.28, 1.55, -0.62)
+rotation = Vector3(0.18, 0, 0.22)
+mesh = SubResource("EarMesh")
+
+[node name="FrontLeftLeg" type="MeshInstance3D" parent="ImportedModel"]
+position = Vector3(-0.33, 0.42, -0.38)
+mesh = SubResource("LegMesh")
+
+[node name="FrontRightLeg" type="MeshInstance3D" parent="ImportedModel"]
+position = Vector3(0.33, 0.42, -0.38)
+mesh = SubResource("LegMesh")
+
+[node name="BackLeftLeg" type="MeshInstance3D" parent="ImportedModel"]
+position = Vector3(-0.33, 0.42, 0.42)
+mesh = SubResource("LegMesh")
+
+[node name="BackRightLeg" type="MeshInstance3D" parent="ImportedModel"]
+position = Vector3(0.33, 0.42, 0.42)
+mesh = SubResource("LegMesh")
+
+[node name="Tail" type="MeshInstance3D" parent="ImportedModel"]
+position = Vector3(0, 1.02, 0.88)
+rotation = Vector3(1.0, 0, 0)
+mesh = SubResource("TailMesh")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="ImportedModel"]
