@@ -19,7 +19,7 @@ func _ready() -> void:
 	_animation_player = _resolve_animation_player()
 	_animation_tree = _resolve_animation_tree()
 	if _animation_tree:
-		var playback := _animation_tree.get("parameters/playback")
+		var playback: Variant = _animation_tree.get("parameters/playback")
 		if playback is AnimationNodeStateMachinePlayback:
 			_state_machine = playback
 	play_state(&"Idle")
