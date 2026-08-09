@@ -1,141 +1,174 @@
-# WILD DASH 3D — Godot Next
+# WILD DASH 3D — Windows Release Candidate
 
-이 폴더는 React/Electron **Prototype V1을 대체하지 않는** 차세대 Godot 3D 프로젝트입니다.
-기존 Prototype V1의 게임 규칙과 밸런스 개념만 참고하고, Canvas/DOM 구현은 직접 이식하지 않습니다.
+이 폴더는 기존 React/Electron **Prototype V1을 덮어쓰지 않고 보존한 채** 개발하는 Godot 기반 차세대 3D 버전입니다.
+현재 release 브랜치의 게임 버전은 `0.9.0-rc1`입니다.
 
-## 현재 단계 — Vertical Slice 01
+## 현재 게임
 
-현재 Godot 버전은 전체 게임이 아니라 **4-racer 3D gameplay vertical slice**입니다.
+- Windows PC
+- 오프라인 싱글플레이
+- Godot 4.7.1
+- 실제 `CharacterBody3D` 이동/물리 충돌
+- Dog / Rabbit / Elephant / Cat 선택
+- Wild / Chaos / Nightmare 난이도 선택
+- AI 4~10마리 캠페인 안정화
+- 별도 성능 Scene에서 10 → 25 → 50 Racer 단계 벤치마크
+- 로컬 JSON Save v2
+- 키보드 + 게임패드
+- Pause / Settings / Result / Lobby 흐름
 
-- Dog: 플레이어 1명
-- Rabbit / Elephant / Cat: AI 3마리
-- 실제 CharacterBody3D 이동/점프/collision
-- smoothing chase camera
-- 테스트 트랙 1개
-- 기본 장애물
-- FinishLine Area3D
-- 실시간 순위/standings
-- FPS HUD
-
-목표는 그래픽 완성이 아니라 **"3D WILD DASH가 재미있는가?"**를 검증하는 것입니다.
-상세 튜닝과 평가 기준은 `docs/VERTICAL_SLICE_01.md`를 참고하세요.
-
-## 첫 단계 목표
-
-현재 단계는 전체 게임 제작이 아니라 **실제 3D vertical-slice용 기본 구조**를 만드는 단계입니다.
-
-포함:
-
-- Godot 프로젝트 부팅 구조
-- 테스트용 3D 직선 트랙
-- Capsule 기반 임시 3D 캐릭터
-- CharacterBody3D 물리 이동/점프
-- 중앙 GameManager / RaceManager / InputManager / AudioManager / SaveManager
-- 3-racer AI race
-- ItemSystem 인터페이스
-- Prototype V1에서 가져온 규칙 상수 모음
-- 3D 모델과 게임 로직을 분리하는 CharacterRoot / VisualModel 구조
-- Blender/Maya → GLB/glTF → Godot asset pipeline
-
-아직 포함하지 않음:
-
-- 완성 캐릭터 모델
-- 49 AI 동시 레이스
-- 완성 트랙
-- 아이템 실제 3D 프리팹/효과
-- 동물별 완성 스킬 연출
-- 4개 라운드 전체 구현
-- 정식 UI/오디오
-
-## 프로젝트 열기
-
-Godot 4.x에서 다음 파일을 프로젝트로 import합니다.
+## 게임 흐름
 
 ```text
-godot/project.godot
+Launch
+→ Lobby
+→ Character Select
+→ Round 1: Wild World Grand Prix
+→ Round 2: Fruit Collection
+→ Round 3: Floor Collapse Survival
+→ Final: Push-Out Arena
+→ Result
+→ Save
+→ Lobby / Replay / Quit
 ```
 
-F6/F5로 실행하면 테스트 트랙과 4 racers가 표시됩니다.
+CI에서는 위 흐름을 Headless로 완료한 뒤 프로세스를 다시 실행해 Save Load까지 확인합니다.
 
-기본 조작:
+## 조작
 
-- W / ↑ : 가속
-- S / ↓ : 감속
-- A/D 또는 ←/→ : 조향
+### Keyboard 기본값
+
+- W / ↑ : 가속 / 앞으로
+- S / ↓ : 감속 / 뒤로
+- A / ← : 왼쪽
+- D / → : 오른쪽
 - Space : 점프
-- E : 스킬 요청
-- Q : 아이템 사용 요청
+- E : 스킬
+- Q : 아이템
+- Esc / P : Pause
 
-## 폴더 구조
+Settings 화면에서 Keyboard binding을 변경할 수 있으며 변경값은 Save에 저장됩니다.
+
+### Gamepad 기본값
+
+- Left Stick / D-Pad : 이동 / 조향
+- A : 점프
+- X : 스킬
+- B : 아이템
+- Start : Pause
+
+Keyboard와 Gamepad는 같은 Godot InputMap action을 사용하므로 게임 로직이 입력 장치별로 분기되지 않습니다.
+
+## Settings
+
+### Audio
+
+- Master Volume
+- Music Volume
+- SFX Volume
+- Mute
+- `Master / Music / SFX` Audio Bus
+
+현재 RC는 외부 음원 라이선스에 의존하지 않도록 가벼운 procedural placeholder BGM/SFX를 사용합니다. 최종 사운드 리소스가 준비되면 AudioManager의 theme/SFX 리소스만 교체할 수 있습니다.
+
+### Graphics
+
+- 1280×720
+- 1600×900
+- 1920×1080
+- Windowed / Fullscreen
+- 30 / 60 / 120 / Unlimited FPS
+
+기본값은 1600×900, Windowed, 60 FPS입니다.
+
+### Accessibility
+
+- Reduced Motion
+- High Contrast
+
+Reduced Motion은 추적 카메라의 움직임을 더 안정적으로 만들고, High Contrast는 메뉴/HUD의 명도 대비와 그림자를 강화합니다.
+
+## Save System
+
+저장 위치:
 
 ```text
-godot/
-  scenes/       엔트리/게임 화면 Scene
-  scripts/      전역 Manager
-  characters/   CharacterRoot / visual wrapper / Controller / AI
-  camera/       3D camera follow logic
-  tracks/       3D 트랙 Scene / finish trigger
-  systems/      엔진 독립에 가까운 게임 규칙/아이템 시스템
-  ui/           Godot Control/HUD
-  audio/        SFX/BGM 리소스
-  assets/       GLB/glTF, texture, DCC source, material
-  docs/         Vertical slice 검증 기록
+user://wild_dash_save.json
 ```
 
-## Character Scene 설계
+Save version: `2`
 
-캐릭터의 물리/게임 로직과 외형 모델을 분리합니다.
+저장 항목:
+
+- profile: fans / wins / best rank / launches / campaigns / last character
+- audio settings
+- graphics settings
+- accessibility settings
+- keyboard bindings
+- records
+- unlocks
+
+v1 Save의 `sound / reduced_motion / high_contrast` 값을 v2 구조로 migration합니다.
+더 새로운 버전의 Save가 발견되면 RC1은 해당 파일을 덮어쓰지 않습니다.
+
+## Pause
+
+게임 플레이 중:
 
 ```text
-CharacterRoot (CharacterBody3D)
-├─ CollisionShape3D
-├─ VisualModel
-│  └─ ImportedModel (GLB/glTF instance)
-│     ├─ Skeleton3D
-│     ├─ skinned MeshInstance3D
-│     └─ AnimationPlayer 또는 AnimationTree
-└─ gameplay helpers
+Esc / P / Gamepad Start
 ```
 
-### CharacterRoot
+으로 일시정지할 수 있습니다.
 
-`character_controller.gd`가 담당합니다.
+Pause 메뉴:
 
-- 이동
-- 중력
-- 점프
-- physics collision
-- skill cooldown
-- held item
-- race registration / finish state
+- Resume
+- Return to Lobby
+- Quit Game
 
-### VisualModel
+## 4 Round Scene 구조
 
-`character_visual.gd`가 담당합니다.
+각 라운드는 독립 Scene + ModeController입니다.
 
-- GLB/glTF 모델
-- Skeleton3D
-- mesh/material
-- animation playback
-- visual-only 보정
+```text
+res://modes/grand_prix/grand_prix.tscn
+res://modes/fruit_collection/fruit_collection.tscn
+res://modes/floor_collapse/floor_collapse.tscn
+res://modes/push_out/push_out.tscn
+```
 
-`CharacterController`는 GLB 내부 bone/mesh/AnimationPlayer 경로를 직접 알지 않습니다.
-따라서 나중에 모델을 교체할 때 `VisualModel` wrapper만 바꾸고 gameplay controller는 그대로 유지하는 것이 원칙입니다.
+공유 시스템:
 
-## 3D 모델 제작 → Export → Godot Import
+```text
+GameManager
+RaceManager
+InputManager
+SettingsManager
+AudioManager
+SaveManager
+ResultManager
+PauseManager
+CharacterController
+AIController
+ItemSystem
+```
 
-WILD DASH의 기본 캐릭터 asset pipeline입니다.
+라운드별 규칙은 해당 ModeController가 소유합니다.
+
+## 3D Character Asset Pipeline
 
 ```text
 Blender / Maya
-→ GLB(default) 또는 glTF 2.0
-→ godot/assets/characters/<animal>/
-→ Godot import
-→ characters/visuals/<animal>_visual.tscn
-→ CharacterRoot에 VisualModel로 instance
+→ GLB 또는 glTF 2.0
+→ Godot Import
+→ VisualModel wrapper
+→ CharacterRoot
 ```
 
-모든 playable animal의 기본 animation contract:
+캐릭터 외형과 게임 로직을 분리하여 모델을 교체해도 `CharacterController`는 수정하지 않는 것을 원칙으로 합니다.
+
+기본 animation contract:
 
 ```text
 Idle
@@ -147,29 +180,65 @@ Win
 Lose
 ```
 
-WILD DASH는 최대 50 racers를 목표로 하므로 초기 제작 budget은 LOD0 약 8k–12k triangles, material 1개 우선, 1024 texture 중심으로 시작합니다.
-더 상세한 제작/LOD/export/import 체크리스트는 `assets/CHARACTER_PIPELINE.md`를 참고하세요.
+자세한 내용은 `assets/CHARACTER_PIPELINE.md`를 참고합니다.
 
-## Prototype V1에서 재사용하는 개념
+## 50 Racer 성능 게이트
 
-- 플레이어 1명 + 최대 AI 49마리
-- 총 50-racer 구조
-- 25위 이내 다음 라운드 진출
-- dog / rabbit / elephant / cat 역할과 cooldown 개념
-- banana / shield / magnet / ink 아이템 개념
-- Wild / Chaos / Nightmare 난이도 단계
-- 4라운드 토너먼트 흐름
-- versioned save schema 원칙
+일반 캠페인은 아직 AI 최대 10으로 유지합니다.
+50 Racer는 별도 benchmark에서만 단계 검증합니다.
 
-TypeScript 소스 자체를 복사하는 것이 아니라 Godot의 Scene/Node/Resource/CharacterBody3D 방식으로 다시 구현합니다.
+```text
+10 racers
+→ 25 racers
+→ 50 racers
+```
 
-## 다음 개발 순서
+Headless CI에서는 AI LOD, update frequency 조절, animation LOD, collision 단순화 효과를 비교합니다.
+실제 50 Racer를 일반 플레이 설정으로 승격하기 전에는 Windows rendered benchmark에서 FPS / CPU / GPU / Physics / AI / Draw Calls / Memory를 다시 확인해야 합니다.
 
-1. Vertical Slice 01을 Windows에서 3~5회 직접 플레이해 조작감 확정
-2. camera / steering / jump / obstacle spacing 튜닝
-3. checkpoint + Curve3D TrackProgress로 교체
-4. 실제 GLB 캐릭터 1종 연결
-5. 장애물 1종 + 아이템 박스 1종을 gameplay vertical slice로 완성
-6. 성능 측정 후 AI 5 → 10 → 25 → 50 단계 확장
+성능 결과는 `docs/RACER_SCALING_BENCHMARK.md`에 기록되어 있습니다.
 
-React/Electron Prototype V1은 저장소 루트에 계속 보존합니다.
+## Windows Export
+
+저장소에는 `export_presets.cfg`의 `Windows Desktop` preset이 포함되어 있습니다.
+Godot 4.7.1 Editor와 동일 버전의 Export Templates가 설치되어 있으면 다음처럼 Release export가 가능합니다.
+
+```powershell
+Godot_v4.7.1-stable_win64.exe --headless --path godot --export-release "Windows Desktop" "build/windows/WILD_DASH_3D.exe"
+```
+
+GitHub Actions의 Windows runner도 동일한 방식으로 `.exe`를 생성하고 실제 smoke launch 후 artifact로 업로드합니다.
+
+## CI Release Gate
+
+현재 workflow가 검사하는 항목:
+
+1. Godot 프로젝트 import
+2. Keyboard / Gamepad InputMap
+3. Keyboard remapping
+4. Master / Music / SFX Audio Bus
+5. Graphics / Accessibility / FPS Settings
+6. Pause / Resume
+7. Save write
+8. Launch → Lobby → Character Select → 4 Rounds → Result → Save
+9. Restart → Save Load
+10. 10 AI campaign regression
+11. 10 / 25 / 50 racer performance benchmark
+12. Windows x86_64 release export
+13. Exported `.exe` smoke launch
+14. Windows artifact upload
+
+## Steam
+
+Steam SDK는 현재 프로젝트에 포함하지 않습니다.
+Steam 배포는 별도 단계이며 Steamworks/achievement/cloud 같은 플랫폼 기능은 핵심 GameManager, RaceManager, SaveManager와 직접 결합하지 않는 것을 원칙으로 합니다.
+
+## 아직 RC 제한 사항
+
+- 실제 production 동물 GLB/Animation은 아직 placeholder 단계
+- BGM/SFX는 procedural placeholder
+- Windows executable code signing은 아직 하지 않음
+- 50 Racer는 headless CPU/Physics gate는 통과했지만 실제 production mesh를 사용한 Windows GPU gate는 아직 별도 확인 필요
+- Steam 통합 없음
+
+최종 RC 판정은 `docs/RELEASE_CANDIDATE_CHECKLIST.md`를 참고합니다.
