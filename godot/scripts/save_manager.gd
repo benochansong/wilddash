@@ -1,6 +1,6 @@
 extends Node
 
-const SAVE_VERSION := 1
+const SAVE_VERSION := 2
 const SAVE_PATH := "user://wild_dash_save.json"
 
 func default_data() -> Dictionary:
@@ -11,6 +11,7 @@ func default_data() -> Dictionary:
 		"tutorial_completed": false,
 		"unlocks": {"characters": []},
 		"records": {},
+		"chimera": WildDashChimeraSystem.default_loadout().to_dictionary(),
 	}
 
 func load_data() -> Dictionary:
@@ -32,6 +33,14 @@ func save_data(data: Dictionary) -> bool:
 		return false
 	file.store_string(JSON.stringify(normalized, "\t"))
 	return true
+
+func save_chimera(loadout: WildDashChimeraLoadout) -> bool:
+	var data := load_data()
+	data.chimera = (loadout if loadout != null else WildDashChimeraSystem.default_loadout()).to_dictionary()
+	return save_data(data)
+
+func load_chimera() -> WildDashChimeraLoadout:
+	return WildDashChimeraLoadout.from_dictionary(load_data().get("chimera", {}))
 
 func reset_to_defaults() -> Dictionary:
 	var data := default_data()
@@ -66,6 +75,10 @@ func _validate_and_migrate(raw: Dictionary) -> Dictionary:
 	var records = raw.get("records", {})
 	if typeof(records) == TYPE_DICTIONARY:
 		result.records = records.duplicate(true)
+
+	var chimera = raw.get("chimera", {})
+	if typeof(chimera) == TYPE_DICTIONARY:
+		result.chimera = WildDashChimeraLoadout.from_dictionary(chimera).to_dictionary()
 
 	result.version = SAVE_VERSION
 	return result
