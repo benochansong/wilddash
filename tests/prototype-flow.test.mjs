@@ -4,6 +4,7 @@ import test from "node:test";
 import ts from "typescript";
 
 const source = readFileSync("game/systems/flowSystem.ts", "utf8");
+const page = readFileSync("app/page.tsx", "utf8");
 const compiled = ts.transpileModule(source, {
   compilerOptions: {
     module: ts.ModuleKind.ESNext,
@@ -53,4 +54,18 @@ test("prototype v1 routes race and arena failures directly to result", () => {
   });
   assert.equal(flow.arenaFlowOutcome("survival", false).failureRank, 11);
   assert.equal(flow.arenaFlowOutcome("final", false).failureRank, 2);
+});
+
+test("page delegates prototype navigation decisions to flowSystem", () => {
+  for (const call of [
+    "entryScreen(saveManager.hasCompletedTutorial())",
+    "arenaFlowOutcome(mode, success)",
+    "screenAfterRace(rank)",
+    "roundClearedAfterRace(rank)",
+    "nextRoundAfterBreak(roundCleared)",
+  ]) {
+    assert.ok(page.includes(call), `page is not using flow rule: ${call}`);
+  }
+
+  assert.doesNotMatch(page, /roundCleared===1\?"fruit":roundCleared===2\?"survival":"final"/);
 });
