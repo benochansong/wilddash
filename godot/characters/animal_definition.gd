@@ -40,15 +40,21 @@ extends Resource
 @export var camera_fov := 70.0
 
 @export_group("Skill")
-@export var skill_id: StringName = &"dash"
-@export var skill_name := "균형 질주"
-@export_multiline var skill_description := "2.5초 동안 속도가 상승합니다."
-@export var skill_cooldown := 12.0
-@export var skill_duration := 2.5
+@export var skill_id: StringName = &"rally_dash"
+@export var skill_name := "RALLY DASH"
+@export_multiline var skill_description := "짧은 시간 안정적으로 전방을 밀어붙입니다."
+@export var skill_cooldown := 9.0
+@export var skill_duration := 2.0
 @export var skill_speed_multiplier := 1.0
+@export var skill_acceleration_multiplier := 1.0
 @export var skill_turn_multiplier := 1.0
 @export var skill_jump_multiplier := 1.0
 @export var skill_knockback_multiplier := 1.0
+@export var skill_collision_retention_multiplier := 1.0
+@export var skill_evade_duration := 0.0
+@export var skill_forward_impulse := 0.0
+@export var skill_lateral_impulse := 0.0
+@export var skill_push_strength := 0.0
 
 func camera_profile() -> Dictionary:
 	return {
