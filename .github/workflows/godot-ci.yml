@@ -118,37 +118,38 @@ jobs:
           & $env:GODOT_EXE --headless --editor --path godot --quit
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Export Windows RC2 x86_64
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force "godot\build\windows" | Out-Null
-          & $env:GODOT_EXE --headless --path godot --export-release "Windows Desktop" "build/windows/WILD_DASH_3D_RC2.exe"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if (-not (Test-Path "godot\build\windows\WILD_DASH_3D_RC2.exe")) { throw "RC2 Windows executable was not generated" }
-          Get-Item "godot\build\windows\WILD_DASH_3D_RC2.exe" | Format-List Name,Length,LastWriteTime
-
-      - name: Smoke launch exported RC2 executable
+      - name: Export package and smoke-test Windows RC2
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
+          $outDir = Join-Path $PWD "godot\build\windows"
+          New-Item -ItemType Directory -Force $outDir | Out-Null
+          & $env:GODOT_EXE --headless --path godot --export-release "Windows Desktop" "build/windows/WILD_DASH_3D_RC2.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          $exe = Join-Path $outDir "WILD_DASH_3D_RC2.exe"
+          if (-not (Test-Path $exe)) { throw "RC2 Windows executable was not generated" }
+          $item = Get-Item $exe
+          Write-Host "RC2 EXE: $($item.FullName) bytes=$($item.Length)"
+
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
+          $shaFile = Join-Path $outDir "WILD_DASH_3D_RC2.sha256"
+          "$hash  WILD_DASH_3D_RC2.exe" | Set-Content $shaFile
+
+          $zip = Join-Path $PWD "godot\build\WILD-DASH-3D-Windows-RC2-Character-Chimera.zip"
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path $exe,$shaFile -DestinationPath $zip -CompressionLevel Optimal
+          if (-not (Test-Path $zip)) { throw "RC2 ZIP package was not generated" }
+          Write-Host "RC2 ZIP: $zip bytes=$((Get-Item $zip).Length) sha256=$hash"
+
           $env:WILDDASH_AI_COUNT = "4"
-          $exe = (Resolve-Path "godot\build\windows\WILD_DASH_3D_RC2.exe").Path
-          Write-Host "Launching RC2 from: $exe"
           $proc = Start-Process -FilePath $exe -ArgumentList "--headless" -PassThru -Wait
           if ($proc.ExitCode -ne 0) { throw "RC2 executable exited with code $($proc.ExitCode)" }
-
-      - name: Generate SHA256 checksum
-        shell: pwsh
-        run: |
-          $hash = (Get-FileHash "godot\build\windows\WILD_DASH_3D_RC2.exe" -Algorithm SHA256).Hash.ToLower()
-          "$hash  WILD_DASH_3D_RC2.exe" | Set-Content "godot\build\windows\WILD_DASH_3D_RC2.sha256"
-          Get-Content "godot\build\windows\WILD_DASH_3D_RC2.sha256"
+          Write-Host "RC2_SMOKE_PASS exit=0"
 
       - name: Upload Windows RC2 Character and Chimera build
         uses: actions/upload-artifact@v4
         with:
           name: WILD-DASH-3D-Windows-RC2-Character-Chimera
-          path: |
-            godot/build/windows/WILD_DASH_3D_RC2.exe
-            godot/build/windows/WILD_DASH_3D_RC2.sha256
+          path: godot/build/WILD-DASH-3D-Windows-RC2-Character-Chimera.zip
           if-no-files-found: error
