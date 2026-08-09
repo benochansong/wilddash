@@ -28,6 +28,9 @@ const ROUND_SCENES: Array[String] = [
 	"res://modes/floor_collapse/floor_collapse.tscn",
 	"res://modes/push_out/push_out.tscn",
 ]
+const LOBBY_SCENE := "res://scenes/lobby.tscn"
+const CHARACTER_SELECT_SCENE := "res://scenes/character_select.tscn"
+const SETTINGS_SCENE := "res://scenes/settings.tscn"
 const RESULT_SCENE := "res://scenes/result.tscn"
 const MIN_AI_COUNT := 4
 const MAX_AI_COUNT := 10
@@ -43,14 +46,17 @@ var campaign_running := false
 var _transition_pending := false
 
 func _ready() -> void:
+	selected_animal = SaveManager.get_last_character()
 	set_state(GameState.LOBBY)
 
 func set_state(next_state: GameState) -> void:
 	if state == next_state:
+		_update_audio_for_state(next_state)
 		return
 	var previous_state: GameState = state
 	state = next_state
 	game_state_changed.emit(previous_state, next_state)
+	_update_audio_for_state(next_state)
 
 func configure_run(
 	animal: StringName,
@@ -58,13 +64,21 @@ func configure_run(
 	parts: Dictionary,
 	requested_ai_count: int = MIN_AI_COUNT,
 ) -> void:
-	selected_animal = animal
+	selected_animal = animal if animal in [&"dog", &"rabbit", &"elephant", &"cat"] else &"dog"
 	difficulty = difficulty_id
 	chimera_parts = parts.duplicate(true)
 	ai_count = clampi(requested_ai_count, MIN_AI_COUNT, MAX_AI_COUNT)
+	SaveManager.set_last_character(selected_animal)
 
 func set_ai_count(value: int) -> void:
 	ai_count = clampi(value, MIN_AI_COUNT, MAX_AI_COUNT)
+
+func show_character_select() -> void:
+	set_state(GameState.CHARACTER_SELECT)
+	get_tree().change_scene_to_file(CHARACTER_SELECT_SCENE)
+
+func show_settings() -> void:
+	get_tree().change_scene_to_file(SETTINGS_SCENE)
 
 func start_campaign() -> void:
 	if campaign_running:
@@ -103,6 +117,24 @@ func get_current_round_id() -> StringName:
 		return &""
 	return ROUND_IDS[current_round_index]
 
+func is_gameplay_state() -> bool:
+	return state in [GameState.COUNTDOWN, GameState.RACE, GameState.ROUND_BREAK, GameState.ARENA, GameState.FINAL]
+
+func return_to_lobby() -> void:
+	campaign_running = false
+	current_round_index = -1
+	_transition_pending = false
+	round_active = false
+	get_tree().paused = false
+	ResultManager.reset_campaign()
+	set_state(GameState.LOBBY)
+	get_tree().change_scene_to_file(LOBBY_SCENE)
+
+func abort_to_lobby() -> void:
+	RaceManager.stop_race()
+	RaceManager.clear_racers()
+	return_to_lobby()
+
 func reset_run() -> void:
 	campaign_running = false
 	current_round_index = -1
@@ -130,10 +162,25 @@ func _transition_after_round() -> void:
 		set_state(GameState.ROUND_BREAK)
 		_load_current_round()
 		return
-
 	campaign_running = false
 	set_state(GameState.RESULT)
 	print("CAMPAIGN COMPLETE rounds=%d clears=%d" % [ResultManager.round_results.size(), ResultManager.get_success_count()])
 	var error: Error = get_tree().change_scene_to_file(RESULT_SCENE)
 	if error != OK:
 		push_error("Failed to load result scene: %s" % error_string(error))
+
+func _update_audio_for_state(next_state: GameState) -> void:
+	var audio := get_node_or_null("/root/AudioManager")
+	if audio == null:
+		return
+	match next_state:
+		GameState.LOBBY, GameState.CHARACTER_SELECT:
+			audio.call("play_theme", "menu")
+		GameState.RACE, GameState.COUNTDOWN:
+			audio.call("play_theme", "race")
+		GameState.ARENA, GameState.FINAL, GameState.ROUND_BREAK:
+			audio.call("play_theme", "arena")
+		GameState.RESULT:
+			audio.call("play_theme", "result")
+		_:
+			pass
