@@ -33,5 +33,8 @@ export default tseslint.config(
       sourceType: "commonjs",
       globals: globals.node,
     },
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
   },
 );
