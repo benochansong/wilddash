@@ -105,8 +105,9 @@ func _update_fruits(delta: float) -> void:
 func _check_player_pickups() -> void:
 	if player == null:
 		return
+	var pickup_radius := player.get_interaction_radius(1.15)
 	for i in range(fruits.size()):
-		if fruit_active[i] and player.global_position.distance_to(fruits[i].global_position) < 1.15:
+		if fruit_active[i] and player.global_position.distance_to(fruits[i].global_position) < pickup_radius:
 			_collect_fruit(i)
 			player_score += 1
 			hud.set_message("Fruit collected! %d/%d" % [player_score, TARGET_SCORE])
