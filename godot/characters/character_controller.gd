@@ -6,11 +6,14 @@ signal held_item_changed(item_id: StringName)
 signal finished_race(rank: int)
 signal arena_action_requested
 signal animal_configured(animal_id: StringName)
+signal chimera_configured(loadout: WildDashChimeraLoadout)
 
 enum MovementMode {
 	RACE,
 	ARENA,
 }
+
+const CHIMERA_VISUAL_SCENE: PackedScene = preload("res://chimera/chimera_visual.tscn")
 
 @export var is_player := true
 @export var animal_id: StringName = &"dog"
@@ -29,6 +32,7 @@ enum MovementMode {
 @export var knockback_decay := 16.0
 
 var animal_definition: WildDashAnimalDefinition
+var chimera_loadout: WildDashChimeraLoadout
 var current_speed := 0.0
 var skill_cooldown_remaining := 0.0
 var finished := false
@@ -43,6 +47,11 @@ var _skill_jump_multiplier := 1.0
 var _skill_knockback_multiplier := 1.0
 var _hit_reaction_cooldown := 0.0
 var _visual: WildDashCharacterVisual
+var _skill_definition_override: WildDashAnimalDefinition
+var _passive_pickup_radius_multiplier := 1.0
+var _passive_turn_multiplier := 1.0
+var _passive_knockback_received_multiplier := 1.0
+var _collision_speed_retention := 0.92
 
 @onready var _collision_shape := get_node_or_null("CollisionShape3D") as CollisionShape3D
 @onready var _visual_slot := get_node_or_null("VisualSlot") as Node3D
@@ -90,7 +99,7 @@ func _physics_process(delta: float) -> void:
 	target_speed *= _skill_speed_multiplier
 
 	current_speed = move_toward(current_speed, target_speed, acceleration * delta)
-	rotate_y(-steer * turn_speed * _skill_turn_multiplier * delta)
+	rotate_y(-steer * turn_speed * _passive_turn_multiplier * _skill_turn_multiplier * delta)
 
 	if InputManager.consume_jump() and is_on_floor():
 		velocity.y = jump_velocity * _skill_jump_multiplier
@@ -106,7 +115,7 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 
 	if has_blocking_collision():
-		current_speed = maxf(cruise_speed * 0.55, current_speed * 0.92)
+		current_speed = maxf(cruise_speed * 0.55, current_speed * _collision_speed_retention)
 		_trigger_hit_visual()
 	_sync_visual()
 
@@ -126,7 +135,7 @@ func _process_arena_player(delta: float) -> void:
 	velocity.z = move_toward(velocity.z, desired.z, arena_acceleration * delta)
 	if move_axis.length_squared() > 0.01:
 		var desired_yaw := atan2(-move_axis.x, -move_axis.y)
-		rotation.y = lerp_angle(rotation.y, desired_yaw, clampf(turn_speed * _skill_turn_multiplier * delta, 0.0, 1.0))
+		rotation.y = lerp_angle(rotation.y, desired_yaw, clampf(turn_speed * _passive_turn_multiplier * _skill_turn_multiplier * delta, 0.0, 1.0))
 	if InputManager.consume_jump():
 		if is_on_floor():
 			velocity.y = jump_velocity * 0.78 * _skill_jump_multiplier
@@ -144,9 +153,33 @@ func _process_arena_player(delta: float) -> void:
 	_sync_visual()
 
 func configure_animal(id: StringName) -> void:
+	chimera_loadout = null
+	_skill_definition_override = null
 	animal_id = id if WildDashAnimalCatalog.is_valid(id) else &"dog"
 	if is_inside_tree():
 		_apply_animal_definition()
+
+func configure_chimera(value: WildDashChimeraLoadout) -> void:
+	chimera_loadout = value.duplicate_loadout() if value != null else WildDashChimeraSystem.default_loadout()
+	chimera_loadout.normalize()
+	var body_definition := WildDashAnimalCatalog.get_definition(chimera_loadout.body_id)
+	var tail_definition := WildDashAnimalCatalog.get_definition(chimera_loadout.tail_id)
+	if body_definition == null or tail_definition == null:
+		return
+	animal_id = body_definition.animal_id
+	animal_definition = body_definition
+	_skill_definition_override = tail_definition
+	_apply_definition_values(body_definition)
+	_apply_chimera_passive()
+	_apply_collision_profile()
+	_install_chimera_visual()
+	chimera_configured.emit(chimera_loadout.duplicate_loadout())
+
+func is_chimera() -> bool:
+	return chimera_loadout != null
+
+func get_chimera_loadout() -> WildDashChimeraLoadout:
+	return null if chimera_loadout == null else chimera_loadout.duplicate_loadout()
 
 func get_animal_definition() -> WildDashAnimalDefinition:
 	return animal_definition
@@ -166,10 +199,21 @@ func get_camera_profile() -> Dictionary:
 	return animal_definition.camera_profile()
 
 func get_display_name() -> String:
+	if chimera_loadout != null:
+		return "Chimera"
 	return String(animal_id).capitalize() if animal_definition == null else animal_definition.display_name
 
 func get_skill_name() -> String:
-	return "Skill" if animal_definition == null else animal_definition.skill_name
+	var definition := _get_active_skill_definition()
+	return "Skill" if definition == null else definition.skill_name
+
+func get_passive_name() -> String:
+	if chimera_loadout == null:
+		return ""
+	return str(WildDashChimeraSystem.passive_profile(chimera_loadout.head_id).get("name", ""))
+
+func get_interaction_radius(base_radius: float) -> float:
+	return base_radius * _passive_pickup_radius_multiplier
 
 func has_blocking_collision() -> bool:
 	for i in range(get_slide_collision_count()):
@@ -194,7 +238,7 @@ func apply_knockback(direction: Vector3, strength: float) -> void:
 	var planar := Vector3(direction.x, 0.0, direction.z)
 	if planar.length_squared() <= 0.0001:
 		return
-	_knockback_velocity += planar.normalized() * strength * _skill_knockback_multiplier
+	_knockback_velocity += planar.normalized() * strength * _passive_knockback_received_multiplier * _skill_knockback_multiplier
 
 func get_knockback_velocity() -> Vector3:
 	return _knockback_velocity
@@ -222,9 +266,7 @@ func set_finished(rank: int) -> void:
 func try_use_skill() -> bool:
 	if skill_cooldown_remaining > 0.0:
 		return false
-	var definition := animal_definition
-	if definition == null:
-		definition = WildDashAnimalCatalog.get_definition(animal_id)
+	var definition := _get_active_skill_definition()
 	if definition == null:
 		return false
 
@@ -245,7 +287,7 @@ func try_use_skill() -> bool:
 			pass
 	if _visual:
 		_visual.play_action(&"Skill", minf(0.7, definition.skill_duration))
-	skill_requested.emit(animal_id)
+	skill_requested.emit(definition.animal_id)
 	return true
 
 func set_held_item(item_id: StringName) -> void:
@@ -259,19 +301,25 @@ func _apply_animal_definition() -> void:
 	animal_definition = WildDashAnimalCatalog.get_definition(animal_id)
 	if animal_definition == null:
 		return
+	chimera_loadout = null
+	_skill_definition_override = null
+	_reset_passive_modifiers()
 	animal_id = animal_definition.animal_id
-	max_speed = animal_definition.max_speed
-	cruise_speed = animal_definition.cruise_speed
-	acceleration = animal_definition.acceleration
-	turn_speed = animal_definition.turn_speed
-	jump_velocity = animal_definition.jump_velocity
-	gravity = animal_definition.gravity
-	arena_move_speed = animal_definition.arena_move_speed
-	arena_acceleration = animal_definition.arena_acceleration
-	knockback_decay = animal_definition.knockback_decay
+	_apply_definition_values(animal_definition)
 	_apply_collision_profile()
 	_install_visual()
 	animal_configured.emit(animal_id)
+
+func _apply_definition_values(definition: WildDashAnimalDefinition) -> void:
+	max_speed = definition.max_speed
+	cruise_speed = definition.cruise_speed
+	acceleration = definition.acceleration
+	turn_speed = definition.turn_speed
+	jump_velocity = definition.jump_velocity
+	gravity = definition.gravity
+	arena_move_speed = definition.arena_move_speed
+	arena_acceleration = definition.arena_acceleration
+	knockback_decay = definition.knockback_decay
 
 func _apply_collision_profile() -> void:
 	if _collision_shape == null or animal_definition == null:
@@ -285,9 +333,7 @@ func _apply_collision_profile() -> void:
 func _install_visual() -> void:
 	if _visual_slot == null or animal_definition == null or animal_definition.visual_scene == null:
 		return
-	for child in _visual_slot.get_children():
-		_visual_slot.remove_child(child)
-		child.queue_free()
+	_clear_visual_slot()
 	var visual_instance := animal_definition.visual_scene.instantiate()
 	if visual_instance == null:
 		push_error("Failed to instantiate visual for %s" % animal_id)
@@ -297,6 +343,49 @@ func _install_visual() -> void:
 	_visual = visual_instance as WildDashCharacterVisual
 	if _visual:
 		_visual.set_lod_level(_performance_lod_level)
+
+func _install_chimera_visual() -> void:
+	if _visual_slot == null or chimera_loadout == null:
+		return
+	_clear_visual_slot()
+	var visual_instance := CHIMERA_VISUAL_SCENE.instantiate() as WildDashChimeraVisual
+	if visual_instance == null:
+		push_error("Failed to instantiate chimera visual")
+		return
+	visual_instance.name = "VisualModel"
+	visual_instance.configure_loadout(chimera_loadout)
+	_visual_slot.add_child(visual_instance)
+	_visual = visual_instance
+	_visual.set_lod_level(_performance_lod_level)
+
+func _clear_visual_slot() -> void:
+	for child in _visual_slot.get_children():
+		_visual_slot.remove_child(child)
+		child.queue_free()
+	_visual = null
+
+func _apply_chimera_passive() -> void:
+	_reset_passive_modifiers()
+	if chimera_loadout == null:
+		return
+	var passive := WildDashChimeraSystem.passive_profile(chimera_loadout.head_id)
+	_passive_pickup_radius_multiplier = float(passive.get("pickup_radius_multiplier", 1.0))
+	_passive_turn_multiplier = float(passive.get("turn_multiplier", 1.0))
+	_passive_knockback_received_multiplier = float(passive.get("knockback_received_multiplier", 1.0))
+	_collision_speed_retention = float(passive.get("collision_retention", 0.92))
+
+func _reset_passive_modifiers() -> void:
+	_passive_pickup_radius_multiplier = 1.0
+	_passive_turn_multiplier = 1.0
+	_passive_knockback_received_multiplier = 1.0
+	_collision_speed_retention = 0.92
+
+func _get_active_skill_definition() -> WildDashAnimalDefinition:
+	if _skill_definition_override != null:
+		return _skill_definition_override
+	if animal_definition != null:
+		return animal_definition
+	return WildDashAnimalCatalog.get_definition(animal_id)
 
 func _start_skill_effect(definition: WildDashAnimalDefinition) -> void:
 	_skill_effect_remaining = maxf(0.0, definition.skill_duration)
