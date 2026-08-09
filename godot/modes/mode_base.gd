@@ -46,8 +46,11 @@ func spawn_racer(
 	if racer == null:
 		push_error("Failed to instantiate shared racer scene")
 		return null
+	var resolved_animal := animal
+	if is_player_character and WildDashAnimalCatalog.is_valid(GameManager.selected_animal):
+		resolved_animal = GameManager.selected_animal
 	racer.name = node_name
-	racer.animal_id = animal
+	racer.animal_id = resolved_animal
 	racer.is_player = is_player_character
 	racer.movement_mode = movement
 	racer.position = spawn_position
