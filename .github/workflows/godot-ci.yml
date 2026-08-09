@@ -132,11 +132,10 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $env:WILDDASH_AI_COUNT = "4"
-          Get-ChildItem "godot\build\windows" -Force | Format-Table Name,Length,FullName
           $exe = (Resolve-Path "godot\build\windows\WILD_DASH_3D_RC2.exe").Path
           Write-Host "Launching RC2 from: $exe"
-          & $exe --headless
-          if ($LASTEXITCODE -ne 0) { throw "RC2 executable exited with code $LASTEXITCODE" }
+          $proc = Start-Process -FilePath $exe -ArgumentList "--headless" -PassThru -Wait
+          if ($proc.ExitCode -ne 0) { throw "RC2 executable exited with code $($proc.ExitCode)" }
 
       - name: Generate SHA256 checksum
         shell: pwsh
