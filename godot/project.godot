@@ -1,9 +1,10 @@
 ; WILD DASH 3D - Godot project
-; Four-round prototype lives beside the React/Electron Prototype V1.
+; RC2 Character & Chimera Build
 config_version=5
 
 [application]
 config/name="WILD DASH 3D"
+config/version="0.9.0-rc2"
 run/main_scene="res://scenes/main.tscn"
 
 [autoload]
