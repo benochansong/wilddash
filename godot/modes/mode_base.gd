@@ -49,12 +49,16 @@ func spawn_racer(
 	var resolved_animal := animal
 	if is_player_character and WildDashAnimalCatalog.is_valid(GameManager.selected_animal):
 		resolved_animal = GameManager.selected_animal
+	if is_player_character and GameManager.chimera_enabled:
+		resolved_animal = GameManager.get_chimera_loadout().body_id
 	racer.name = node_name
 	racer.animal_id = resolved_animal
 	racer.is_player = is_player_character
 	racer.movement_mode = movement
 	racer.position = spawn_position
 	add_child(racer)
+	if is_player_character and GameManager.chimera_enabled:
+		racer.configure_chimera(GameManager.get_chimera_loadout())
 	racers.append(racer)
 	if is_player_character:
 		player = racer
