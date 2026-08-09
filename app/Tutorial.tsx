@@ -11,7 +11,7 @@ const STEPS = [
 
 export function Tutorial({ hero, onDone }: { hero:string; onDone:()=>void }) {
   const [step,setStep]=useState(0); const [flash,setFlash]=useState(false);
-  const advance=()=>{setFlash(true);setTimeout(()=>{setFlash(false);if(step>=STEPS.length-1){try{localStorage.setItem("wild-dash-tutorial","done")}catch{}onDone();}else setStep((v)=>v+1);},350)};
+  const advance=()=>{setFlash(true);setTimeout(()=>{setFlash(false);if(step>=STEPS.length-1){try{localStorage.setItem("wild-dash-tutorial","done")}catch { /* local storage is optional */ }onDone();}else setStep((v)=>v+1);},350)};
   useEffect(()=>{const key=(e:KeyboardEvent)=>{if(STEPS[step].keys.includes(e.key.toLowerCase() as never))advance()};window.addEventListener("keydown",key);return()=>window.removeEventListener("keydown",key)},[step]);
   const current=STEPS[step];
   return <section className="tutorial-page"><button className="tutorial-skip" onClick={onDone}>건너뛰기 →</button><div className="tutorial-copy"><p>30초 훈련소 · {step+1}/{STEPS.length}</p><h2>{current.title}</h2><span>{current.copy}</span></div><div className={`training-ground ${flash?"success":""}`}><div className="training-lanes"><i/><i/></div><div className="training-obstacle">{step===0?"↕":step===1?"🪵":step===2?"🦊":"🎁"}</div><div className="training-hero"><span>{hero}</span><b>YOU</b></div>{flash&&<div className="training-good">GOOD!</div>}</div><div className="tutorial-action"><button onClick={advance}><b>{current.icon}</b><span>{current.action}</span><small>{step===0?"W / S":step===1?"SPACE":step===2?"E":"Q"}</small></button></div><div className="tutorial-dots">{STEPS.map((_,i)=><i key={i} className={i<=step?"active":""}/>)}</div></section>;
