@@ -92,8 +92,9 @@ func _process(_delta: float) -> void:
 
 func _physics_process(delta: float) -> void:
 	if RaceManager.active:
-		for racer in RaceManager.racers:
+		for racer in RaceManager.racers.duplicate():
 			RaceManager.sync_checkpoint_from_position(racer)
+			RaceManager.sync_finish_from_position(racer)
 
 	if player != null and player.global_position.y < -28.0 and not player.finished:
 		player.reset_motion(RaceManager.get_respawn_position(player))
