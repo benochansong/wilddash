@@ -76,11 +76,11 @@ func _build_ui() -> void:
 	var panel := ColorRect.new()
 	panel.color = Color(0.02, 0.04, 0.08, 0.82)
 	panel.position = Vector2(24, 24)
-	panel.size = Vector2(520, 250)
+	panel.size = Vector2(650, 315)
 	layer.add_child(panel)
 	info_label = Label.new()
 	info_label.position = Vector2(20, 16)
-	info_label.size = Vector2(485, 220)
+	info_label.size = Vector2(615, 285)
 	info_label.add_theme_font_size_override("font_size", 18)
 	panel.add_child(info_label)
 
@@ -111,10 +111,12 @@ func _refresh_preview() -> void:
 		racer.configure_chimera(loadout)
 	var description := WildDashChimeraSystem.describe(loadout)
 	if info_label != null:
-		info_label.text = "WILD DASH CHIMERA LAB\n\nHead  %s  — %s\nBody  %s  — %s\nTail  %s  — %s\nPalette %s   Pattern %s\n\n1/2 Head · 3/4 Body · 5/6 Tail · C Color · P Pattern\nEnter: Save & use" % [
-			description.head, description.passive.name,
-			description.body, description.body_role,
-			description.tail, description.skill_name,
+		info_label.text = "WILD DASH CHIMERA LAB — PLAYSTYLE BUILD\n\nHEAD  %s  → ACTIVE SKILL: %s\nBODY  %s  → PASSIVE: %s\nTAIL  %s  → UTILITY: %s\n\n%s\n%s\nPalette %s   Pattern %s\n\n1/2 Head · 3/4 Body · 5/6 Tail · C Color · P Pattern\nEnter: Save & use" % [
+			description.head, description.skill_name,
+			description.body, description.body_passive.name,
+			description.tail, description.tail_utility.name,
+			description.body_passive.description,
+			description.tail_utility.description,
 			description.palette, description.pattern,
 		]
 
@@ -122,4 +124,4 @@ func _save_and_apply() -> void:
 	SaveManager.save_chimera(loadout)
 	GameManager.configure_chimera(loadout.to_dictionary(), true)
 	if info_label != null:
-		info_label.text += "\n\nSAVED — Chimera enabled for the next campaign."
+		info_label.text += "\n\nSAVED — gameplay build enabled for the next campaign."
