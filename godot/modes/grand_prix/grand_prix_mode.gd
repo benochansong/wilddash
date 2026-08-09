@@ -12,20 +12,19 @@ var _fps_samples := 0
 var _headless_debug_elapsed := 0.0
 
 func _ready() -> void:
-	setup_mode(&"grand_prix", "ROUND 1 — Wild World Grand Prix", "W/↑ 가속 · A/D 조향 · Space 점프", false)
+	setup_mode(&"grand_prix", "ROUND 1 — Wild World Grand Prix", "W/↑ 또는 패드로 가속 · 좌우 조향 · Space/A 점프", false)
 	RaceManager.clear_racers()
 	var track := TRACK_SCENE.instantiate()
 	track.name = "TestTrack"
 	add_child(track)
 
-	player = spawn_racer("Dog", &"dog", Vector3(-5.8, 0.1, 40.0), true, WildDashCharacterController.MovementMode.RACE)
+	var selected := GameManager.selected_animal
+	player = spawn_racer(String(selected).capitalize(), selected, Vector3(-5.8, 0.1, 40.0), true, WildDashCharacterController.MovementMode.RACE)
 	var ai_total: int = GameManager.ai_count
 	for i in range(ai_total):
 		var lane: float = SAFE_LANES[i % SAFE_LANES.size()]
 		var animal: StringName = AI_ANIMALS[i % AI_ANIMALS.size()]
 		var speed: float = AI_SPEEDS[i % AI_SPEEDS.size()] - float(i / AI_SPEEDS.size()) * 0.12
-		# Keep extra racers in a staggered second row so capsule bodies never
-		# overlap when multiple safe outer lanes are reused.
 		var start_row: int = 1 if i >= 3 else 0
 		var start_z := 40.0 + float(start_row) * 3.2 + float(i / SAFE_LANES.size()) * 1.6
 		var racer := spawn_racer("AI_%02d" % (i + 1), animal, Vector3(lane, 0.1, start_z), false, WildDashCharacterController.MovementMode.RACE)
@@ -47,6 +46,7 @@ func _ready() -> void:
 		await get_tree().create_timer(1.0).timeout
 	GameManager.begin_round(&"grand_prix")
 	RaceManager.start_race()
+	print("RC_FLOW Race")
 	print("MODE START id=grand_prix ai=%d" % ai_racers.size())
 	print("GRAND PRIX START racers=%d ai=%d" % [RaceManager.racers.size(), ai_racers.size()])
 
@@ -79,6 +79,7 @@ func _physics_process(delta: float) -> void:
 
 func _on_player_finished(rank: int) -> void:
 	_player_rank = rank
+	AudioManager.play_sfx_id("finish")
 	print("GRAND PRIX PLAYER FINISH rank=%d elapsed=%.2fs" % [rank, RaceManager.get_elapsed_seconds()])
 
 func _on_race_completed() -> void:
