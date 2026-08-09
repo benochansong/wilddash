@@ -19,13 +19,23 @@
 
 Godot 4.7.1 stable에서 headless editor import와 실제 물리 경주를 실행했습니다.
 
-최종 확인 run:
+AI의 초기 random phase/회피 방향은 검증 재현성을 위해 deterministic personality + 고정 기본 lane으로 바꿨습니다. 동일 코드의 최종 CI와 즉시 재실행이 모두 성공했고 두 번 모두 같은 finish order가 나왔습니다.
+
+최종 재실행 결과:
 
 ```text
 RACE START racers=4
-PLAYER FINISH rank=3 elapsed=12.51s
-RACE COMPLETE order=Cat, Elephant, Dog (YOU), Rabbit
-FPS SAMPLE min=1 avg=133.9 max=145
+PLAYER FINISH rank=4 elapsed=12.51s
+RACE COMPLETE order=Rabbit, Cat, Elephant, Dog (YOU)
+FPS SAMPLE min=1 avg=133.5 max=145
+```
+
+직전 동일 코드 run도:
+
+```text
+PLAYER FINISH rank=4 elapsed=12.44s
+RACE COMPLETE order=Rabbit, Cat, Elephant, Dog (YOU)
+FPS SAMPLE min=1 avg=133.3 max=145
 ```
 
 `min=1`은 headless 프로세스 초기화 구간이 포함된 값입니다. 또한 headless FPS는 GPU 렌더링 benchmark가 아니므로 Windows 실제 성능 수치로 사용하지 않습니다.
@@ -42,7 +52,7 @@ FPS SAMPLE min=1 avg=133.9 max=145
 
 를 한 Scene에서 문제없이 실행했습니다.
 
-Headless 평균 FPS는 133.9로 기록됐지만 렌더러/GPU workload가 실제 Windows 실행과 다르므로 **성능 여유가 있다는 참고 신호** 정도로만 봅니다.
+최종 deterministic run의 headless 평균 FPS는 약 133 FPS였지만 렌더러/GPU workload가 실제 Windows 실행과 다르므로 **성능 여유가 있다는 참고 신호** 정도로만 봅니다.
 
 ### Windows에서 확인할 목표
 
@@ -54,7 +64,7 @@ Headless 평균 FPS는 133.9로 기록됐지만 렌더러/GPU workload가 실제
 
 ## 물리 안정성 분석
 
-초기 검증에서 두 가지 실제 문제를 발견해 수정했습니다.
+검증 과정에서 실제 문제를 발견해 수정했습니다.
 
 ### 1. 바닥 collision을 장애물 collision으로 오인
 
@@ -84,7 +94,18 @@ Headless 평균 FPS는 133.9로 기록됐지만 렌더러/GPU workload가 실제
 - 장애물 접근 시 AI jump 허용
 - progress가 멈추면 avoidance 방향을 바꾸는 간단한 stuck recovery 추가
 
-최종 CI에서는 네 racer 모두 결승선을 통과했습니다.
+### 3. AI random path로 인한 재현성 문제
+
+중간 CI에서는 같은 코드여도 random phase/avoidance 방향에 따라 Rabbit이 첫 장애물 모서리에 걸리는 경우가 한 번 재현됐습니다.
+
+수정:
+
+- AI 초기 random phase 제거
+- animal별 deterministic phase / avoidance direction 지정
+- Rabbit / Elephant / Cat에 서로 다른 안정적인 기본 racing lane 지정
+- obstacle avoidance와 stuck recovery는 안전망으로 유지
+
+최종 동일 코드 CI를 연속 두 번 실행해 모두 네 racer가 완주했고 finish order도 동일했습니다.
 
 ### 현재 판단
 
@@ -95,6 +116,7 @@ Headless 평균 FPS는 133.9로 기록됐지만 렌더러/GPU workload가 실제
 - 영구 obstacle trap 없음
 - 네 racer 모두 완주
 - finish order 중복 기록 없음
+- 동일 빌드 반복 실행의 기본 AI 결과 재현
 
 까지 확인됐습니다.
 
@@ -108,20 +130,22 @@ Headless 평균 FPS는 133.9로 기록됐지만 렌더러/GPU workload가 실제
 
 - 동물별 target speed
 - preferred lane
-- 작은 lane wander
+- 작은 deterministic lane wander
 - forward physics ray
 - obstacle 감지 시 lateral avoidance
 - obstacle 감지 시 jump
 - stuck progress 감지 후 recovery 방향 변경
 
-최종 CI finish order:
+최종 deterministic CI finish order:
 
-1. Cat
-2. Elephant
-3. Dog (player, no headless input)
-4. Rabbit
+1. Rabbit — target speed 10.8
+2. Cat — target speed 10.5
+3. Elephant — target speed 9.9
+4. Dog — headless에서는 사용자 입력 없이 cruise speed 8.8
 
-따라서 현재 AI 3마리가 같은 물리 트랙에서 서로 다른 주행 성향을 가지며 완주할 수 있다는 최소 목표는 달성했습니다.
+Dog은 실제 플레이에서 W/↑ 입력 시 max speed 14.5를 사용할 수 있으므로, 자동 테스트에서 4위인 것은 의도된 결과입니다. 플레이어가 가속과 조향/점프를 사용하면 AI를 추월할 여지가 있습니다.
+
+현재 AI 3마리가 같은 실제 물리 트랙에서 서로 다른 주행 성향을 가지며 반복적으로 완주할 수 있다는 최소 목표는 달성했습니다.
 
 아직 없는 것:
 
@@ -178,11 +202,12 @@ Windows에서 최소 3~5회 직접 플레이하며 다음을 판단합니다.
 
 - 실제 3D 물리 이동
 - 4-racer race lifecycle
-- AI 3마리 완주
+- AI 3마리 반복 완주
 - 장애물 회피/점프
 - FinishLine
 - live ranking
 - camera/HUD
+- deterministic baseline
 - Godot 4.7.1 import/runtime 안정성
 
 다음 개발 전에 필요한 것은 기능 추가가 아니라 **Windows에서 직접 조작감 playtest**입니다.
