@@ -28,6 +28,11 @@ func begin_mode(normal_duration: float, headless_duration := 6.0) -> void:
 	time_remaining = headless_duration if DisplayServer.get_name() == "headless" else normal_duration
 	GameManager.begin_round(mode_id)
 	print("MODE START id=%s ai=%d" % [mode_id, ai_racers.size()])
+	match mode_id:
+		&"fruit_collection": print("RC_FLOW Round 2")
+		&"floor_collapse": print("RC_FLOW Round 3")
+		&"push_out": print("RC_FLOW Final")
+		_: pass
 
 func finish_mode(success: bool, score: int, details: Dictionary = {}) -> void:
 	if mode_finished:
@@ -46,8 +51,9 @@ func spawn_racer(
 	if racer == null:
 		push_error("Failed to instantiate shared racer scene")
 		return null
-	racer.name = node_name
-	racer.animal_id = animal
+	var effective_animal := GameManager.selected_animal if is_player_character else animal
+	racer.name = String(effective_animal).capitalize() if is_player_character else node_name
+	racer.animal_id = effective_animal
 	racer.is_player = is_player_character
 	racer.movement_mode = movement
 	racer.position = spawn_position
