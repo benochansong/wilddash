@@ -39,6 +39,16 @@ jobs:
       - name: Import release candidate project headlessly
         run: /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --editor --path godot --quit
 
+      - name: Verify input audio settings save and pause systems
+        run: |
+          set -o pipefail
+          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-system-test"
+          rm -rf "$XDG_DATA_HOME"
+          timeout 15s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot res://tests/release_candidate_systems.tscn \
+            | tee /tmp/wilddash-systems.log
+          grep -q "RC_SYSTEMS PASS" /tmp/wilddash-systems.log
+
       - name: Run launch to result flow with four AI
         run: |
           set -o pipefail
