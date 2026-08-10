@@ -194,7 +194,7 @@ func _apply_obstacle_difficulty() -> void:
 	var stack: Array[Node] = [_track]
 	var changed := 0
 	while not stack.is_empty():
-		var node := stack.pop_back()
+		var node: Node = stack.pop_back() as Node
 		for child in node.get_children():
 			stack.append(child)
 			if child is WildDashDynamicObstacle:
