@@ -37,12 +37,13 @@ func _physics_process(delta: float) -> void:
 	global_position += _direction * speed * delta
 	if _direction.length_squared() > 0.001:
 		look_at(global_position + _direction, Vector3.UP)
-	for racer in RaceManager.racers:
-		if racer == null or racer == owner_racer or not is_instance_valid(racer) or RaceManager.finish_order.has(racer):
-			continue
-		if global_position.distance_to(racer.global_position + Vector3.UP * 0.6) <= 1.35:
-			_resolve_hit(racer)
-			return
+
+	# Area3D catches incidental racers. The homing target gets one direct
+	# distance check to guard against fast-moving overlap misses without
+	# scanning every racer every physics frame.
+	if target_racer != null and is_instance_valid(target_racer) and not RaceManager.finish_order.has(target_racer):
+		if global_position.distance_to(target_racer.global_position + Vector3.UP * 0.6) <= 1.35:
+			_resolve_hit(target_racer)
 
 func _on_body_entered(body: Node) -> void:
 	_resolve_hit(body)
