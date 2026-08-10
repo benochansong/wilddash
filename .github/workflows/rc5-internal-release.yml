@@ -58,11 +58,14 @@ jobs:
         run: |
           set -euo pipefail
           test -f rc5_dist/WILD_DASH_3D_0.9.0-rc5_Windows_x64_UNSIGNED_INTERNAL.zip
+          test -f rc5_dist/WILD_DASH_3D_RC5.exe
+          test -f rc5_dist/SHA256.txt
           test -f rc5_dist/UNSIGNED_INTERNAL_TEST.txt
-          test -f rc5_dist/WILD_DASH_3D_RC5.exe.sha256
-          test -f rc5_dist/release_metadata.txt
           grep -qi "UNSIGNED" rc5_dist/UNSIGNED_INTERNAL_TEST.txt
           grep -qi "internal" rc5_dist/UNSIGNED_INTERNAL_TEST.txt
+          actual_sha="$(sha256sum rc5_dist/WILD_DASH_3D_RC5.exe | awk '{print $1}')"
+          grep -qi "$actual_sha" rc5_dist/SHA256.txt
+          echo "Windows executable SHA-256 verified: $actual_sha"
 
       - name: Write RC5 internal release notes
         shell: bash
