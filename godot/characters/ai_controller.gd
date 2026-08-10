@@ -227,13 +227,27 @@ func _update_route_brain(elapsed: float, allow_raycast: bool) -> void:
 		_stuck_seconds = 0.0
 
 func _advance_route_index() -> void:
-	if _race_route.size() < 2:
+	if _race_route.size() < 2 or _racer == null:
 		return
+	# A fixed 3.5m capture radius is fine around 10-15m/s but can make racers
+	# orbit a waypoint after a boost, jump landing, or headless stress speed.
+	# Scale the capture radius conservatively and also accept a waypoint that
+	# has just been crossed while the racer remains inside the local corridor.
+	var reach_radius := clampf(3.5 + maxf(0.0, _racer.current_speed - 18.0) * 0.12, 3.5, 7.5)
 	while _route_index < _race_route.size() - 1:
 		var target := _race_route[_route_index]
-		var planar := target - _racer.global_position
-		planar.y = 0.0
-		if planar.length() > 3.5:
+		var planar_to_target := target - _racer.global_position
+		planar_to_target.y = 0.0
+		var reached := planar_to_target.length() <= reach_radius
+		var passed_target := false
+		if not reached and _route_index > 0 and planar_to_target.length() <= 12.0:
+			var segment := target - _race_route[_route_index - 1]
+			segment.y = 0.0
+			if segment.length_squared() > 0.001:
+				var beyond := _racer.global_position - target
+				beyond.y = 0.0
+				passed_target = beyond.dot(segment.normalized()) > 0.0
+		if not reached and not passed_target:
 			break
 		_route_index += 1
 
@@ -270,22 +284,25 @@ func _update_hard_stuck_recovery(delta: float) -> void:
 	_recovery_sample_progress = RaceManager.get_track_progress(_racer)
 
 # Falling below the course is a real checkpoint respawn. A racer that is still
-# near the course but has been stuck for four seconds gets a lighter recovery:
-# snap to its nearest current-route waypoint instead of replaying the whole
-# checkpoint sector. This prevents deterministic corner/obstacle loops without
-# granting normal AI a shortcut during healthy driving.
+# near the course but has been stuck for four seconds gets a lighter recovery.
+# Keep recovery local to the current route target so a folded hairpin cannot
+# snap the racer onto a spatially-near future branch and accidentally bypass
+# an ordered checkpoint.
 func _recover_stalled_to_route() -> void:
 	if _racer == null or _race_route.is_empty():
 		return
-	var nearest := _find_nearest_route_index(_racer.global_position)
-	nearest = clampi(nearest, 1, _race_route.size() - 1)
-	var safe_position := _race_route[nearest] + Vector3.UP * 0.35
+	var previous_index := clampi(_route_index - 1, 1, _race_route.size() - 1)
+	var current_index := clampi(_route_index, 1, _race_route.size() - 1)
+	var previous_distance := _racer.global_position.distance_squared_to(_race_route[previous_index])
+	var current_distance := _racer.global_position.distance_squared_to(_race_route[current_index])
+	var safe_index := previous_index if previous_distance <= current_distance else current_index
+	var safe_position := _race_route[safe_index] + Vector3.UP * 0.35
 	_racer.reset_motion(safe_position)
-	_route_index = mini(nearest + 1, _race_route.size() - 1)
+	_route_index = mini(safe_index + 1, _race_route.size() - 1)
 	_orient_from_position(safe_position)
 	_reset_recovery_sampling()
 	print("AI ROUTE STALL RECOVERY racer=%s route=%d checkpoint=%d" % [
-		RaceManager.get_racer_label(_racer), nearest, RaceManager.get_checkpoint_progress(_racer),
+		RaceManager.get_racer_label(_racer), safe_index, RaceManager.get_checkpoint_progress(_racer),
 	])
 
 func _recover_to_track() -> void:
