@@ -1,0 +1,308 @@
+name: WILD DASH Windows Signed Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version, e.g. 0.9.0-rc4"
+        required: true
+        default: "0.9.0-rc4"
+        type: string
+      tag:
+        description: "Git tag, e.g. v0.9.0-rc4"
+        required: true
+        default: "v0.9.0-rc4"
+        type: string
+      release_title:
+        description: "GitHub release title"
+        required: true
+        default: "WILD DASH 3D RC4 — Signed Gameplay Build"
+        type: string
+      signing_provider:
+        description: "How to sign the Windows executable"
+        required: true
+        default: "unsigned-test"
+        type: choice
+        options:
+          - unsigned-test
+          - artifact-signing
+          - self-hosted-cert-store
+      publish_release:
+        description: "Publish a GitHub pre-release after trusted signature verification"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows-unsigned:
+    name: Build and smoke-test unsigned Windows binary
+    runs-on: windows-2025
+    timeout-minutes: 20
+    env:
+      VERSION: ${{ inputs.version }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
+
+      - name: Install Godot 4.7.1 and export templates
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          Invoke-WebRequest "https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_win64.exe.zip" -OutFile "$env:RUNNER_TEMP\godot.zip"
+          Expand-Archive "$env:RUNNER_TEMP\godot.zip" "$env:RUNNER_TEMP\godot" -Force
+          Invoke-WebRequest "https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_export_templates.tpz" -OutFile "$env:RUNNER_TEMP\templates.zip"
+          Expand-Archive "$env:RUNNER_TEMP\templates.zip" "$env:RUNNER_TEMP\templates" -Force
+          $templateDir = "$env:APPDATA\Godot\export_templates\4.7.1.stable"
+          New-Item -ItemType Directory -Force $templateDir | Out-Null
+          Copy-Item "$env:RUNNER_TEMP\templates\templates\*" $templateDir -Recurse -Force
+          $godotFile = Get-ChildItem "$env:RUNNER_TEMP\godot\*console.exe" | Select-Object -First 1
+          if ($null -eq $godotFile) { throw "Godot console executable not found" }
+          "GODOT_EXE=$($godotFile.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          & $godotFile.FullName --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Import Godot project
+        shell: pwsh
+        run: |
+          & $env:GODOT_EXE --headless --editor --path godot --quit
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Export Windows x64 executable
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force "unsigned" | Out-Null
+          & $env:GODOT_EXE --headless --path godot --export-release "Windows Desktop" "../unsigned/WILD_DASH_3D.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $exe = (Resolve-Path "unsigned\WILD_DASH_3D.exe").Path
+          Write-Host "WILDDASH UNSIGNED EXPORT bytes=$((Get-Item $exe).Length) path=$exe"
+
+      - name: Smoke-test exported executable before signing
+        shell: pwsh
+        run: |
+          $env:WILDDASH_AUTOTEST_LOAD_ONLY = "1"
+          $exe = (Resolve-Path "unsigned\WILD_DASH_3D.exe").Path
+          $proc = Start-Process -FilePath $exe -ArgumentList "--headless" -PassThru -Wait
+          Write-Host "WILDDASH UNSIGNED SMOKE EXIT=$($proc.ExitCode)"
+          if ($proc.ExitCode -ne 0) { throw "Unsigned exported executable failed smoke test" }
+
+      - name: Upload unsigned build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WILD-DASH-Windows-unsigned
+          path: unsigned/WILD_DASH_3D.exe
+          if-no-files-found: error
+          retention-days: 7
+
+  sign-with-artifact-signing:
+    name: Sign with Microsoft Artifact Signing
+    if: ${{ inputs.signing_provider == 'artifact-signing' }}
+    needs: build-windows-unsigned
+    runs-on: windows-2025
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      VERSION: ${{ inputs.version }}
+      RELEASE_TITLE: ${{ inputs.release_title }}
+    steps:
+      - name: Checkout signing helpers
+        uses: actions/checkout@v5
+
+      - name: Download unsigned executable
+        uses: actions/download-artifact@v4
+        with:
+          name: WILD-DASH-Windows-unsigned
+          path: signed
+
+      - name: Azure login with GitHub OIDC
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Sign executable with Microsoft Artifact Signing
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ vars.WILDDASH_ARTIFACT_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.WILDDASH_ARTIFACT_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.WILDDASH_ARTIFACT_SIGNING_PROFILE }}
+          files: ${{ github.workspace }}\signed\WILD_DASH_3D.exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+          description: WILD DASH 3D
+          description-url: https://github.com/benochansong/wilddash
+
+      - name: Verify trusted RSA Authenticode signature and timestamp
+        shell: pwsh
+        run: |
+          & ".\godot\tools\verify_windows_signature.ps1" -FilePath ".\signed\WILD_DASH_3D.exe" -RequireTimestamp
+
+      - name: Smoke-test signed executable
+        shell: pwsh
+        run: |
+          $env:WILDDASH_AUTOTEST_LOAD_ONLY = "1"
+          $exe = (Resolve-Path ".\signed\WILD_DASH_3D.exe").Path
+          $proc = Start-Process -FilePath $exe -ArgumentList "--headless" -PassThru -Wait
+          Write-Host "WILDDASH SIGNED SMOKE EXIT=$($proc.ExitCode)"
+          if ($proc.ExitCode -ne 0) { throw "Signed executable failed smoke test" }
+
+      - name: Package signed release
+        shell: pwsh
+        run: |
+          @"
+          $env:RELEASE_TITLE
+          Version $env:VERSION
+          Windows x64 / Offline Single Player
+
+          SIGNING STATUS: TRUSTED AUTHENTICODE SIGNATURE VERIFIED
+          Signature policy: RSA + SHA256 + RFC3161 timestamp
+
+          Keyboard: WASD/Arrows, Space Jump, E Skill, Q Item, Esc/P Pause
+          Gamepad: Left Stick/D-Pad, A Jump, X Skill, B Item, Start Pause
+          "@ | Set-Content ".\signed\README_WINDOWS.txt" -Encoding UTF8
+          "TRUSTED AUTHENTICODE SIGNATURE VERIFIED`nprovider=Microsoft Artifact Signing`n" | Set-Content ".\signed\SIGNING_STATUS.txt" -Encoding ASCII
+          $zip = ".\signed\WILD_DASH_3D_$env:VERSION`_Windows_x64_SIGNED.zip"
+          Compress-Archive -Path ".\signed\WILD_DASH_3D.exe",".\signed\README_WINDOWS.txt",".\signed\SIGNING_STATUS.txt" -DestinationPath $zip -Force
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  $(Split-Path $zip -Leaf)" | Set-Content ".\signed\SHA256.txt" -Encoding ASCII
+
+      - name: Upload signed distribution
+        uses: actions/upload-artifact@v4
+        with:
+          name: WILD-DASH-Windows-signed
+          path: |
+            signed/WILD_DASH_3D.exe
+            signed/*_Windows_x64_SIGNED.zip
+            signed/README_WINDOWS.txt
+            signed/SIGNING_STATUS.txt
+            signed/SHA256.txt
+          if-no-files-found: error
+
+  sign-with-self-hosted-cert-store:
+    name: Sign on self-hosted Windows certificate runner
+    if: ${{ inputs.signing_provider == 'self-hosted-cert-store' }}
+    needs: build-windows-unsigned
+    runs-on: [self-hosted, windows, wilddash-signing]
+    timeout-minutes: 20
+    env:
+      VERSION: ${{ inputs.version }}
+      RELEASE_TITLE: ${{ inputs.release_title }}
+    steps:
+      - name: Checkout signing helpers
+        uses: actions/checkout@v5
+
+      - name: Download unsigned executable
+        uses: actions/download-artifact@v4
+        with:
+          name: WILD-DASH-Windows-unsigned
+          path: signed
+
+      - name: Sign with trusted RSA certificate in Windows certificate store
+        shell: pwsh
+        run: |
+          & ".\godot\tools\sign_windows_cert_store.ps1" `
+            -FilePath ".\signed\WILD_DASH_3D.exe" `
+            -CertificateThumbprint "${{ secrets.WILDDASH_CERT_THUMBPRINT }}" `
+            -TimestampUrl "${{ vars.WILDDASH_TIMESTAMP_URL }}" `
+            -Description "WILD DASH 3D"
+
+      - name: Verify trusted RSA Authenticode signature and timestamp
+        shell: pwsh
+        run: |
+          & ".\godot\tools\verify_windows_signature.ps1" -FilePath ".\signed\WILD_DASH_3D.exe" -RequireTimestamp
+
+      - name: Smoke-test signed executable
+        shell: pwsh
+        run: |
+          $env:WILDDASH_AUTOTEST_LOAD_ONLY = "1"
+          $exe = (Resolve-Path ".\signed\WILD_DASH_3D.exe").Path
+          $proc = Start-Process -FilePath $exe -ArgumentList "--headless" -PassThru -Wait
+          Write-Host "WILDDASH SIGNED SMOKE EXIT=$($proc.ExitCode)"
+          if ($proc.ExitCode -ne 0) { throw "Signed executable failed smoke test" }
+
+      - name: Package signed release
+        shell: pwsh
+        run: |
+          @"
+          $env:RELEASE_TITLE
+          Version $env:VERSION
+          Windows x64 / Offline Single Player
+
+          SIGNING STATUS: TRUSTED AUTHENTICODE SIGNATURE VERIFIED
+          Signature policy: RSA + SHA256 + RFC3161 timestamp
+          "@ | Set-Content ".\signed\README_WINDOWS.txt" -Encoding UTF8
+          "TRUSTED AUTHENTICODE SIGNATURE VERIFIED`nprovider=self-hosted certificate store`n" | Set-Content ".\signed\SIGNING_STATUS.txt" -Encoding ASCII
+          $zip = ".\signed\WILD_DASH_3D_$env:VERSION`_Windows_x64_SIGNED.zip"
+          Compress-Archive -Path ".\signed\WILD_DASH_3D.exe",".\signed\README_WINDOWS.txt",".\signed\SIGNING_STATUS.txt" -DestinationPath $zip -Force
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  $(Split-Path $zip -Leaf)" | Set-Content ".\signed\SHA256.txt" -Encoding ASCII
+
+      - name: Upload signed distribution
+        uses: actions/upload-artifact@v4
+        with:
+          name: WILD-DASH-Windows-signed
+          path: |
+            signed/WILD_DASH_3D.exe
+            signed/*_Windows_x64_SIGNED.zip
+            signed/README_WINDOWS.txt
+            signed/SIGNING_STATUS.txt
+            signed/SHA256.txt
+          if-no-files-found: error
+
+  publish-signed-prerelease:
+    name: Publish signed GitHub pre-release
+    if: >-
+      ${{ always() && inputs.publish_release == true && inputs.signing_provider != 'unsigned-test' &&
+          (needs.sign-with-artifact-signing.result == 'success' || needs.sign-with-self-hosted-cert-store.result == 'success') }}
+    needs:
+      - sign-with-artifact-signing
+      - sign-with-self-hosted-cert-store
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ inputs.tag }}
+      RELEASE_TITLE: ${{ inputs.release_title }}
+    steps:
+      - name: Checkout release notes
+        uses: actions/checkout@v5
+
+      - name: Download verified signed distribution
+        uses: actions/download-artifact@v4
+        with:
+          name: WILD-DASH-Windows-signed
+          path: signed
+
+      - name: Refuse unsigned publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f signed/SIGNING_STATUS.txt
+          grep -q "TRUSTED AUTHENTICODE SIGNATURE VERIFIED" signed/SIGNING_STATUS.txt
+          test -f signed/SHA256.txt
+          ls signed/*_Windows_x64_SIGNED.zip >/dev/null
+
+      - name: Publish signed pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/release-notes.md <<'EOF'
+          This Windows build passed WILD DASH CI, was code-signed with a trusted RSA Authenticode certificate, was RFC3161 timestamped, passed Windows signature verification, and passed a post-signing headless smoke launch.
+
+          The ZIP includes SIGNING_STATUS.txt and SHA256.txt for verification.
+          EOF
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "$RELEASE_TITLE" --notes-file /tmp/release-notes.md --prerelease
+          else
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "$RELEASE_TITLE" --notes-file /tmp/release-notes.md --prerelease
+          fi
+          gh release upload "$TAG" signed/*_Windows_x64_SIGNED.zip signed/SHA256.txt signed/SIGNING_STATUS.txt --clobber
+          gh release view "$TAG" --json name,tagName,isPrerelease,url
