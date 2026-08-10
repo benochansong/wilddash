@@ -1,54 +1,191 @@
 extends Node
 
+const BUS_MASTER := "Master"
+const BUS_MUSIC := "Music"
+const BUS_SFX := "SFX"
+const SFX_POOL_SIZE := 8
+
 var muted := false
-var sfx_volume := 1.0
-var music_volume := 0.65
+var master_volume := 0.85
+var music_volume := 0.62
+var sfx_volume := 0.82
 var _music_player: AudioStreamPlayer
+var _sfx_players: Array[AudioStreamPlayer] = []
+var _sfx_cursor := 0
+var _themes: Dictionary = {}
+var _sfx_library: Dictionary = {}
+var _current_theme := ""
 
 func _ready() -> void:
+	_ensure_bus(BUS_MUSIC)
+	_ensure_bus(BUS_SFX)
 	_music_player = AudioStreamPlayer.new()
 	_music_player.name = "MusicPlayer"
+	_music_player.bus = BUS_MUSIC
 	add_child(_music_player)
-	_apply_music_volume()
+	for i in range(SFX_POOL_SIZE):
+		var player := AudioStreamPlayer.new()
+		player.name = "SFX_%02d" % i
+		player.bus = BUS_SFX
+		add_child(player)
+		_sfx_players.append(player)
+	if DisplayServer.get_name() != "headless":
+		_build_procedural_audio()
+	apply_settings(SettingsManager.get_audio_settings())
+	if DisplayServer.get_name() != "headless":
+		play_theme("menu")
 
+func apply_settings(audio: Dictionary) -> void:
+	muted = bool(audio.get("muted", false))
+	master_volume = clampf(float(audio.get("master_volume", 0.85)), 0.0, 1.0)
+	music_volume = clampf(float(audio.get("music_volume", 0.62)), 0.0, 1.0)
+	sfx_volume = clampf(float(audio.get("sfx_volume", 0.82)), 0.0, 1.0)
+	_set_bus_volume(BUS_MASTER, master_volume)
+	_set_bus_volume(BUS_MUSIC, music_volume)
+	_set_bus_volume(BUS_SFX, sfx_volume)
+	var master_index := AudioServer.get_bus_index(BUS_MASTER)
+	if master_index >= 0:
+		AudioServer.set_bus_mute(master_index, muted)
+
+# Compatibility setters used by the gameplay prototype API.
 func set_muted(value: bool) -> void:
 	muted = value
-	_apply_music_volume()
+	var audio := {
+		"muted": muted,
+		"master_volume": master_volume,
+		"music_volume": music_volume,
+		"sfx_volume": sfx_volume,
+	}
+	apply_settings(audio)
 
 func set_sfx_volume(value: float) -> void:
 	sfx_volume = clampf(value, 0.0, 1.0)
+	_set_bus_volume(BUS_SFX, sfx_volume)
 
 func set_music_volume(value: float) -> void:
 	music_volume = clampf(value, 0.0, 1.0)
-	_apply_music_volume()
+	_set_bus_volume(BUS_MUSIC, music_volume)
 
-func play_sfx(stream: AudioStream, volume_scale := 1.0) -> void:
-	if muted or stream == null:
+func play_theme(theme_id: String) -> void:
+	if DisplayServer.get_name() == "headless" or muted:
 		return
-	var player := AudioStreamPlayer.new()
-	player.stream = stream
-	player.volume_db = _volume_db(sfx_volume * volume_scale)
-	add_child(player)
-	player.finished.connect(player.queue_free)
-	player.play()
-
-func play_music(stream: AudioStream, loop := true) -> void:
+	if _current_theme == theme_id and _music_player.playing:
+		return
+	var stream: AudioStream = _themes.get(theme_id, _themes.get("menu"))
 	if stream == null:
 		return
+	_current_theme = theme_id
+	_music_player.stop()
+	_music_player.stream = stream
+	_music_player.play()
+
+func play_music(stream: AudioStream, loop := true) -> void:
+	if stream == null or _music_player == null:
+		return
+	_current_theme = "custom"
 	_music_player.stop()
 	_music_player.stream = stream
 	if stream is AudioStreamWAV:
 		(stream as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD if loop else AudioStreamWAV.LOOP_DISABLED
-	_apply_music_volume()
 	_music_player.play()
 
 func stop_music() -> void:
-	_music_player.stop()
+	_current_theme = ""
+	if _music_player != null:
+		_music_player.stop()
 
-func _apply_music_volume() -> void:
-	if _music_player == null:
+func play_sfx_id(sfx_id: String, volume_scale := 1.0) -> void:
+	if DisplayServer.get_name() == "headless" or muted or _sfx_players.is_empty():
 		return
-	_music_player.volume_db = -80.0 if muted else _volume_db(music_volume)
+	var stream: AudioStream = _sfx_library.get(sfx_id)
+	if stream == null:
+		return
+	_play_on_pool(stream, volume_scale)
 
-func _volume_db(value: float) -> float:
-	return -80.0 if value <= 0.0001 else linear_to_db(clampf(value, 0.0001, 1.0))
+func play_sfx(stream: AudioStream, volume_scale := 1.0) -> void:
+	if stream == null or DisplayServer.get_name() == "headless" or muted or _sfx_players.is_empty():
+		return
+	_play_on_pool(stream, volume_scale)
+
+func _play_on_pool(stream: AudioStream, volume_scale: float) -> void:
+	var player := _sfx_players[_sfx_cursor]
+	_sfx_cursor = (_sfx_cursor + 1) % _sfx_players.size()
+	player.stop()
+	player.volume_db = linear_to_db(clampf(volume_scale, 0.01, 1.0))
+	player.stream = stream
+	player.play()
+
+func _ensure_bus(bus_name: String) -> void:
+	if AudioServer.get_bus_index(bus_name) >= 0:
+		return
+	AudioServer.add_bus()
+	var index := AudioServer.bus_count - 1
+	AudioServer.set_bus_name(index, bus_name)
+	AudioServer.set_bus_send(index, BUS_MASTER)
+
+func _set_bus_volume(bus_name: String, value: float) -> void:
+	var index := AudioServer.get_bus_index(bus_name)
+	if index < 0:
+		return
+	AudioServer.set_bus_volume_db(index, -80.0 if value <= 0.0001 else linear_to_db(value))
+
+func _build_procedural_audio() -> void:
+	_themes["menu"] = _make_theme([196.0, 246.94, 293.66], 4.0, 0.16)
+	_themes["race"] = _make_theme([220.0, 329.63, 440.0], 3.2, 0.18)
+	_themes["arena"] = _make_theme([174.61, 261.63, 349.23], 3.6, 0.18)
+	_themes["result"] = _make_theme([261.63, 329.63, 392.0], 4.4, 0.15)
+	_sfx_library["ui"] = _make_tone(660.0, 0.07, 0.32)
+	_sfx_library["jump"] = _make_sweep(360.0, 720.0, 0.12, 0.28)
+	_sfx_library["skill"] = _make_sweep(520.0, 220.0, 0.16, 0.30)
+	_sfx_library["item"] = _make_tone(880.0, 0.10, 0.26)
+	_sfx_library["hit"] = _make_sweep(180.0, 95.0, 0.09, 0.30)
+	_sfx_library["finish"] = _make_sweep(440.0, 880.0, 0.22, 0.34)
+
+func _make_theme(frequencies: Array, duration: float, amplitude: float) -> AudioStreamWAV:
+	var sample_rate := 22050
+	var sample_count := int(duration * float(sample_rate))
+	var data := PackedByteArray()
+	data.resize(sample_count * 2)
+	for i in range(sample_count):
+		var time := float(i) / float(sample_rate)
+		var beat := int(floor(time * 2.0)) % frequencies.size()
+		var frequency := float(frequencies[beat])
+		var envelope := 0.55 + 0.45 * sin(TAU * 0.5 * time) * sin(TAU * 0.5 * time)
+		var sample := sin(TAU * frequency * time) * amplitude * envelope
+		_write_sample_16(data, i, sample)
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = sample_rate
+	stream.stereo = false
+	stream.data = data
+	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	stream.loop_begin = 0
+	stream.loop_end = sample_count
+	return stream
+
+func _make_tone(frequency: float, duration: float, amplitude: float) -> AudioStreamWAV:
+	return _make_sweep(frequency, frequency, duration, amplitude)
+
+func _make_sweep(start_frequency: float, end_frequency: float, duration: float, amplitude: float) -> AudioStreamWAV:
+	var sample_rate := 22050
+	var sample_count := maxi(1, int(duration * float(sample_rate)))
+	var data := PackedByteArray()
+	data.resize(sample_count * 2)
+	var phase := 0.0
+	for i in range(sample_count):
+		var ratio := float(i) / float(sample_count)
+		var frequency := lerpf(start_frequency, end_frequency, ratio)
+		phase += TAU * frequency / float(sample_rate)
+		var envelope := 1.0 - ratio
+		_write_sample_16(data, i, sin(phase) * amplitude * envelope)
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = sample_rate
+	stream.stereo = false
+	stream.data = data
+	return stream
+
+func _write_sample_16(data: PackedByteArray, index: int, sample: float) -> void:
+	var value := int(clampf(sample, -1.0, 1.0) * 32767.0)
+	data[index * 2] = value & 0xff
+	data[index * 2 + 1] = (value >> 8) & 0xff
