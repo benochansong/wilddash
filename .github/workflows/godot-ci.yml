@@ -145,7 +145,7 @@ jobs:
             --headless --path godot \
             | tee /tmp/wilddash-godot-4.log
           grep -q "GRAND PRIX START racers=5 ai=4 checkpoints=11" /tmp/wilddash-godot-4.log
-          grep -q "GRAND PRIX ITEM BOXES READY count=33 stations=11" /tmp/wilddash-godot-4.log
+          grep -q "RC5 GRAND PRIX ITEM BOXES PASS count=33 target=33 stations=11 respawn=5.0s" /tmp/wilddash-godot-4.log
           grep -q "ITEM BOX PICKUP" /tmp/wilddash-godot-4.log
           grep -q "AI ITEM USE" /tmp/wilddash-godot-4.log
           grep -q "GRAND PRIX COMPLETE racers=5 finishers=5" /tmp/wilddash-godot-4.log
@@ -166,7 +166,7 @@ jobs:
             --headless --path godot \
             | tee /tmp/wilddash-godot-10.log
           grep -q "GRAND PRIX START racers=11 ai=10 checkpoints=11" /tmp/wilddash-godot-10.log
-          grep -q "GRAND PRIX ITEM BOXES READY count=33 stations=11" /tmp/wilddash-godot-10.log
+          grep -q "RC5 GRAND PRIX ITEM BOXES PASS count=33 target=33 stations=11 respawn=5.0s" /tmp/wilddash-godot-10.log
           grep -q "ITEM BOX PICKUP" /tmp/wilddash-godot-10.log
           grep -q "AI ITEM USE" /tmp/wilddash-godot-10.log
           grep -q "GRAND PRIX COMPLETE racers=11 finishers=11" /tmp/wilddash-godot-10.log
