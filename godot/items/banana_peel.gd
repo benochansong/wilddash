@@ -22,20 +22,18 @@ func _process(delta: float) -> void:
 	if _life >= 16.0:
 		queue_free()
 
-func _physics_process(_delta: float) -> void:
-	if not _armed:
-		return
-	for racer in RaceManager.racers:
-		if racer == null or racer == owner_racer or not is_instance_valid(racer) or RaceManager.finish_order.has(racer):
-			continue
-		if global_position.distance_to(racer.global_position) <= 1.35:
-			_resolve_hit(racer)
-			return
-
 func _arm_later() -> void:
 	await get_tree().create_timer(0.3).timeout
-	if is_inside_tree():
-		_armed = true
+	if not is_inside_tree():
+		return
+	_armed = true
+	# A racer can already overlap while the trap is arming. Check the Area3D
+	# overlap set once here, then rely on body_entered rather than scanning the
+	# entire race field every physics frame for the rest of the trap lifetime.
+	for body in get_overlapping_bodies():
+		_resolve_hit(body)
+		if is_queued_for_deletion():
+			return
 
 func _on_body_entered(body: Node) -> void:
 	if _armed:
