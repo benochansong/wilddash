@@ -63,13 +63,13 @@ func _ready() -> void:
 		driver.acceleration = 22.0
 		driver.avoidance_distance = 7.5
 
+		# Rabbit remains the dedicated shortcut specialist. Hard makes Rabbit more
+		# willing to take the risky route, but does not force unrelated animals
+		# into a path that conflicts with their own skill behavior.
 		var shortcut_seed := i + 4
 		var use_shortcut := animal == &"rabbit" and WildDashDifficultySystem.should_take_shortcut(GameManager.difficulty, shortcut_seed)
-		if GameManager.difficulty == WildDashDifficultySystem.HARD and animal == &"cat":
-			use_shortcut = WildDashDifficultySystem.should_take_shortcut(GameManager.difficulty, shortcut_seed + 11)
 		if use_shortcut:
-			if animal == &"rabbit":
-				driver.preferred_lane = clampf(lane * 0.25, -0.8, 0.8)
+			driver.preferred_lane = clampf(lane * 0.25, -0.8, 0.8)
 			driver.set_race_route(_build_shortcut_route())
 			_shortcut_users += 1
 			print("AI SHORTCUT ROUTE racer=%s animal=%s difficulty=%s saving=%.1fm risk=narrow+sweeper" % [
