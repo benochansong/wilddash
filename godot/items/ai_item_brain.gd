@@ -1,6 +1,8 @@
 class_name WildDashAIItemBrain
 extends Node
 
+const DECISION_INTERVAL := 0.20 # 5 Hz: enough reaction without per-frame pack scans.
+
 var _racer: WildDashCharacterController
 var _driver: WildDashAIController
 var _think_elapsed := 0.0
@@ -24,7 +26,7 @@ func _process(delta: float) -> void:
 		_held_age = 0.0
 	_held_age += delta
 	_think_elapsed += delta
-	if _think_elapsed < 0.32:
+	if _think_elapsed < DECISION_INTERVAL:
 		return
 	_think_elapsed = 0.0
 	evaluate_and_use_now()
@@ -43,18 +45,9 @@ func evaluate_and_use_now() -> bool:
 		return false
 	var used := ItemSystem.use_held_item(_racer)
 	if used:
-		print("AI ITEM USE racer=%s item=%s utility=%.2f rank=%d" % [
-			RaceManager.get_racer_label(_racer),
-			ItemSystem.get_display_name(item_id),
-			utility,
-			RaceManager.get_rank(_racer),
-		])
+		print("AI ITEM USE racer=%s item=%s utility=%.2f rank=%d" % [RaceManager.get_racer_label(_racer), ItemSystem.get_display_name(item_id), utility, RaceManager.get_rank(_racer)])
 		if ItemSystem.is_new_item(item_id):
-			print("AI NEW ITEM USE racer=%s item=%s utility=%.2f" % [
-				RaceManager.get_racer_label(_racer),
-				ItemSystem.get_display_name(item_id),
-				utility,
-			])
+			print("AI NEW ITEM USE racer=%s item=%s utility=%.2f" % [RaceManager.get_racer_label(_racer), ItemSystem.get_display_name(item_id), utility])
 		_last_item = &""
 		_held_age = 0.0
 	return used
