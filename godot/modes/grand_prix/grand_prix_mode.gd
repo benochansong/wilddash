@@ -5,13 +5,16 @@ const ITEM_BOX_SCENE: PackedScene = preload("res://items/item_box.tscn")
 const CHASE_CAMERA_SCRIPT: Script = preload("res://camera/chase_camera.gd")
 const AI_ITEM_BRAIN_SCRIPT: Script = preload("res://items/ai_item_brain.gd")
 const AI_ANIMALS: Array[StringName] = [&"rabbit", &"elephant", &"cat", &"dog"]
-const AI_SPEEDS: Array[float] = [13.2, 12.5, 13.0, 12.8]
+const AI_SPEEDS: Array[float] = [14.5, 13.9, 14.3, 14.2]
 const ROUTE_LANES: Array[float] = [-2.4, 2.4, -0.8, 0.8, -1.7, 1.7, -0.2, 0.2, -2.8, 2.8]
-const ITEM_BOX_ROUTE_INDICES: Array[int] = [2, 4, 6, 8, 10, 12, 15]
+const ITEM_BOX_ROUTE_INDICES: Array[int] = [2, 4, 6, 8, 11, 14, 16, 19, 22, 23, 26]
 const ITEM_BOX_LANE_OFFSETS: Array[float] = [-3.2, 0.0, 3.2]
-const SHORTCUT_SKIP_ROUTE_INDEX := 13
-const SHORTCUT_ENTRY_ROUTE_INDEX := 12
-const SHORTCUT_EXIT_ROUTE_INDEX := 14
+
+const SHORTCUT_A_SKIP_ROUTE_INDEX := 17
+const SHORTCUT_B_SKIP_ROUTE_INDEX := 24
+const PLAYER_MAX_SPEED_SCALE := 1.10
+const PLAYER_CRUISE_SPEED_SCALE := 1.06
+const PLAYER_ACCELERATION_SCALE := 1.08
 
 var _player_rank := 0
 var _fps_sum := 0.0
@@ -23,13 +26,14 @@ var _item_boxes: Array[WildDashItemBox] = []
 var _ai_item_brains: Array[WildDashAIItemBrain] = []
 var _finish_times: Array[float] = []
 var _realtime_balance_run := false
-var _shortcut_users := 0
+var _shortcut_a_users := 0
+var _shortcut_b_users := 0
 
 func _ready() -> void:
 	setup_mode(
 		&"grand_prix",
 		"ROUND 1 — Wild World Grand Prix",
-		"W/↑ 가속 · A/D 조향 · Space 점프 · E/X 캐릭터 스킬 · Q/B 아이템 · 7개 체크포인트",
+		"W/↑ 가속 · A/D 조향 · Space 점프 · E/X 캐릭터 스킬 · Q/B 아이템 · 11개 체크포인트",
 		false,
 	)
 	RaceManager.clear_racers()
@@ -45,6 +49,8 @@ func _ready() -> void:
 
 	var start := _track.get_start_position()
 	player = spawn_racer("Player", &"dog", start + Vector3(-2.5, 0.1, 0.0), true, WildDashCharacterController.MovementMode.RACE)
+	_apply_grand_prix_player_pace(player)
+
 	var ai_total: int = GameManager.ai_count
 	var headless := DisplayServer.get_name() == "headless"
 	_realtime_balance_run = headless and OS.has_environment("WILDDASH_REALTIME_BALANCE")
@@ -56,16 +62,32 @@ func _ready() -> void:
 		var spawn_position := start + Vector3(lane, 0.1, float(start_row) * 3.0)
 		var racer := spawn_racer("AI_%02d" % (i + 1), animal, spawn_position, false, WildDashCharacterController.MovementMode.RACE)
 		var driver := spawn_ai_driver(racer, WildDashAIController.AIMode.RACE, speed, lane, 0.10)
-		driver.steering_strength = 5.8
-		driver.acceleration = 22.0
-		driver.avoidance_distance = 7.5
+		driver.steering_strength = 6.2
+		driver.acceleration = 24.0
+		driver.avoidance_distance = 8.2
+
+		# Shortcut choices are not character locks. Rabbit AI demonstrates the
+		# jump-friendly mid-race line while Cat AI demonstrates the technical
+		# comeback line. Human players of every racer can enter either branch.
 		if animal == &"rabbit":
 			driver.preferred_lane = clampf(lane * 0.25, -0.8, 0.8)
-			driver.set_race_route(_build_shortcut_route())
-			_shortcut_users += 1
-			print("AI SHORTCUT ROUTE racer=%s animal=rabbit saving=%.1fm risk=narrow+sweeper" % [racer.name, _get_shortcut_saving()])
+			driver.set_race_route(_build_shortcut_route(SHORTCUT_A_SKIP_ROUTE_INDEX))
+			_shortcut_a_users += 1
+			print("AI SHORTCUT A ROUTE racer=%s animal=%s saving=%.1fm gain=%.1fs" % [
+				racer.name, animal, _track.get_shortcut_a_saving(),
+				_track.get_shortcut_a_saving() / maxf(speed, 1.0),
+			])
+		elif animal == &"cat":
+			driver.preferred_lane = clampf(lane * 0.35, -1.0, 1.0)
+			driver.set_race_route(_build_shortcut_route(SHORTCUT_B_SKIP_ROUTE_INDEX))
+			_shortcut_b_users += 1
+			print("AI SHORTCUT B ROUTE racer=%s animal=%s saving=%.1fm gain=%.1fs" % [
+				racer.name, animal, _track.get_shortcut_b_saving(),
+				_track.get_shortcut_b_saving() / maxf(speed, 1.0),
+			])
 		else:
 			driver.set_race_route(_route_points)
+
 		var item_brain := AI_ITEM_BRAIN_SCRIPT.new() as WildDashAIItemBrain
 		item_brain.name = "%sItemBrain" % racer.name
 		item_brain.configure(racer, driver)
@@ -74,15 +96,15 @@ func _ready() -> void:
 
 	_spawn_item_boxes()
 
-	# Normal CI uses accelerated movement so full campaign regression is fast.
-	# WILDDASH_REALTIME_BALANCE keeps production-like speeds to measure RC3 race
-	# pacing without changing the retail gameplay values.
+	# Normal CI uses accelerated movement so the full four-round regression
+	# remains practical despite the 2.4 km course. WILDDASH_REALTIME_BALANCE
+	# keeps production pace for manual pacing telemetry.
 	if headless:
-		var player_test_speed := 13.2 if _realtime_balance_run else 36.0
+		var player_test_speed := player.max_speed if _realtime_balance_run else 42.0
 		var headless_driver := spawn_ai_driver(player, WildDashAIController.AIMode.RACE, player_test_speed, 0.0, 0.0, true)
-		headless_driver.steering_strength = 5.8 if _realtime_balance_run else 10.0
-		headless_driver.acceleration = 22.0 if _realtime_balance_run else 65.0
-		headless_driver.avoidance_distance = 7.5 if _realtime_balance_run else 8.0
+		headless_driver.steering_strength = 6.2 if _realtime_balance_run else 11.0
+		headless_driver.acceleration = 24.0 if _realtime_balance_run else 72.0
+		headless_driver.avoidance_distance = 8.2
 		headless_driver.set_race_route(_route_points)
 		var player_item_brain := AI_ITEM_BRAIN_SCRIPT.new() as WildDashAIItemBrain
 		player_item_brain.name = "PlayerTestItemBrain"
@@ -93,9 +115,9 @@ func _ready() -> void:
 			for driver in ai_drivers:
 				if driver == headless_driver:
 					continue
-				driver.target_speed *= 2.65
-				driver.acceleration = 62.0
-				driver.steering_strength = 9.5
+				driver.target_speed *= 2.85
+				driver.acceleration = 70.0
+				driver.steering_strength = 10.5
 
 	var camera := CHASE_CAMERA_SCRIPT.new() as Camera3D
 	if camera != null:
@@ -131,7 +153,10 @@ func _process(_delta: float) -> void:
 	var checkpoint_progress := RaceManager.get_checkpoint_progress(player)
 	var checkpoint_total := RaceManager.get_checkpoint_count()
 	var progress_percent := RaceManager.get_progress_percent(player)
-	hud.set_metrics("Rank %d/%d   CP %d/%d   Progress %d%%   Speed %.1f   FPS %d" % [rank, RaceManager.racers.size(), checkpoint_progress, checkpoint_total, roundi(progress_percent), player.current_speed, fps])
+	hud.set_metrics("Rank %d/%d   CP %d/%d   Progress %d%%   Speed %.1f   FPS %d" % [
+		rank, RaceManager.racers.size(), checkpoint_progress, checkpoint_total,
+		roundi(progress_percent), player.current_speed, fps,
+	])
 	hud.set_item_state(ItemSystem.get_display_name(player.get_held_item()), ItemSystem.get_status_text(player))
 
 func _physics_process(delta: float) -> void:
@@ -140,7 +165,7 @@ func _physics_process(delta: float) -> void:
 			RaceManager.sync_checkpoint_from_position(racer)
 			RaceManager.sync_finish_from_position(racer)
 
-	if player != null and player.global_position.y < -28.0 and not player.finished:
+	if player != null and player.global_position.y < -34.0 and not player.finished:
 		player.reset_motion(RaceManager.get_respawn_position(player))
 		_orient_to_route(player)
 		print("PLAYER TRACK RECOVERY checkpoint=%d" % RaceManager.get_checkpoint_progress(player))
@@ -187,25 +212,27 @@ func _spawn_item_boxes() -> void:
 			box.position = point + right * lane_offset + Vector3.UP * 1.35
 			add_child(box)
 			_item_boxes.append(box)
-	print("GRAND PRIX ITEM BOXES READY count=%d stations=%d respawn=5s" % [_item_boxes.size(), ITEM_BOX_ROUTE_INDICES.size()])
+	print("GRAND PRIX ITEM BOXES READY count=%d stations=%d respawn=5s first_route=%d final_route=%d" % [
+		_item_boxes.size(), ITEM_BOX_ROUTE_INDICES.size(), ITEM_BOX_ROUTE_INDICES[0], ITEM_BOX_ROUTE_INDICES[-1],
+	])
 
-func _build_shortcut_route() -> Array[Vector3]:
+func _build_shortcut_route(skip_route_index: int) -> Array[Vector3]:
 	var route: Array[Vector3] = []
 	for i in range(_route_points.size()):
-		if i == SHORTCUT_SKIP_ROUTE_INDEX:
+		if i == skip_route_index:
 			continue
 		route.append(_route_points[i])
 	return route
 
-func _get_shortcut_saving() -> float:
-	if _route_points.size() <= SHORTCUT_EXIT_ROUTE_INDEX:
-		return 0.0
-	var a := _route_points[SHORTCUT_ENTRY_ROUTE_INDEX]
-	var detour := _route_points[SHORTCUT_SKIP_ROUTE_INDEX]
-	var b := _route_points[SHORTCUT_EXIT_ROUTE_INDEX]
-	var safe_distance := a.distance_to(detour) + detour.distance_to(b)
-	var shortcut_distance := a.distance_to(b)
-	return maxf(0.0, safe_distance - shortcut_distance)
+func _apply_grand_prix_player_pace(racer: WildDashCharacterController) -> void:
+	if racer == null:
+		return
+	racer.max_speed *= PLAYER_MAX_SPEED_SCALE
+	racer.cruise_speed *= PLAYER_CRUISE_SPEED_SCALE
+	racer.acceleration *= PLAYER_ACCELERATION_SCALE
+	print("GRAND PRIX PLAYER PACE max=%.2f cruise=%.2f accel=%.2f target=130-170s" % [
+		racer.max_speed, racer.cruise_speed, racer.acceleration,
+	])
 
 func _orient_to_route(racer: WildDashCharacterController) -> void:
 	if _route_points.size() < 2:
@@ -227,7 +254,10 @@ func _on_any_racer_finished(_racer: Node3D, _rank: int) -> void:
 
 func _on_player_finished(rank: int) -> void:
 	_player_rank = rank
-	print("GRAND PRIX PLAYER FINISH rank=%d elapsed=%.2fs checkpoints=%d/%d" % [rank, RaceManager.get_elapsed_seconds(), RaceManager.get_checkpoint_progress(player), RaceManager.get_checkpoint_count()])
+	print("GRAND PRIX PLAYER FINISH rank=%d elapsed=%.2fs checkpoints=%d/%d" % [
+		rank, RaceManager.get_elapsed_seconds(),
+		RaceManager.get_checkpoint_progress(player), RaceManager.get_checkpoint_count(),
+	])
 
 func _on_race_completed() -> void:
 	if _player_rank <= 0 and player != null:
@@ -247,10 +277,15 @@ func _on_race_completed() -> void:
 	var field_complete := RaceManager.get_elapsed_seconds()
 	var qualifying_rank := ceili(float(RaceManager.racers.size()) * 0.5)
 	var success := _player_rank > 0 and _player_rank <= qualifying_rank
-	print("GRAND PRIX COMPLETE racers=%d finishers=%d order=%s" % [RaceManager.racers.size(), RaceManager.finish_order.size(), ", ".join(labels)])
+	print("GRAND PRIX COMPLETE racers=%d finishers=%d order=%s" % [
+		RaceManager.racers.size(), RaceManager.finish_order.size(), ", ".join(labels),
+	])
+	if ai_racers.size() in [4, 10, 14] and RaceManager.finish_order.size() == RaceManager.racers.size():
+		print("%d AI COMPLETE PASS finishers=%d" % [ai_racers.size(), RaceManager.finish_order.size()])
 	print("GRAND PRIX FPS avg=%.1f headless=%s" % [average_fps, str(DisplayServer.get_name() == "headless")])
-	print("RC3 RACE TELEMETRY average_finish=%.2fs field_complete=%.2fs target=80-120 shortcut_users=%d shortcut_saving=%.1fm" % [
-		average_finish, field_complete, _shortcut_users, _get_shortcut_saving(),
+	print("GRAND PRIX RACE TELEMETRY average_finish=%.2fs field_complete=%.2fs player_target=130-170 shortcut_a_users=%d shortcut_b_users=%d shortcut_a=%.1fm shortcut_b=%.1fm" % [
+		average_finish, field_complete, _shortcut_a_users, _shortcut_b_users,
+		_track.get_shortcut_a_saving(), _track.get_shortcut_b_saving(),
 	])
 	finish_mode(success, _player_rank, {
 		"rank": _player_rank,
@@ -259,9 +294,12 @@ func _on_race_completed() -> void:
 		"checkpoints": RaceManager.get_checkpoint_count(),
 		"track_length_m": RaceManager.get_track_length(),
 		"item_boxes": _item_boxes.size(),
+		"item_stations": ITEM_BOX_ROUTE_INDICES.size(),
 		"average_finish_seconds": average_finish,
 		"field_complete_seconds": field_complete,
-		"shortcut_users": _shortcut_users,
-		"shortcut_saving_m": _get_shortcut_saving(),
+		"shortcut_a_users": _shortcut_a_users,
+		"shortcut_b_users": _shortcut_b_users,
+		"shortcut_a_saving_m": _track.get_shortcut_a_saving(),
+		"shortcut_b_saving_m": _track.get_shortcut_b_saving(),
 		"order": labels,
 	})
