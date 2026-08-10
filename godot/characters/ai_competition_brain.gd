@@ -21,21 +21,28 @@ var _mistakes := 0
 var _recoveries := 0
 var _temporary_lane_bias := 0.0
 var _mistake_remaining := 0.0
+var _initialized := false
 var _rng := RandomNumberGenerator.new()
 
 func configure(racer: WildDashCharacterController, driver: WildDashAIController) -> void:
 	_racer = racer
 	_driver = driver
 	_profile = WildDashDifficultySystem.get_profile(GameManager.difficulty)
-	_base_target_speed = driver.target_speed
-	_base_lane = driver.preferred_lane
-	_base_wander = driver.lane_wander
-	_base_steering = driver.steering_strength
-	_base_acceleration = driver.acceleration
-	_base_avoidance = driver.avoidance_distance
-	_last_position = racer.global_position
-	_last_rank = RaceManager.get_rank(racer)
 	_rng.seed = int(racer.get_instance_id() * 7919 + String(GameManager.difficulty).hash())
+	call_deferred("_capture_mode_baseline")
+
+func _capture_mode_baseline() -> void:
+	if _racer == null or _driver == null:
+		return
+	_base_target_speed = _driver.target_speed
+	_base_lane = _driver.preferred_lane
+	_base_wander = _driver.lane_wander
+	_base_steering = _driver.steering_strength
+	_base_acceleration = _driver.acceleration
+	_base_avoidance = _driver.avoidance_distance
+	_last_position = _racer.global_position
+	_last_rank = RaceManager.get_rank(_racer)
+	_initialized = true
 	_apply_profile_baseline()
 
 func refresh_baseline_from_driver() -> void:
@@ -48,7 +55,7 @@ func refresh_baseline_from_driver() -> void:
 	_apply_profile_baseline()
 
 func _physics_process(delta: float) -> void:
-	if _racer == null or _driver == null or not is_instance_valid(_racer) or _racer.finished:
+	if not _initialized or _racer == null or _driver == null or not is_instance_valid(_racer) or _racer.finished:
 		return
 	_detect_rank_change()
 	_detect_recovery_jump()
@@ -85,8 +92,6 @@ func _evaluate_competition(elapsed: float) -> void:
 	var ahead := _nearest_competitor(true, 13.0)
 	var behind := _nearest_competitor(false, 9.0)
 
-	# Deliberate, small mistakes keep AI human. Casual makes more; Hard still
-	# retains a tiny error rate so it never becomes a perfect racing line bot.
 	if _mistake_remaining <= 0.0 and _rng.randf() < float(_profile.mistake_chance) * maxf(0.25, elapsed * 2.0):
 		_mistake_remaining = _rng.randf_range(0.35, 0.80)
 		_temporary_lane_bias = _rng.randf_range(-1.15, 1.15)
@@ -101,15 +106,11 @@ func _evaluate_competition(elapsed: float) -> void:
 		var side := -1.0 if ((int(_racer.get_instance_id()) + rank) % 2 == 0) else 1.0
 		overtake_bias = side * lerpf(0.65, 2.20, risk)
 		_overtake_attempts += 1
-		# Close packs on Normal/Hard get a tiny acceleration preference, not a
-		# hidden top-speed teleport/rubber-band bonus.
 		if rank > 1:
 			_driver.acceleration *= lerpf(1.0, 1.12, risk)
 	elif behind != null and rank <= maxi(3, total / 3):
-		# Leaders defend a line rather than receiving extra speed.
 		overtake_bias = (-0.45 if int(_racer.get_instance_id()) % 2 == 0 else 0.45) * risk
 
-	# Late race makes AI more willing to hold a passing line. No position warp.
 	if progress >= 78.0 and rank > 1:
 		overtake_bias *= 1.18
 	_driver.preferred_lane = clampf(_base_lane + overtake_bias, -3.2, 3.2)
@@ -146,7 +147,6 @@ func _detect_rank_change() -> void:
 func _detect_recovery_jump() -> void:
 	var current := _racer.global_position
 	var distance := current.distance_to(_last_position)
-	# A large single-frame position correction is the track recovery path.
 	if RaceManager.active and distance >= 11.0:
 		_penalty_remaining = maxf(_penalty_remaining, float(_profile.recovery_penalty))
 		_recoveries += 1
