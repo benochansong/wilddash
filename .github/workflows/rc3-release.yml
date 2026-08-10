@@ -249,13 +249,18 @@ jobs:
           New-Item -ItemType Directory -Force "godot\build\windows" | Out-Null
           & $env:GODOT_EXE --headless --path godot --export-release "Windows Desktop" "build/windows/WILD_DASH_3D_RC3.exe"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if (-not (Test-Path "godot\build\windows\WILD_DASH_3D_RC3.exe")) { throw "Windows RC3 executable was not generated" }
+          $exe = (Resolve-Path "godot\build\windows\WILD_DASH_3D_RC3.exe").Path
+          $info = Get-Item $exe
+          Write-Host "RC3 WINDOWS EXPORT path=$($info.FullName) bytes=$($info.Length)"
 
       - name: Smoke launch exported RC3 executable
         shell: pwsh
         run: |
           $env:WILDDASH_AUTOTEST_LOAD_ONLY = "1"
-          $proc = Start-Process -FilePath "godot\build\windows\WILD_DASH_3D_RC3.exe" -ArgumentList "--headless" -PassThru -Wait
+          $exe = (Resolve-Path "godot\build\windows\WILD_DASH_3D_RC3.exe").Path
+          $info = Get-Item $exe
+          Write-Host "RC3 WINDOWS SMOKE FILE path=$($info.FullName) bytes=$($info.Length)"
+          $proc = Start-Process -FilePath $exe -ArgumentList "--headless" -PassThru -Wait
           Write-Host "RC3 WINDOWS SMOKE EXIT=$($proc.ExitCode)"
           if ($proc.ExitCode -ne 0) { throw "Exported RC3 executable exited with code $($proc.ExitCode)" }
 
