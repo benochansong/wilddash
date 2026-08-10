@@ -3,6 +3,7 @@ extends Node3D
 
 const RACER_SCENE: PackedScene = preload("res://characters/test_racer.tscn")
 const AI_SKILL_BRAIN_SCRIPT: Script = preload("res://characters/ai_skill_brain.gd")
+const AI_COMPETITION_BRAIN_SCRIPT: Script = preload("res://characters/ai_competition_brain.gd")
 
 var mode_id: StringName = &""
 var display_name := ""
@@ -10,6 +11,7 @@ var player: WildDashCharacterController
 var racers: Array[WildDashCharacterController] = []
 var ai_racers: Array[WildDashCharacterController] = []
 var ai_drivers: Array[WildDashAIController] = []
+var ai_competition_brains: Array[WildDashAICompetitionBrain] = []
 var hud: WildDashModeHUD
 var time_remaining := 0.0
 var mode_finished := false
@@ -93,6 +95,16 @@ func spawn_ai_driver(
 		skill_brain.name = "%sSkillBrain" % racer.name
 		skill_brain.racer_path = NodePath("../%s" % racer.name)
 		add_child(skill_brain)
+
+	# Player autopilot in headless CI must remain deterministic and is not a
+	# competitive opponent. Real AI racers get the difficulty/overtake brain.
+	if not preserve_player_identity:
+		var competition_brain := AI_COMPETITION_BRAIN_SCRIPT.new() as WildDashAICompetitionBrain
+		if competition_brain != null:
+			competition_brain.name = "%sCompetitionBrain" % racer.name
+			competition_brain.configure(racer, driver)
+			add_child(competition_brain)
+			ai_competition_brains.append(competition_brain)
 	return driver
 
 func create_box(
