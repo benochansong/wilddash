@@ -119,6 +119,10 @@ jobs:
       - name: Run four-round campaign with four AI
         run: |
           set -o pipefail
+          export WILDDASH_AUTOTEST=1
+          export WILDDASH_AI_COUNT=4
+          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-flow-4"
+          rm -rf "$XDG_DATA_HOME"
           timeout 125s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot \
             | tee /tmp/wilddash-godot-4.log
@@ -138,7 +142,10 @@ jobs:
       - name: Stress four-round campaign with ten AI
         run: |
           set -o pipefail
+          export WILDDASH_AUTOTEST=1
           export WILDDASH_AI_COUNT=10
+          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-flow-10"
+          rm -rf "$XDG_DATA_HOME"
           timeout 140s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot \
             | tee /tmp/wilddash-godot-10.log
@@ -158,7 +165,10 @@ jobs:
       - name: Stress four-round campaign with fourteen AI
         run: |
           set -o pipefail
+          export WILDDASH_AUTOTEST=1
           export WILDDASH_AI_COUNT=14
+          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-flow-14"
+          rm -rf "$XDG_DATA_HOME"
           timeout 155s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot \
             | tee /tmp/wilddash-godot-14.log
