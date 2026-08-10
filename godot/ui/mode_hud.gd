@@ -4,6 +4,7 @@ extends CanvasLayer
 var _title_label: Label
 var _metrics_label: Label
 var _message_label: Label
+var _item_icon_label: Label
 var _item_label: Label
 var _item_status_label: Label
 var _skill_icon_label: Label
@@ -27,20 +28,27 @@ func _ready() -> void:
 	_message_label.add_theme_font_size_override("font_size", 16)
 	add_child(_message_label)
 
+	_item_icon_label = Label.new()
+	_item_icon_label.position = Vector2(1010, 20)
+	_item_icon_label.size = Vector2(72, 44)
+	_item_icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_item_icon_label.add_theme_font_size_override("font_size", 24)
+	add_child(_item_icon_label)
+
 	_item_label = Label.new()
-	_item_label.position = Vector2(1050, 24)
-	_item_label.size = Vector2(350, 40)
+	_item_label.position = Vector2(1070, 24)
+	_item_label.size = Vector2(330, 40)
 	_item_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_item_label.add_theme_font_size_override("font_size", 22)
 	add_child(_item_label)
 
 	_item_status_label = Label.new()
-	_item_status_label.position = Vector2(1020, 58)
-	_item_status_label.size = Vector2(380, 34)
+	_item_status_label.position = Vector2(1010, 58)
+	_item_status_label.size = Vector2(390, 34)
 	_item_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_item_status_label.add_theme_font_size_override("font_size", 16)
 	add_child(_item_status_label)
-	set_item_state("—", "ITEM EMPTY")
+	set_item_state("—", "ITEM EMPTY", "--")
 
 	_skill_icon_label = Label.new()
 	_skill_icon_label.position = Vector2(1032, 104)
@@ -84,7 +92,8 @@ func set_metrics(text: String) -> void:
 func set_message(text: String) -> void:
 	_message_label.text = text
 
-func set_item_state(item_name: String, status: String) -> void:
+func set_item_state(item_name: String, status: String, icon_text := "--") -> void:
+	_item_icon_label.text = "[ %s ]" % icon_text
 	_item_label.text = "ITEM  [ %s ]" % item_name
 	_item_status_label.text = status
 
