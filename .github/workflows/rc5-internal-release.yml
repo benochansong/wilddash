@@ -1,0 +1,128 @@
+name: WILD DASH RC5 Internal Prerelease
+
+on:
+  push:
+    branches:
+      - release/wilddash-3d-rc5
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish-internal-rc5:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: v0.9.0-rc5-internal
+      VALIDATED_SHA: ce6ba5b230f5bc917856d4b9fe0d018e251ae68a
+      VALIDATED_RUN: '31394423372'
+      EXPECTED_ARTIFACT_ID: '9065297197'
+      EXPECTED_ARTIFACT_DIGEST: sha256:689ece08ddaa311f6c6bdf7dd9a769445c8a5a4b02fd2c53b272fd509201286d
+      ARTIFACT_NAME: WILD-DASH-3D-RC5-Unsigned-Internal
+
+    steps:
+      - name: Confirm exact validated artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${EXPECTED_ARTIFACT_ID}")"
+          actual_name="$(jq -r '.name' <<<"$artifact_json")"
+          actual_run="$(jq -r '.workflow_run.id' <<<"$artifact_json")"
+          actual_digest="$(jq -r '.digest // empty' <<<"$artifact_json")"
+          expired="$(jq -r '.expired' <<<"$artifact_json")"
+
+          test "$actual_name" = "$ARTIFACT_NAME"
+          test "$actual_run" = "$VALIDATED_RUN"
+          test "$expired" = "false"
+          if [[ -n "$actual_digest" ]]; then
+            test "$actual_digest" = "$EXPECTED_ARTIFACT_DIGEST"
+          fi
+
+          echo "Validated artifact: id=${EXPECTED_ARTIFACT_ID} run=${actual_run} digest=${actual_digest:-unavailable}"
+
+      - name: Download validated Windows candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p rc5_dist
+          gh run download "$VALIDATED_RUN" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "$ARTIFACT_NAME" \
+            --dir rc5_dist
+          find rc5_dist -maxdepth 2 -type f -print
+
+      - name: Verify internal candidate package
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f rc5_dist/WILD_DASH_3D_0.9.0-rc5_Windows_x64_UNSIGNED_INTERNAL.zip
+          test -f rc5_dist/UNSIGNED_INTERNAL_TEST.txt
+          test -f rc5_dist/WILD_DASH_3D_RC5.exe.sha256
+          test -f rc5_dist/release_metadata.txt
+          grep -qi "UNSIGNED" rc5_dist/UNSIGNED_INTERNAL_TEST.txt
+          grep -qi "internal" rc5_dist/UNSIGNED_INTERNAL_TEST.txt
+
+      - name: Write RC5 internal release notes
+        shell: bash
+        run: |
+          cat > rc5-release-notes.md <<'EOF'
+          # WILD DASH 3D 0.9.0 RC5 — Internal Test
+
+          This is the validated RC5 gameplay candidate for private/internal testing.
+
+          ## Automated validation
+          - RC5 Gameplay Challenge: PASS
+          - Grand Prix Pack CI: PASS
+          - Godot CI: PASS
+          - Typecheck / lint / unit test / build: PASS
+          - Windows x64 export and smoke launch: PASS
+          - Normal 15-racer realtime proxy average finish: 134.73s (target 130–170s)
+          - 10 / 25 / 50 racer headless performance benchmark: 60 FPS
+
+          ## RC5 gameplay scope
+          - 2.2–2.6 km Grand Prix track, 11 checkpoints, 2 shortcuts
+          - 36 item boxes for 15/18 racer fields
+          - 12-item combat system with rank weighting and AI item utility
+          - 4 character skills with AI skill utility
+          - Normal 15 racers; Hard up to 18 racers
+          - Character Select, Chimera Lab, Save v2, four-round campaign
+          - RC5 gameplay telemetry and projectile/trap CPU optimizations
+
+          ## Known balance signals for manual testing
+          - Normal field finish gap was 116.99s in the latest headless proxy; the tail/recovery experience needs human review.
+          - Rabbit averaged a stronger finish position than Dog/Cat/Elephant in the latest single automated sample; do not treat this single sample as a final balance verdict.
+          - Headless Player is AI-driven, so player_rank_changes=0 is not evidence of human comeback feel.
+          - Headless benchmark validates CPU/physics/AI behavior, not real GPU/render performance.
+
+          ## Distribution status
+          **UNSIGNED — INTERNAL TEST ONLY.**
+
+          A trusted Authenticode signing configuration has not been verified for this RC5. Windows SmartScreen warnings are expected. Do not redistribute this build as the public/signed RC5.
+
+          Validated source commit: `ce6ba5b230f5bc917856d4b9fe0d018e251ae68a`
+          Validated Actions run: `31394423372`
+          EOF
+
+      - name: Create private internal prerelease
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists; leaving it unchanged."
+            exit 0
+          fi
+
+          mapfile -t assets < <(find rc5_dist -maxdepth 1 -type f -print | sort)
+          test "${#assets[@]}" -gt 0
+
+          gh release create "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$VALIDATED_SHA" \
+            --title "WILD DASH 3D RC5 — Internal Test" \
+            --prerelease \
+            --notes-file rc5-release-notes.md \
+            "${assets[@]}"
+
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json tagName,name,isPrerelease,url
