@@ -11,6 +11,9 @@ const PERSONALITY_IDS: Array[StringName] = [
 const DEFAULT_DECISION_HZ := 6.0
 const PRECISION_ROUTE_START := 20
 const PRECISION_ROUTE_END := 26
+const LATE_FALLBACK_CHECKPOINT := 9
+const LATE_FALLBACK_SECONDS := 2.5
+const LATE_PROGRESS_EPSILON := 0.8
 
 var risk_level := 0.50
 var shortcut_preference := 0.45
@@ -26,6 +29,9 @@ var _decision_hz := DEFAULT_DECISION_HZ
 var _elapsed := 999.0
 var _side_sign := 1.0
 var _lane_synced_after_route := false
+var _late_best_progress := 0.0
+var _late_no_progress_seconds := 0.0
+var _safe_route_fallback_active := false
 
 static func get_profile_ids() -> Array[StringName]:
 	return [&"balanced", &"aggressive", &"safe", &"shortcut", &"item_fighter"]
@@ -83,12 +89,41 @@ func _process(delta: float) -> void:
 	if not _lane_synced_after_route:
 		_base_lane = _driver.preferred_lane
 		_lane_synced_after_route = true
+	_update_late_route_recovery(delta)
 	_elapsed += delta
 	var interval := 1.0 / clampf(_decision_hz, 4.0, 8.0)
 	if _elapsed < interval:
 		return
 	_elapsed = 0.0
 	_update_tactical_choice()
+
+func _update_late_route_recovery(delta: float) -> void:
+	if _safe_route_fallback_active:
+		return
+	var checkpoint := RaceManager.get_checkpoint_progress(_racer)
+	if checkpoint < LATE_FALLBACK_CHECKPOINT or checkpoint >= RaceManager.get_checkpoint_count():
+		_late_best_progress = 0.0
+		_late_no_progress_seconds = 0.0
+		return
+	var progress := RaceManager.get_progress_percent(_racer)
+	if progress > _late_best_progress + LATE_PROGRESS_EPSILON:
+		_late_best_progress = progress
+		_late_no_progress_seconds = 0.0
+		return
+	_late_no_progress_seconds += delta
+	if _late_no_progress_seconds < LATE_FALLBACK_SECONDS:
+		return
+	var safe_route := RaceManager.get_route_points()
+	if safe_route.size() < 2:
+		return
+	_driver.set_race_route(safe_route)
+	_driver.preferred_lane = 0.0
+	_driver.lane_wander = minf(_driver.lane_wander, 0.06)
+	_base_lane = 0.0
+	_safe_route_fallback_active = true
+	print("AI SAFE ROUTE FALLBACK racer=%s checkpoint=%d progress=%.1f" % [
+		RaceManager.get_racer_label(_racer), checkpoint, progress,
+	])
 
 func _update_tactical_choice() -> void:
 	_driver.preferred_lane = lerpf(_driver.preferred_lane, _base_lane, 0.34)
