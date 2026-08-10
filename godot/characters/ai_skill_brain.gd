@@ -5,6 +5,9 @@ extends Node
 @export var decision_interval := 0.20
 @export var warmup_seconds := 1.15
 
+const SHADOW_STEP_PRECISION_START := 76.0
+const SHADOW_STEP_PRECISION_END := 92.0
+
 var _racer: WildDashCharacterController
 var _elapsed := 0.0
 var _warmup_remaining := 0.0
@@ -84,6 +87,13 @@ func _calculate_utility(skill_id: StringName) -> float:
 				return 0.94
 			return 0.46
 		&"shadow_step":
+			if _racer.movement_mode == WildDashCharacterController.MovementMode.RACE:
+				var progress := RaceManager.get_progress_percent(_racer)
+				# Shortcut B, tunnel approach and the late chicane are precision-first.
+				# At stress-test speed a Shadow Step's forward impulse can clear the
+				# safe runoff even if the short ground probe itself succeeds.
+				if progress >= SHADOW_STEP_PRECISION_START and progress <= SHADOW_STEP_PRECISION_END:
+					return 0.50
 			if obstacle or _racer.has_blocking_collision():
 				return 0.96
 			if nearby > 0:
