@@ -70,6 +70,12 @@ func _process(delta: float) -> void:
 	_update_pack_decision()
 
 func _update_pack_decision() -> void:
+	# CI and future difficulty systems may deliberately scale a driver's speed
+	# after this tactics node is configured. Adopt large external scale changes
+	# as the new baseline instead of accidentally cancelling them on first think.
+	if _base_speed > 0.0 and _driver.target_speed > _base_speed * 1.75:
+		_base_speed = _driver.target_speed
+
 	var forward := -_racer.global_transform.basis.z.normalized()
 	var right := _racer.global_transform.basis.x.normalized()
 	var nearest: WildDashCharacterController = null
