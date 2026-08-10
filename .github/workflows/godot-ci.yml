@@ -99,7 +99,7 @@ jobs:
           grep -q "TRACK NODE BUDGET PASS" /tmp/wilddash-grand-prix-track.log
           grep -q "FINISH VALIDATION PASS" /tmp/wilddash-grand-prix-track.log
 
-      - name: Verify six-item party racing gameplay
+      - name: Verify legacy six-item party racing gameplay
         run: |
           set -o pipefail
           timeout 30s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
@@ -115,6 +115,24 @@ jobs:
           grep -q "FEATHER PASS" /tmp/wilddash-items.log
           grep -q "AI ITEM USE PASS" /tmp/wilddash-items.log
           grep -q "ITEM SYSTEM SMOKE PASS items=6 inventory=1" /tmp/wilddash-items.log
+
+      - name: Verify twelve-item combat expansion and AI utility
+        run: |
+          set -o pipefail
+          timeout 35s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot res://tests/item_expansion_smoke.tscn \
+            | tee /tmp/wilddash-item-expansion.log
+          grep -q "ITEM COUNT PASS count=12" /tmp/wilddash-item-expansion.log
+          grep -q "ITEM DEFINITION PASS roles=5 icons=12" /tmp/wilddash-item-expansion.log
+          grep -q "SUPER CARROT PASS" /tmp/wilddash-item-expansion.log
+          grep -q "ACORN BOMB PASS" /tmp/wilddash-item-expansion.log
+          grep -q "BANANA PEEL PASS" /tmp/wilddash-item-expansion.log
+          grep -q "MAGNET PASS" /tmp/wilddash-item-expansion.log
+          grep -q "WIND BOOST PASS" /tmp/wilddash-item-expansion.log
+          grep -q "GHOST FRUIT PASS" /tmp/wilddash-item-expansion.log
+          grep -q "ITEM HISTORY PASS recent=2" /tmp/wilddash-item-expansion.log
+          grep -q "AI NEW ITEM USE PASS items=6" /tmp/wilddash-item-expansion.log
+          grep -q "ITEM EXPANSION SMOKE PASS items=12 roles=5 history=2" /tmp/wilddash-item-expansion.log
 
       - name: Run four-round campaign with four AI
         run: |
