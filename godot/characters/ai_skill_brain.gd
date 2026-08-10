@@ -40,6 +40,14 @@ func consider_skill_use() -> bool:
 	if utility < 0.72:
 		return false
 	var hint := _direction_hint(skill_id)
+	if skill_id == &"shadow_step" and _racer.movement_mode == WildDashCharacterController.MovementMode.RACE:
+		if not _shadow_step_ground_is_safe(hint):
+			# Try a straight precision dash before giving up. This preserves Cat's
+			# escape utility without throwing the AI from an open split/hairpin.
+			hint = Vector2(0.0, -1.0)
+			if not _shadow_step_ground_is_safe(hint):
+				_last_utility = 0.40
+				return false
 	if not _racer.try_use_skill(hint):
 		return false
 	print("AI SKILL USE racer=%s skill=%s utility=%.2f" % [_racer.get_display_name(), _racer.get_skill_name(), utility])
@@ -111,6 +119,26 @@ func _direction_hint(skill_id: StringName) -> Vector2:
 	elif right_blocked and not left_blocked:
 		sign_value = -1.0
 	return Vector2(sign_value, -1.0)
+
+func _shadow_step_ground_is_safe(hint: Vector2) -> bool:
+	if _racer == null or _racer.get_world_3d() == null:
+		return false
+	var forward := -_racer.global_transform.basis.z.normalized()
+	var right := _racer.global_transform.basis.x.normalized()
+	var lateral := clampf(hint.x, -1.0, 1.0)
+	# The impulse decays quickly, so a 3.2m forward / 2.5m lateral probe is a
+	# conservative destination estimate. Check halfway and destination ground.
+	var offset := forward * 3.2 + right * lateral * 2.5
+	for ratio in [0.5, 1.0]:
+		var point := _racer.global_position + offset * ratio
+		var from := point + Vector3.UP * 2.8
+		var to := point + Vector3.DOWN * 5.5
+		var query := PhysicsRayQueryParameters3D.create(from, to)
+		query.exclude = [_racer.get_rid()]
+		query.collision_mask = 1
+		if _racer.get_world_3d().direct_space_state.intersect_ray(query).is_empty():
+			return false
+	return true
 
 func _has_obstacle_ahead(distance: float) -> bool:
 	if _racer == null or _racer.get_world_3d() == null:
