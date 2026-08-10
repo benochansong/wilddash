@@ -2,17 +2,33 @@ class_name WildDashAISkillBrain
 extends Node
 
 @export var racer_path: NodePath
-@export var decision_interval := 0.35
-@export var warmup_seconds := 1.15
+@export var decision_interval := 0.31
+@export var warmup_seconds := 0.95
 
 var _racer: WildDashCharacterController
 var _elapsed := 0.0
 var _warmup_remaining := 0.0
 var _last_utility := 0.0
+var _utility_threshold := 0.67
+var _difficulty_id: StringName = WildDashDifficultySystem.NORMAL
 
 func _ready() -> void:
 	_racer = get_node_or_null(racer_path) as WildDashCharacterController
+	configure_difficulty(GameManager.difficulty)
 	_warmup_remaining = warmup_seconds
+
+func configure_difficulty(id: StringName) -> void:
+	_difficulty_id = WildDashDifficultySystem.normalize(id)
+	var profile := WildDashDifficultySystem.get_profile(_difficulty_id)
+	decision_interval = float(profile.skill_decision_interval)
+	warmup_seconds = float(profile.skill_warmup)
+	_utility_threshold = float(profile.skill_utility_threshold)
+
+func get_utility_threshold() -> float:
+	return _utility_threshold
+
+func get_decision_interval() -> float:
+	return decision_interval
 
 func _physics_process(delta: float) -> void:
 	if _racer == null or _racer.finished:
@@ -37,20 +53,18 @@ func consider_skill_use() -> bool:
 	var skill_id := _racer.get_skill_id()
 	var utility := _calculate_utility(skill_id)
 	_last_utility = utility
-	if utility < 0.72:
+	if utility < _utility_threshold:
 		return false
 	var hint := _direction_hint(skill_id)
 	if skill_id == &"shadow_step" and _racer.movement_mode == WildDashCharacterController.MovementMode.RACE:
 		if not _shadow_step_ground_is_safe(hint):
-			# Try a straight precision dash before giving up. This preserves Cat's
-			# escape utility without throwing the AI from an open split/hairpin.
 			hint = Vector2(0.0, -1.0)
 			if not _shadow_step_ground_is_safe(hint):
 				_last_utility = 0.40
 				return false
 	if not _racer.try_use_skill(hint):
 		return false
-	print("AI SKILL USE racer=%s skill=%s utility=%.2f" % [_racer.get_display_name(), _racer.get_skill_name(), utility])
+	print("AI SKILL USE racer=%s skill=%s utility=%.2f difficulty=%s" % [_racer.get_display_name(), _racer.get_skill_name(), utility, _difficulty_id])
 	return true
 
 func get_last_utility() -> float:
@@ -61,11 +75,16 @@ func _calculate_utility(skill_id: StringName) -> float:
 	var obstacle := _has_obstacle_ahead(6.5)
 	var speed_ratio := 0.0 if _racer.max_speed <= 0.01 else _racer.current_speed / _racer.max_speed
 	var rank := RaceManager.get_rank(_racer) if _racer.movement_mode == WildDashCharacterController.MovementMode.RACE else 1
+	var late_chase := false
+	if _racer.movement_mode == WildDashCharacterController.MovementMode.RACE:
+		late_chase = RaceManager.get_progress_percent(_racer) >= 75.0 and rank > 1
 
 	match skill_id:
 		&"rally_dash":
 			if obstacle:
 				return 0.25
+			if late_chase:
+				return 0.94
 			if rank > 1 and speed_ratio >= 0.55:
 				return 0.84
 			if speed_ratio < 0.72:
@@ -74,6 +93,10 @@ func _calculate_utility(skill_id: StringName) -> float:
 		&"spring_leap":
 			if obstacle:
 				return 0.98
+			if _racer.movement_mode == WildDashCharacterController.MovementMode.RACE:
+				var progress := RaceManager.get_progress_percent(_racer)
+				if progress >= 65.0 and progress <= 82.0:
+					return 0.92
 			if speed_ratio < 0.60:
 				return 0.78
 			if _racer.movement_mode == WildDashCharacterController.MovementMode.ARENA and nearby > 0:
@@ -90,6 +113,8 @@ func _calculate_utility(skill_id: StringName) -> float:
 				return 0.96
 			if nearby > 0:
 				return 0.84
+			if late_chase:
+				return 0.82
 			if rank > 1 and speed_ratio < 0.76:
 				return 0.75
 			return 0.50
@@ -126,8 +151,6 @@ func _shadow_step_ground_is_safe(hint: Vector2) -> bool:
 	var forward: Vector3 = -_racer.global_transform.basis.z.normalized()
 	var right: Vector3 = _racer.global_transform.basis.x.normalized()
 	var lateral: float = clampf(hint.x, -1.0, 1.0)
-	# The impulse decays quickly, so a 3.2m forward / 2.5m lateral probe is a
-	# conservative destination estimate. Check halfway and destination ground.
 	var offset: Vector3 = forward * 3.2 + right * lateral * 2.5
 	for raw_ratio in [0.5, 1.0]:
 		var ratio: float = float(raw_ratio)
