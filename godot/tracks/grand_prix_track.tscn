@@ -21,8 +21,8 @@ use_collision = true
 material = SubResource("RampMaterial")
 
 [node name="FinishRunoff" type="CSGBox3D" parent="."]
-position = Vector3(-4.743, -0.22, -1094.23)
-rotation = Vector3(0, 0.321751, 0)
+position = Vector3(10.3208, -0.22, -1866.542)
+rotation = Vector3(0, 0.247812, 0)
 size = Vector3(20, 0.5, 30)
 use_collision = true
 material = SubResource("RunoffMaterial")
