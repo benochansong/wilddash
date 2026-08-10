@@ -9,6 +9,8 @@ const PERSONALITY_IDS: Array[StringName] = [
 	&"item_fighter",
 ]
 const DEFAULT_DECISION_HZ := 6.0
+const PRECISION_ROUTE_START := 20
+const PRECISION_ROUTE_END := 26
 
 var risk_level := 0.50
 var shortcut_preference := 0.45
@@ -23,6 +25,7 @@ var _base_speed := 0.0
 var _decision_hz := DEFAULT_DECISION_HZ
 var _elapsed := 999.0
 var _side_sign := 1.0
+var _lane_synced_after_route := false
 
 static func get_profile_ids() -> Array[StringName]:
 	return [&"balanced", &"aggressive", &"safe", &"shortcut", &"item_fighter"]
@@ -57,6 +60,11 @@ func sync_base_speed_from_driver() -> void:
 	if _driver != null:
 		_base_speed = _driver.target_speed
 
+func sync_base_lane_from_driver() -> void:
+	if _driver != null:
+		_base_lane = _driver.preferred_lane
+		_lane_synced_after_route = true
+
 func get_personality_id() -> StringName:
 	return _personality_id
 
@@ -69,6 +77,12 @@ func get_item_threshold_bias() -> float:
 func _process(delta: float) -> void:
 	if _racer == null or _driver == null or not is_instance_valid(_racer) or _racer.finished or not RaceManager.active:
 		return
+	# Grand Prix assigns shortcut routes immediately after configuring the
+	# personality. Capture that authored lane on the first live race tick so
+	# personality overtakes never restore the pre-shortcut lane.
+	if not _lane_synced_after_route:
+		_base_lane = _driver.preferred_lane
+		_lane_synced_after_route = true
 	_elapsed += delta
 	var interval := 1.0 / clampf(_decision_hz, 4.0, 8.0)
 	if _elapsed < interval:
@@ -79,6 +93,14 @@ func _process(delta: float) -> void:
 func _update_tactical_choice() -> void:
 	_driver.preferred_lane = lerpf(_driver.preferred_lane, _base_lane, 0.34)
 	_driver.target_speed = _base_speed
+
+	# Shortcut B, tunnel entry and the final technical sequence require a stable
+	# authored line. Personality still affects speed/item/shortcut choice, but
+	# opportunistic passing yields here instead of fighting the route geometry.
+	var route_index := _driver.get_route_index()
+	if route_index >= PRECISION_ROUTE_START and route_index <= PRECISION_ROUTE_END:
+		_driver.preferred_lane = _base_lane
+		return
 
 	var nearby := _find_close_racer_ahead(14.0 + risk_level * 4.0)
 	var target := nearby.get("racer") as Node3D
