@@ -33,14 +33,14 @@ const CHARACTER_SELECT_SCENE := "res://scenes/character_select.tscn"
 const SETTINGS_SCENE := "res://scenes/settings.tscn"
 const RESULT_SCENE := "res://scenes/result.tscn"
 const MIN_AI_COUNT := 4
-const MAX_AI_COUNT := 10
+const MAX_AI_COUNT := 14
 
 var state: GameState = GameState.BOOT
 var selected_animal: StringName = &"dog"
-var difficulty: StringName = &"chaos"
+var difficulty: StringName = WildDashDifficultySystem.NORMAL
 var chimera_enabled := false
 var chimera_parts: Dictionary = WildDashChimeraSystem.default_loadout().to_dictionary()
-var ai_count := MIN_AI_COUNT
+var ai_count := 10
 var current_round_index := -1
 var round_active := false
 var campaign_running := false
@@ -48,6 +48,8 @@ var _transition_pending := false
 
 func _ready() -> void:
 	selected_animal = SaveManager.get_last_character()
+	difficulty = WildDashDifficultySystem.NORMAL
+	ai_count = WildDashDifficultySystem.get_default_ai_count(difficulty)
 	set_state(GameState.LOBBY)
 
 func set_state(next_state: GameState) -> void:
@@ -63,14 +65,18 @@ func configure_run(
 	animal: StringName,
 	difficulty_id: StringName,
 	parts: Dictionary,
-	requested_ai_count: int = MIN_AI_COUNT,
+	requested_ai_count: int = -1,
 ) -> void:
 	selected_animal = animal if WildDashAnimalCatalog.is_valid(animal) else &"dog"
-	difficulty = difficulty_id
+	difficulty = WildDashDifficultySystem.normalize(difficulty_id)
 	if not parts.is_empty():
 		chimera_parts = WildDashChimeraLoadout.from_dictionary(parts).to_dictionary()
-	ai_count = clampi(requested_ai_count, MIN_AI_COUNT, MAX_AI_COUNT)
+	var resolved_ai_count := requested_ai_count
+	if resolved_ai_count < 0:
+		resolved_ai_count = WildDashDifficultySystem.get_default_ai_count(difficulty)
+	ai_count = clampi(resolved_ai_count, MIN_AI_COUNT, MAX_AI_COUNT)
 	SaveManager.set_last_character(selected_animal)
+	print("DIFFICULTY CONFIG id=%s ai=%d profile=%s" % [difficulty, ai_count, WildDashDifficultySystem.describe(difficulty)])
 
 func configure_chimera(parts: Dictionary, enabled := true) -> void:
 	chimera_parts = WildDashChimeraLoadout.from_dictionary(parts).to_dictionary()
@@ -81,6 +87,9 @@ func disable_chimera() -> void:
 
 func get_chimera_loadout() -> WildDashChimeraLoadout:
 	return WildDashChimeraLoadout.from_dictionary(chimera_parts)
+
+func get_difficulty_profile() -> Dictionary:
+	return WildDashDifficultySystem.get_profile(difficulty)
 
 func set_ai_count(value: int) -> void:
 	ai_count = clampi(value, MIN_AI_COUNT, MAX_AI_COUNT)
@@ -178,7 +187,7 @@ func _load_current_round() -> void:
 		return
 	var scene_path: String = ROUND_SCENES[current_round_index]
 	var mode_id: StringName = ROUND_IDS[current_round_index]
-	print("LOAD MODE index=%d id=%s ai=%d" % [current_round_index + 1, mode_id, ai_count])
+	print("LOAD MODE index=%d id=%s ai=%d difficulty=%s" % [current_round_index + 1, mode_id, ai_count, difficulty])
 	var error: Error = get_tree().change_scene_to_file(scene_path)
 	if error != OK:
 		push_error("Failed to load round scene %s: %s" % [scene_path, error_string(error)])
@@ -204,7 +213,7 @@ func _autotest_start_character_select() -> void:
 	await get_tree().process_frame
 	var scene := get_tree().current_scene
 	if scene == null or not scene.has_method("_start_run"):
-		push_error("RC3 autotest could not start Character Select")
+		push_error("Difficulty autotest could not start Character Select")
 		get_tree().quit(3)
 		return
 	scene.call("_start_run")
