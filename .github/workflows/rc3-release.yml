@@ -233,9 +233,12 @@ jobs:
           $templateDir = "$env:APPDATA\Godot\export_templates\4.7.1.stable"
           New-Item -ItemType Directory -Force $templateDir | Out-Null
           Copy-Item "$env:RUNNER_TEMP\templates\templates\*" $templateDir -Recurse -Force
-          $godot = (Get-ChildItem "$env:RUNNER_TEMP\godot\Godot_v4.7.1-stable_win64.exe").FullName
+          $godotFile = Get-ChildItem "$env:RUNNER_TEMP\godot\*console.exe" | Select-Object -First 1
+          if ($null -eq $godotFile) { throw "Godot console executable not found" }
+          $godot = $godotFile.FullName
           "GODOT_EXE=$godot" | Out-File -FilePath $env:GITHUB_ENV -Append
           & $godot --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Import project on Windows
         shell: pwsh
