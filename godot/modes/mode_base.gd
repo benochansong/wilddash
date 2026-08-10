@@ -85,6 +85,12 @@ func spawn_ai_driver(
 	driver.preferred_lane = lane
 	driver.lane_wander = wander
 	driver.preserve_player_identity = preserve_player_identity
+	# Race-specific base values are established before _ready(), so the
+	# difficulty profile scales the intended tuned driver rather than defaults.
+	if ai_mode == WildDashAIController.AIMode.RACE:
+		driver.steering_strength = 5.8
+		driver.acceleration = 22.0
+		driver.avoidance_distance = 7.5
 	add_child(driver)
 	ai_drivers.append(driver)
 
