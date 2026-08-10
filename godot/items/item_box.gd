@@ -10,6 +10,7 @@ var _time := 0.0
 var _scan_elapsed := 0.0
 
 func _ready() -> void:
+	add_to_group("wilddash_item_box")
 	collision_layer = 4
 	collision_mask = 2
 	monitoring = true
@@ -33,7 +34,11 @@ func _physics_process(delta: float) -> void:
 	for racer in RaceManager.racers:
 		if racer == null or not is_instance_valid(racer) or RaceManager.finish_order.has(racer):
 			continue
-		if global_position.distance_to(racer.global_position + Vector3.UP * 0.8) <= 3.3:
+		var pickup_radius := 3.3
+		if racer.has_method("get_interaction_radius"):
+			pickup_radius = float(racer.call("get_interaction_radius", pickup_radius))
+		pickup_radius = ItemSystem.get_pickup_radius(racer, pickup_radius)
+		if global_position.distance_to(racer.global_position + Vector3.UP * 0.8) <= pickup_radius:
 			if _try_pickup(racer):
 				return
 
