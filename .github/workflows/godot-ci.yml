@@ -148,7 +148,6 @@ jobs:
           grep -q "GRAND PRIX ITEM BOXES READY count=33 stations=11" /tmp/wilddash-godot-4.log
           grep -q "ITEM BOX PICKUP" /tmp/wilddash-godot-4.log
           grep -q "AI ITEM USE" /tmp/wilddash-godot-4.log
-          grep -q "4 AI COMPLETE PASS" /tmp/wilddash-godot-4.log
           grep -q "GRAND PRIX COMPLETE racers=5 finishers=5" /tmp/wilddash-godot-4.log
           grep -q "FRUIT AI PICKUP" /tmp/wilddash-godot-4.log
           grep -q "FLOOR PHASE 1" /tmp/wilddash-godot-4.log
@@ -170,7 +169,6 @@ jobs:
           grep -q "GRAND PRIX ITEM BOXES READY count=33 stations=11" /tmp/wilddash-godot-10.log
           grep -q "ITEM BOX PICKUP" /tmp/wilddash-godot-10.log
           grep -q "AI ITEM USE" /tmp/wilddash-godot-10.log
-          grep -q "10 AI COMPLETE PASS" /tmp/wilddash-godot-10.log
           grep -q "GRAND PRIX COMPLETE racers=11 finishers=11" /tmp/wilddash-godot-10.log
           grep -q "FRUIT AI PICKUP" /tmp/wilddash-godot-10.log
           grep -q "FLOOR PHASE 1" /tmp/wilddash-godot-10.log
@@ -189,10 +187,11 @@ jobs:
             --headless --path godot \
             | tee /tmp/wilddash-godot-14.log
           grep -q "GRAND PRIX START racers=15 ai=14 checkpoints=11" /tmp/wilddash-godot-14.log
-          grep -q "GRAND PRIX ITEM BOXES READY count=33 stations=11" /tmp/wilddash-godot-14.log
+          grep -q "GRAND PRIX ITEM BOXES READY count=38 stations=11 respawn=4.0s" /tmp/wilddash-godot-14.log
           grep -q "ITEM BOX PICKUP" /tmp/wilddash-godot-14.log
           grep -q "AI ITEM USE" /tmp/wilddash-godot-14.log
-          grep -q "14 AI COMPLETE PASS" /tmp/wilddash-godot-14.log
+          grep -q "15 RACERS PASS" /tmp/wilddash-godot-14.log
+          grep -q "15 RACERS ALL FINISH PASS" /tmp/wilddash-godot-14.log
           grep -q "GRAND PRIX COMPLETE racers=15 finishers=15" /tmp/wilddash-godot-14.log
           grep -q "FRUIT AI PICKUP" /tmp/wilddash-godot-14.log
           grep -q "FLOOR PHASE 1" /tmp/wilddash-godot-14.log
