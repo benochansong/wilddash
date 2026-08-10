@@ -1,14 +1,10 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://modes/grand_prix/grand_prix_mode.gd" id="1_mode"]
 [ext_resource type="Script" path="res://modes/grand_prix/shortcut_ai_safety.gd" id="2_shortcut_safety"]
-[ext_resource type="Script" path="res://modes/grand_prix/realtime_pilot_guard.gd" id="3_pace_guard"]
 
 [node name="GrandPrix" type="Node3D"]
 script = ExtResource("1_mode")
 
 [node name="ShortcutAISafety" type="Node" parent="."]
 script = ExtResource("2_shortcut_safety")
-
-[node name="RealtimePilotGuard" type="Node" parent="."]
-script = ExtResource("3_pace_guard")
