@@ -33,7 +33,7 @@ const CHARACTER_SELECT_SCENE := "res://scenes/character_select.tscn"
 const SETTINGS_SCENE := "res://scenes/settings.tscn"
 const RESULT_SCENE := "res://scenes/result.tscn"
 const MIN_AI_COUNT := 4
-const MAX_AI_COUNT := 10
+const MAX_AI_COUNT := 14
 
 var state: GameState = GameState.BOOT
 var selected_animal: StringName = &"dog"
