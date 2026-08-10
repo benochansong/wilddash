@@ -1,9 +1,13 @@
 class_name WildDashStickyFruitTrap
 extends Area3D
 
+@export var lifetime := 12.0
+@export var proximity_scan_hz := 6.0
+
 var owner_racer: Node
 var _armed := false
 var _life := 0.0
+var _scan_elapsed := 0.0
 var _visual: Node3D
 
 func _ready() -> void:
@@ -20,12 +24,16 @@ func _process(delta: float) -> void:
 	if _visual != null:
 		_visual.rotation.y += delta * 1.1
 		_visual.rotation.z = sin(_life * 3.0) * 0.12
-	if _life >= 14.0:
+	if _life >= lifetime:
 		queue_free()
 
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	if not _armed:
 		return
+	_scan_elapsed += delta
+	if _scan_elapsed < 1.0 / clampf(proximity_scan_hz, 4.0, 8.0):
+		return
+	_scan_elapsed = 0.0
 	for racer in RaceManager.racers:
 		if racer == null or racer == owner_racer or not is_instance_valid(racer) or RaceManager.finish_order.has(racer):
 			continue

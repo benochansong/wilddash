@@ -134,71 +134,95 @@ jobs:
           grep -q "AI NEW ITEM USE PASS items=6" /tmp/wilddash-item-expansion.log
           grep -q "ITEM EXPANSION SMOKE PASS items=12 roles=5 history=2" /tmp/wilddash-item-expansion.log
 
-      - name: Run four-round campaign with four AI
+      - name: Verify 10 15 18 racer density configuration
         run: |
           set -o pipefail
-          export WILDDASH_AUTOTEST=1
-          export WILDDASH_AI_COUNT=4
-          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-flow-4"
-          rm -rf "$XDG_DATA_HOME"
-          timeout 125s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
-            --headless --path godot \
-            | tee /tmp/wilddash-godot-4.log
-          grep -q "GRAND PRIX START racers=5 ai=4 checkpoints=11" /tmp/wilddash-godot-4.log
-          grep -q "GRAND PRIX ITEM BOXES READY count=33 stations=11" /tmp/wilddash-godot-4.log
-          grep -q "ITEM BOX PICKUP" /tmp/wilddash-godot-4.log
-          grep -q "AI ITEM USE" /tmp/wilddash-godot-4.log
-          grep -q "4 AI COMPLETE PASS" /tmp/wilddash-godot-4.log
-          grep -q "GRAND PRIX COMPLETE racers=5 finishers=5" /tmp/wilddash-godot-4.log
-          grep -q "FRUIT AI PICKUP" /tmp/wilddash-godot-4.log
-          grep -q "FLOOR PHASE 1" /tmp/wilddash-godot-4.log
-          grep -q "PUSH OUT AI BODY CHECK" /tmp/wilddash-godot-4.log
-          grep -q "HEADLESS RESULT rounds=4" /tmp/wilddash-godot-4.log
-          echo "4 ROUND CAMPAIGN PASS ai=4"
+          timeout 25s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot res://tests/grand_prix_density_smoke.tscn \
+            | tee /tmp/wilddash-density.log
+          grep -q "DIFFICULTY RACER COUNT PASS casual=10 normal=15 hard=18" /tmp/wilddash-density.log
+          grep -q "AI COUNT OPTION PASS ai=10/14/18" /tmp/wilddash-density.log
+          grep -q "AI PERSONALITY CONFIG PASS profiles=5 decision_hz=6" /tmp/wilddash-density.log
+          grep -q "AI DECISION RATE PASS item_hz=5 skill_hz=5 tactical_hz=6" /tmp/wilddash-density.log
+          grep -q "RANK SYSTEM PASS" /tmp/wilddash-density.log
+          grep -q "GRAND PRIX DENSITY SMOKE PASS target=15 hard=18 optional_ai=18" /tmp/wilddash-density.log
 
-      - name: Stress four-round campaign with ten AI
+      - name: Run casual-density campaign with nine AI (10 racers)
         run: |
           set -o pipefail
           export WILDDASH_AUTOTEST=1
-          export WILDDASH_AI_COUNT=10
-          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-flow-10"
+          export WILDDASH_AI_COUNT=9
+          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-flow-10-racers"
           rm -rf "$XDG_DATA_HOME"
           timeout 140s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot \
-            | tee /tmp/wilddash-godot-10.log
-          grep -q "GRAND PRIX START racers=11 ai=10 checkpoints=11" /tmp/wilddash-godot-10.log
-          grep -q "GRAND PRIX ITEM BOXES READY count=33 stations=11" /tmp/wilddash-godot-10.log
-          grep -q "ITEM BOX PICKUP" /tmp/wilddash-godot-10.log
-          grep -q "AI ITEM USE" /tmp/wilddash-godot-10.log
-          grep -q "10 AI COMPLETE PASS" /tmp/wilddash-godot-10.log
-          grep -q "GRAND PRIX COMPLETE racers=11 finishers=11" /tmp/wilddash-godot-10.log
-          grep -q "FRUIT AI PICKUP" /tmp/wilddash-godot-10.log
-          grep -q "FLOOR PHASE 1" /tmp/wilddash-godot-10.log
-          grep -q "PUSH OUT AI BODY CHECK" /tmp/wilddash-godot-10.log
-          grep -q "HEADLESS RESULT rounds=4" /tmp/wilddash-godot-10.log
-          echo "4 ROUND CAMPAIGN PASS ai=10"
+            | tee /tmp/wilddash-godot-10-racers.log
+          grep -q "GRAND PRIX START racers=10 ai=9 checkpoints=11" /tmp/wilddash-godot-10-racers.log
+          grep -q "START GRID PASS racers=10" /tmp/wilddash-godot-10-racers.log
+          grep -q "GRAND PRIX ITEM BOXES READY count=38 stations=11 respawn=5.0s" /tmp/wilddash-godot-10-racers.log
+          grep -q "AI ITEM USE" /tmp/wilddash-godot-10-racers.log
+          grep -q "AI SKILL USE" /tmp/wilddash-godot-10-racers.log
+          grep -q "AI SHORTCUT PASS" /tmp/wilddash-godot-10-racers.log
+          grep -q "10 RACERS PASS" /tmp/wilddash-godot-10-racers.log
+          grep -q "10 RACERS ALL FINISH PASS" /tmp/wilddash-godot-10-racers.log
+          grep -q "GRAND PRIX COMPLETE racers=10 finishers=10" /tmp/wilddash-godot-10-racers.log
+          grep -q "FRUIT AI PICKUP" /tmp/wilddash-godot-10-racers.log
+          grep -q "FLOOR PHASE 1" /tmp/wilddash-godot-10-racers.log
+          grep -q "PUSH OUT AI BODY CHECK" /tmp/wilddash-godot-10-racers.log
+          grep -q "HEADLESS RESULT rounds=4" /tmp/wilddash-godot-10-racers.log
+          echo "4 ROUND CAMPAIGN PASS racers=10"
 
-      - name: Stress four-round campaign with fourteen AI
+      - name: Validate target Grand Prix with fourteen AI (15 racers)
         run: |
           set -o pipefail
           export WILDDASH_AUTOTEST=1
           export WILDDASH_AI_COUNT=14
-          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-flow-14"
+          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-flow-15-racers"
           rm -rf "$XDG_DATA_HOME"
           timeout 155s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot \
-            | tee /tmp/wilddash-godot-14.log
-          grep -q "GRAND PRIX START racers=15 ai=14 checkpoints=11" /tmp/wilddash-godot-14.log
-          grep -q "GRAND PRIX ITEM BOXES READY count=33 stations=11" /tmp/wilddash-godot-14.log
-          grep -q "ITEM BOX PICKUP" /tmp/wilddash-godot-14.log
-          grep -q "AI ITEM USE" /tmp/wilddash-godot-14.log
-          grep -q "14 AI COMPLETE PASS" /tmp/wilddash-godot-14.log
-          grep -q "GRAND PRIX COMPLETE racers=15 finishers=15" /tmp/wilddash-godot-14.log
-          grep -q "FRUIT AI PICKUP" /tmp/wilddash-godot-14.log
-          grep -q "FLOOR PHASE 1" /tmp/wilddash-godot-14.log
-          grep -q "PUSH OUT AI BODY CHECK" /tmp/wilddash-godot-14.log
-          grep -q "HEADLESS RESULT rounds=4" /tmp/wilddash-godot-14.log
-          echo "4 ROUND CAMPAIGN PASS ai=14"
+            | tee /tmp/wilddash-godot-15-racers.log
+          grep -q "GRAND PRIX START racers=15 ai=14 checkpoints=11" /tmp/wilddash-godot-15-racers.log
+          grep -q "START GRID PASS racers=15" /tmp/wilddash-godot-15-racers.log
+          grep -q "GRAND PRIX ITEM BOXES READY count=38 stations=11 respawn=4.2s" /tmp/wilddash-godot-15-racers.log
+          grep -q "AI PERSONALITY PASS profiles=5 tactical_hz=6" /tmp/wilddash-godot-15-racers.log
+          grep -q "AI ITEM USE" /tmp/wilddash-godot-15-racers.log
+          grep -q "AI SKILL USE" /tmp/wilddash-godot-15-racers.log
+          grep -q "AI SHORTCUT PASS" /tmp/wilddash-godot-15-racers.log
+          grep -q "15 RACERS PASS" /tmp/wilddash-godot-15-racers.log
+          grep -q "15 RACERS ALL FINISH PASS" /tmp/wilddash-godot-15-racers.log
+          grep -q "GRAND PRIX COMPLETE racers=15 finishers=15" /tmp/wilddash-godot-15-racers.log
+          grep -q "FRUIT AI PICKUP" /tmp/wilddash-godot-15-racers.log
+          grep -q "FLOOR PHASE 1" /tmp/wilddash-godot-15-racers.log
+          grep -q "PUSH OUT AI BODY CHECK" /tmp/wilddash-godot-15-racers.log
+          grep -q "HEADLESS RESULT rounds=4" /tmp/wilddash-godot-15-racers.log
+          echo "4 ROUND CAMPAIGN PASS racers=15"
+
+      - name: Validate hard Grand Prix with seventeen AI (18 racers)
+        run: |
+          set -o pipefail
+          export WILDDASH_AUTOTEST=1
+          export WILDDASH_AI_COUNT=17
+          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-flow-18-racers"
+          rm -rf "$XDG_DATA_HOME"
+          timeout 170s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot \
+            | tee /tmp/wilddash-godot-18-racers.log
+          grep -q "GRAND PRIX START racers=18 ai=17 checkpoints=11" /tmp/wilddash-godot-18-racers.log
+          grep -q "START GRID PASS racers=18" /tmp/wilddash-godot-18-racers.log
+          grep -q "GRAND PRIX ITEM BOXES READY count=38 stations=11 respawn=3.7s" /tmp/wilddash-godot-18-racers.log
+          grep -q "AI PERSONALITY PASS profiles=5 tactical_hz=6" /tmp/wilddash-godot-18-racers.log
+          grep -q "AI ITEM USE" /tmp/wilddash-godot-18-racers.log
+          grep -q "AI SKILL USE" /tmp/wilddash-godot-18-racers.log
+          grep -q "AI SHORTCUT PASS" /tmp/wilddash-godot-18-racers.log
+          grep -q "18 RACERS PASS" /tmp/wilddash-godot-18-racers.log
+          grep -q "18 RACERS ALL FINISH PASS" /tmp/wilddash-godot-18-racers.log
+          grep -q "GRAND PRIX COMPLETE racers=18 finishers=18" /tmp/wilddash-godot-18-racers.log
+          grep -q "FRUIT AI PICKUP" /tmp/wilddash-godot-18-racers.log
+          grep -q "FLOOR PHASE 1" /tmp/wilddash-godot-18-racers.log
+          grep -q "PUSH OUT AI BODY CHECK" /tmp/wilddash-godot-18-racers.log
+          grep -q "HEADLESS RESULT rounds=4" /tmp/wilddash-godot-18-racers.log
+          echo "4 ROUND CAMPAIGN PASS racers=18"
 
       - name: Benchmark 10 25 50 racers before and after optimization
         run: |

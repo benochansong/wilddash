@@ -2,7 +2,7 @@ class_name WildDashAISkillBrain
 extends Node
 
 @export var racer_path: NodePath
-@export var decision_interval := 0.35
+@export var decision_interval := 0.20
 @export var warmup_seconds := 1.15
 
 var _racer: WildDashCharacterController
@@ -42,8 +42,6 @@ func consider_skill_use() -> bool:
 	var hint := _direction_hint(skill_id)
 	if skill_id == &"shadow_step" and _racer.movement_mode == WildDashCharacterController.MovementMode.RACE:
 		if not _shadow_step_ground_is_safe(hint):
-			# Try a straight precision dash before giving up. This preserves Cat's
-			# escape utility without throwing the AI from an open split/hairpin.
 			hint = Vector2(0.0, -1.0)
 			if not _shadow_step_ground_is_safe(hint):
 				_last_utility = 0.40
@@ -126,8 +124,6 @@ func _shadow_step_ground_is_safe(hint: Vector2) -> bool:
 	var forward: Vector3 = -_racer.global_transform.basis.z.normalized()
 	var right: Vector3 = _racer.global_transform.basis.x.normalized()
 	var lateral: float = clampf(hint.x, -1.0, 1.0)
-	# The impulse decays quickly, so a 3.2m forward / 2.5m lateral probe is a
-	# conservative destination estimate. Check halfway and destination ground.
 	var offset: Vector3 = forward * 3.2 + right * lateral * 2.5
 	for raw_ratio in [0.5, 1.0]:
 		var ratio: float = float(raw_ratio)

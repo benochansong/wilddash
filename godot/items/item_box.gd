@@ -2,6 +2,7 @@ class_name WildDashItemBox
 extends Area3D
 
 @export var respawn_seconds := 5.0
+@export var proximity_scan_hz := 6.0
 
 var _active := true
 var _visual_root: Node3D
@@ -28,9 +29,13 @@ func _physics_process(delta: float) -> void:
 	if not _active:
 		return
 	_scan_elapsed += delta
-	if _scan_elapsed < 0.10:
+	var interval := 1.0 / clampf(proximity_scan_hz, 4.0, 8.0)
+	if _scan_elapsed < interval:
 		return
 	_scan_elapsed = 0.0
+	# Area3D body_entered is authoritative. This lower-frequency proximity seam
+	# exists for high-speed or Magnet pickups without scanning all racers every
+	# physics frame.
 	for racer in RaceManager.racers:
 		if racer == null or not is_instance_valid(racer) or RaceManager.finish_order.has(racer):
 			continue

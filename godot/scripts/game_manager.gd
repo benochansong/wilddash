@@ -32,15 +32,22 @@ const LOBBY_SCENE := "res://scenes/lobby.tscn"
 const CHARACTER_SELECT_SCENE := "res://scenes/character_select.tscn"
 const SETTINGS_SCENE := "res://scenes/settings.tscn"
 const RESULT_SCENE := "res://scenes/result.tscn"
+
 const MIN_AI_COUNT := 4
-const MAX_AI_COUNT := 14
+const CASUAL_AI_COUNT := 9
+const NORMAL_AI_COUNT := 14
+const HARD_AI_COUNT := 17
+# 18 AI is intentionally allowed as an opt-in diagnostic configuration even
+# though the supported Hard gameplay preset is Player + 17 AI = 18 racers.
+const MAX_AI_COUNT := 18
+const DEFAULT_AI_COUNT := NORMAL_AI_COUNT
 
 var state: GameState = GameState.BOOT
 var selected_animal: StringName = &"dog"
-var difficulty: StringName = &"chaos"
+var difficulty: StringName = &"normal"
 var chimera_enabled := false
 var chimera_parts: Dictionary = WildDashChimeraSystem.default_loadout().to_dictionary()
-var ai_count := MIN_AI_COUNT
+var ai_count := DEFAULT_AI_COUNT
 var current_round_index := -1
 var round_active := false
 var campaign_running := false
@@ -69,8 +76,15 @@ func configure_run(
 	difficulty = difficulty_id
 	if not parts.is_empty():
 		chimera_parts = WildDashChimeraLoadout.from_dictionary(parts).to_dictionary()
-	ai_count = clampi(requested_ai_count, MIN_AI_COUNT, MAX_AI_COUNT)
+	var resolved_ai_count := requested_ai_count
+	# Existing Character Select builds pass MIN_AI_COUNT when no explicit test
+	# override is present. Resolve that legacy sentinel through the new density
+	# presets so normal gameplay defaults to 15 total racers.
+	if not OS.has_environment("WILDDASH_AI_COUNT") and requested_ai_count <= MIN_AI_COUNT:
+		resolved_ai_count = get_ai_count_for_difficulty(difficulty_id)
+	ai_count = clampi(resolved_ai_count, MIN_AI_COUNT, MAX_AI_COUNT)
 	SaveManager.set_last_character(selected_animal)
+	print("RACER COUNT CONFIG difficulty=%s ai=%d total=%d" % [String(difficulty), ai_count, ai_count + 1])
 
 func configure_chimera(parts: Dictionary, enabled := true) -> void:
 	chimera_parts = WildDashChimeraLoadout.from_dictionary(parts).to_dictionary()
@@ -81,6 +95,20 @@ func disable_chimera() -> void:
 
 func get_chimera_loadout() -> WildDashChimeraLoadout:
 	return WildDashChimeraLoadout.from_dictionary(chimera_parts)
+
+func get_ai_count_for_difficulty(difficulty_id: StringName) -> int:
+	match difficulty_id:
+		&"casual", &"wild":
+			return CASUAL_AI_COUNT
+		&"hard", &"nightmare":
+			return HARD_AI_COUNT
+		&"normal", &"chaos":
+			return NORMAL_AI_COUNT
+		_:
+			return NORMAL_AI_COUNT
+
+func get_total_racer_count() -> int:
+	return ai_count + 1
 
 func set_ai_count(value: int) -> void:
 	ai_count = clampi(value, MIN_AI_COUNT, MAX_AI_COUNT)

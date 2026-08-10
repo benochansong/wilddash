@@ -34,15 +34,26 @@ func _physics_process(delta: float) -> void:
 		if desired.length_squared() > 0.001:
 			desired = desired.normalized()
 			_direction = _direction.lerp(desired, clampf(homing_strength * delta, 0.0, 0.18)).normalized()
-	global_position += _direction * speed * delta
+	var previous := global_position
+	var next := previous + _direction * speed * delta
+	if get_world_3d() != null:
+		var query := PhysicsRayQueryParameters3D.create(previous, next, 3)
+		query.collide_with_areas = false
+		query.collide_with_bodies = true
+		if owner_racer != null and is_instance_valid(owner_racer):
+			query.exclude = [owner_racer.get_rid()]
+		var hit := get_world_3d().direct_space_state.intersect_ray(query)
+		if not hit.is_empty():
+			global_position = hit.get("position", next)
+			var collider := hit.get("collider") as Node
+			if collider is WildDashCharacterController:
+				_resolve_hit(collider)
+			else:
+				queue_free()
+			return
+	global_position = next
 	if _direction.length_squared() > 0.001:
 		look_at(global_position + _direction, Vector3.UP)
-	for racer in RaceManager.racers:
-		if racer == null or racer == owner_racer or not is_instance_valid(racer) or RaceManager.finish_order.has(racer):
-			continue
-		if global_position.distance_to(racer.global_position + Vector3.UP * 0.6) <= 1.35:
-			_resolve_hit(racer)
-			return
 
 func _on_body_entered(body: Node) -> void:
 	_resolve_hit(body)

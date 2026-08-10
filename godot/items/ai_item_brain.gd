@@ -1,6 +1,9 @@
 class_name WildDashAIItemBrain
 extends Node
 
+@export var think_hz := 5.0
+@export var threshold_bias := 0.0
+
 var _racer: WildDashCharacterController
 var _driver: WildDashAIController
 var _think_elapsed := 0.0
@@ -10,6 +13,9 @@ var _last_item: StringName = &""
 func configure(racer: WildDashCharacterController, driver: WildDashAIController) -> void:
 	_racer = racer
 	_driver = driver
+
+func set_threshold_bias(value: float) -> void:
+	threshold_bias = clampf(value, -0.12, 0.12)
 
 func _process(delta: float) -> void:
 	if _racer == null or not is_instance_valid(_racer) or _racer.finished or not RaceManager.active:
@@ -24,7 +30,8 @@ func _process(delta: float) -> void:
 		_held_age = 0.0
 	_held_age += delta
 	_think_elapsed += delta
-	if _think_elapsed < 0.32:
+	var interval := 1.0 / clampf(think_hz, 4.0, 8.0)
+	if _think_elapsed < interval:
 		return
 	_think_elapsed = 0.0
 	evaluate_and_use_now()
@@ -36,9 +43,9 @@ func evaluate_and_use_now() -> bool:
 	if item_id == &"":
 		return false
 	var utility := _utility_for_item(item_id)
-	var threshold := 0.62
+	var threshold := clampf(0.62 + threshold_bias, 0.46, 0.78)
 	if _held_age >= 4.0:
-		threshold = 0.36
+		threshold = clampf(0.36 + threshold_bias, 0.28, 0.55)
 	if utility < threshold:
 		return false
 	var used := ItemSystem.use_held_item(_racer)
