@@ -12,7 +12,7 @@ permissions:
 jobs:
   validate-rc4:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout RC4
         uses: actions/checkout@v4
@@ -56,13 +56,17 @@ jobs:
           grep -q "CHIMERA BODY PASSIVE PASS" /tmp/rc4-chimera.log
           grep -q "CHIMERA TAIL BONUS PASS" /tmp/rc4-chimera.log
 
-      - name: Verify track checkpoints and finish validation
+      - name: Verify track checkpoints shortcuts and finish validation
         run: |
           set -o pipefail
-          timeout 25s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+          timeout 30s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot res://tests/grand_prix_track_smoke.tscn | tee /tmp/rc4-track.log
-          grep -q "GRAND PRIX TRACK LOAD PASS" /tmp/rc4-track.log
-          grep -q "CHECKPOINT PASS count=7" /tmp/rc4-track.log
+          grep -q "TRACK LENGTH PASS" /tmp/rc4-track.log
+          grep -q "PLAYER ROUTE VALID PASS points=30" /tmp/rc4-track.log
+          grep -q "CHECKPOINT PASS count=11" /tmp/rc4-track.log
+          grep -q "SHORTCUT A PASS" /tmp/rc4-track.log
+          grep -q "SHORTCUT B PASS" /tmp/rc4-track.log
+          grep -q "TRACK NODE BUDGET PASS" /tmp/rc4-track.log
           grep -q "FINISH VALIDATION PASS" /tmp/rc4-track.log
 
       - name: Verify six-item system and AI item use
@@ -87,13 +91,18 @@ jobs:
           export WILDDASH_AI_COUNT=4
           export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-rc4-flow-4"
           rm -rf "$XDG_DATA_HOME"
-          timeout 90s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path godot | tee /tmp/rc4-flow-4.log
+          timeout 125s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path godot | tee /tmp/rc4-flow-4.log
+          grep -q "GRAND PRIX START racers=5 ai=4 checkpoints=11" /tmp/rc4-flow-4.log
+          grep -q "GRAND PRIX ITEM BOXES READY count=33 stations=11" /tmp/rc4-flow-4.log
+          grep -q "4 AI COMPLETE PASS" /tmp/rc4-flow-4.log
           grep -q "GRAND PRIX COMPLETE racers=5 finishers=5" /tmp/rc4-flow-4.log
-          grep -q "AI SHORTCUT ROUTE" /tmp/rc4-flow-4.log
+          grep -q "AI SHORTCUT A ROUTE" /tmp/rc4-flow-4.log
+          grep -q "AI SHORTCUT B ROUTE" /tmp/rc4-flow-4.log
           grep -q "AI ITEM USE" /tmp/rc4-flow-4.log
           grep -q "AI SKILL USE" /tmp/rc4-flow-4.log
           grep -q "RC_FLOW Result" /tmp/rc4-flow-4.log
           grep -q "RC_SAVE result_saved=true" /tmp/rc4-flow-4.log
+          echo "4 ROUND CAMPAIGN PASS ai=4"
 
       - name: Stress four-round campaign with ten AI
         run: |
@@ -102,11 +111,32 @@ jobs:
           export WILDDASH_AI_COUNT=10
           export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-rc4-flow-10"
           rm -rf "$XDG_DATA_HOME"
-          timeout 110s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path godot | tee /tmp/rc4-flow-10.log
+          timeout 140s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path godot | tee /tmp/rc4-flow-10.log
+          grep -q "GRAND PRIX START racers=11 ai=10 checkpoints=11" /tmp/rc4-flow-10.log
+          grep -q "GRAND PRIX ITEM BOXES READY count=33 stations=11" /tmp/rc4-flow-10.log
+          grep -q "10 AI COMPLETE PASS" /tmp/rc4-flow-10.log
           grep -q "GRAND PRIX COMPLETE racers=11 finishers=11" /tmp/rc4-flow-10.log
           grep -q "AI ITEM USE" /tmp/rc4-flow-10.log
           grep -q "AI SKILL USE" /tmp/rc4-flow-10.log
           grep -q "RC_SAVE result_saved=true" /tmp/rc4-flow-10.log
+          echo "4 ROUND CAMPAIGN PASS ai=10"
+
+      - name: Stress four-round campaign with fourteen AI
+        run: |
+          set -o pipefail
+          export WILDDASH_AUTOTEST=1
+          export WILDDASH_AI_COUNT=14
+          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-rc4-flow-14"
+          rm -rf "$XDG_DATA_HOME"
+          timeout 155s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path godot | tee /tmp/rc4-flow-14.log
+          grep -q "GRAND PRIX START racers=15 ai=14 checkpoints=11" /tmp/rc4-flow-14.log
+          grep -q "GRAND PRIX ITEM BOXES READY count=33 stations=11" /tmp/rc4-flow-14.log
+          grep -q "14 AI COMPLETE PASS" /tmp/rc4-flow-14.log
+          grep -q "GRAND PRIX COMPLETE racers=15 finishers=15" /tmp/rc4-flow-14.log
+          grep -q "AI ITEM USE" /tmp/rc4-flow-14.log
+          grep -q "AI SKILL USE" /tmp/rc4-flow-14.log
+          grep -q "RC_SAVE result_saved=true" /tmp/rc4-flow-14.log
+          echo "4 ROUND CAMPAIGN PASS ai=14"
 
       - name: Benchmark 10 25 50 racers
         run: |
