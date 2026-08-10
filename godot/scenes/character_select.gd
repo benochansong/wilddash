@@ -2,11 +2,11 @@ extends Node3D
 
 const RACER_SCENE: PackedScene = preload("res://characters/test_racer.tscn")
 const ANIMAL_IDS: Array[StringName] = [&"dog", &"rabbit", &"elephant", &"cat"]
-const DIFFICULTIES: Array[StringName] = [&"wild", &"chaos", &"nightmare"]
+const DIFFICULTIES: Array[StringName] = [WildDashDifficultySystem.CASUAL, WildDashDifficultySystem.NORMAL, WildDashDifficultySystem.HARD]
 
 var _chimera_mode := false
 var _selected_animal: StringName = &"dog"
-var _difficulty: StringName = &"chaos"
+var _difficulty: StringName = WildDashDifficultySystem.NORMAL
 var _loadout: WildDashChimeraLoadout
 var _preview_racer: WildDashCharacterController
 var _summary_label: Label
@@ -21,11 +21,13 @@ func _ready() -> void:
 	_loadout = SaveManager.load_chimera()
 	_palette_index = maxi(0, WildDashChimeraSystem.PALETTES.find(_loadout.palette_id))
 	_pattern_index = maxi(0, WildDashChimeraSystem.PATTERNS.find(_loadout.pattern_id))
+	if OS.has_environment("WILDDASH_DIFFICULTY"):
+		_difficulty = WildDashDifficultySystem.normalize(StringName(OS.get_environment("WILDDASH_DIFFICULTY")))
 	RenderingServer.set_default_clear_color(Color(0.025, 0.045, 0.085))
 	_build_preview_stage()
 	_build_ui()
 	_refresh_preview()
-	print("CHARACTER SELECT READY basic=4 chimera=true")
+	print("CHARACTER SELECT READY basic=4 chimera=true difficulty=%s" % WildDashDifficultySystem.get_display_name(_difficulty))
 
 func _process(delta: float) -> void:
 	if _preview_racer != null:
@@ -207,13 +209,14 @@ func _build_ui() -> void:
 	box.add_child(_summary_label)
 
 	var difficulty_label := Label.new()
-	difficulty_label.text = "Difficulty"
+	difficulty_label.text = "Difficulty · CASUAL / NORMAL / HARD"
 	box.add_child(difficulty_label)
 	var difficulty := OptionButton.new()
-	difficulty.add_item("Wild")
-	difficulty.add_item("Chaos")
-	difficulty.add_item("Nightmare")
-	difficulty.select(1)
+	difficulty.add_item("Casual — forgiving AI & hazards")
+	difficulty.add_item("Normal — competitive party race")
+	difficulty.add_item("Hard — sharper AI & higher risk")
+	var selected_index := DIFFICULTIES.find(_difficulty)
+	difficulty.select(maxi(0, selected_index))
 	difficulty.item_selected.connect(_on_difficulty_selected)
 	box.add_child(difficulty)
 
@@ -303,14 +306,16 @@ func _start_run() -> void:
 	var requested_ai := GameManager.MIN_AI_COUNT
 	if OS.has_environment("WILDDASH_AI_COUNT"):
 		requested_ai = int(OS.get_environment("WILDDASH_AI_COUNT"))
+	if OS.has_environment("WILDDASH_DIFFICULTY"):
+		_difficulty = WildDashDifficultySystem.normalize(StringName(OS.get_environment("WILDDASH_DIFFICULTY")))
 	if _chimera_mode:
 		save_current_selection()
 		GameManager.configure_run(_loadout.body_id, _difficulty, _loadout.to_dictionary(), requested_ai)
-		print("CHARACTER SELECT START chimera head=%s body=%s tail=%s" % [_loadout.head_id, _loadout.body_id, _loadout.tail_id])
+		print("CHARACTER SELECT START chimera head=%s body=%s tail=%s difficulty=%s" % [_loadout.head_id, _loadout.body_id, _loadout.tail_id, WildDashDifficultySystem.get_display_name(_difficulty)])
 	else:
 		GameManager.disable_chimera()
 		GameManager.configure_run(_selected_animal, _difficulty, {}, requested_ai)
-		print("CHARACTER SELECT START animal=%s" % _selected_animal)
+		print("CHARACTER SELECT START animal=%s difficulty=%s" % [_selected_animal, WildDashDifficultySystem.get_display_name(_difficulty)])
 	GameManager.start_campaign()
 
 func _unhandled_key_input(event: InputEvent) -> void:
