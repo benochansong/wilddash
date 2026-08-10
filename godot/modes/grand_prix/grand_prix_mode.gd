@@ -6,7 +6,7 @@ const CHASE_CAMERA_SCRIPT: Script = preload("res://camera/chase_camera.gd")
 const AI_ITEM_BRAIN_SCRIPT: Script = preload("res://items/ai_item_brain.gd")
 const AI_ANIMALS: Array[StringName] = [&"rabbit", &"elephant", &"cat", &"dog"]
 const AI_SPEEDS: Array[float] = [13.2, 12.5, 13.0, 12.8]
-const ROUTE_LANES: Array[float] = [-2.4, 2.4, -0.8, 0.8, -1.7, 1.7, -0.2, 0.2, -2.8, 2.8]
+const ROUTE_LANES: Array[float] = [-2.4, 2.4, -0.8, 0.8, -1.7, 1.7, -0.2, 0.2, -2.8, 2.8, -1.2, 1.2, -3.0, 3.0]
 const ITEM_BOX_ROUTE_INDICES: Array[int] = [2, 4, 6, 8, 10, 12, 15]
 const ITEM_BOX_LANE_OFFSETS: Array[float] = [-3.2, 0.0, 3.2]
 const SHORTCUT_SKIP_ROUTE_INDEX := 13
@@ -24,8 +24,14 @@ var _ai_item_brains: Array[WildDashAIItemBrain] = []
 var _finish_times: Array[float] = []
 var _realtime_balance_run := false
 var _shortcut_users := 0
+var _difficulty_profile: Dictionary = {}
+var _last_player_rank := 0
+var _rank_change_count := 0
+var _player_recovery_lock_remaining := 0.0
+var _player_recovery_count := 0
 
 func _ready() -> void:
+	_difficulty_profile = GameManager.get_difficulty_profile()
 	setup_mode(
 		&"grand_prix",
 		"ROUND 1 — Wild World Grand Prix",
@@ -42,6 +48,7 @@ func _ready() -> void:
 	_track.name = "GrandPrixWorldTrack"
 	add_child(_track)
 	_route_points = _track.get_route_points()
+	_apply_obstacle_difficulty()
 
 	var start := _track.get_start_position()
 	player = spawn_racer("Player", &"dog", start + Vector3(-2.5, 0.1, 0.0), true, WildDashCharacterController.MovementMode.RACE)
@@ -56,37 +63,37 @@ func _ready() -> void:
 		var spawn_position := start + Vector3(lane, 0.1, float(start_row) * 3.0)
 		var racer := spawn_racer("AI_%02d" % (i + 1), animal, spawn_position, false, WildDashCharacterController.MovementMode.RACE)
 		var driver := spawn_ai_driver(racer, WildDashAIController.AIMode.RACE, speed, lane, 0.10)
-		driver.steering_strength = 5.8
-		driver.acceleration = 22.0
-		driver.avoidance_distance = 7.5
+		var takes_shortcut := WildDashDifficultySystem.should_use_shortcut(GameManager.difficulty, animal, i)
 		if animal == &"rabbit":
 			driver.preferred_lane = clampf(lane * 0.25, -0.8, 0.8)
+		if takes_shortcut:
 			driver.set_race_route(_build_shortcut_route())
 			_shortcut_users += 1
-			print("AI SHORTCUT ROUTE racer=%s animal=rabbit saving=%.1fm risk=narrow+sweeper" % [racer.name, _get_shortcut_saving()])
+			print("AI SHORTCUT ROUTE racer=%s animal=%s saving=%.1fm risk=narrow+sweeper difficulty=%s" % [racer.name, animal, _get_shortcut_saving(), GameManager.difficulty])
 		else:
 			driver.set_race_route(_route_points)
 		var item_brain := AI_ITEM_BRAIN_SCRIPT.new() as WildDashAIItemBrain
 		item_brain.name = "%sItemBrain" % racer.name
-		item_brain.configure(racer, driver)
+		item_brain.configure(racer, driver, GameManager.difficulty)
 		add_child(item_brain)
 		_ai_item_brains.append(item_brain)
 
 	_spawn_item_boxes()
 
 	# Normal CI uses accelerated movement so full campaign regression is fast.
-	# WILDDASH_REALTIME_BALANCE keeps production-like speeds to measure RC3 race
-	# pacing without changing the retail gameplay values.
+	# WILDDASH_REALTIME_BALANCE keeps production-like speeds for pacing checks.
 	if headless:
 		var player_test_speed := 13.2 if _realtime_balance_run else 36.0
 		var headless_driver := spawn_ai_driver(player, WildDashAIController.AIMode.RACE, player_test_speed, 0.0, 0.0, true)
-		headless_driver.steering_strength = 5.8 if _realtime_balance_run else 10.0
-		headless_driver.acceleration = 22.0 if _realtime_balance_run else 65.0
-		headless_driver.avoidance_distance = 7.5 if _realtime_balance_run else 8.0
+		if not _realtime_balance_run:
+			headless_driver.target_speed = 36.0
+			headless_driver.steering_strength = 10.0
+			headless_driver.acceleration = 65.0
+			headless_driver.avoidance_distance = 8.0
 		headless_driver.set_race_route(_route_points)
 		var player_item_brain := AI_ITEM_BRAIN_SCRIPT.new() as WildDashAIItemBrain
 		player_item_brain.name = "PlayerTestItemBrain"
-		player_item_brain.configure(player, headless_driver)
+		player_item_brain.configure(player, headless_driver, GameManager.difficulty)
 		add_child(player_item_brain)
 		_ai_item_brains.append(player_item_brain)
 		if not _realtime_balance_run:
@@ -115,9 +122,10 @@ func _ready() -> void:
 	GameManager.begin_round(&"grand_prix")
 	RaceManager.start_race()
 	print("MODE START id=grand_prix ai=%d" % ai_racers.size())
-	print("GRAND PRIX START racers=%d ai=%d checkpoints=%d length=%.1fm item_boxes=%d realtime_balance=%s" % [
+	print("GRAND PRIX START racers=%d ai=%d checkpoints=%d length=%.1fm item_boxes=%d realtime_balance=%s difficulty=%s reaction=%.3f risk=%.2f" % [
 		RaceManager.racers.size(), ai_racers.size(), RaceManager.get_checkpoint_count(),
-		RaceManager.get_track_length(), _item_boxes.size(), str(_realtime_balance_run),
+		RaceManager.get_track_length(), _item_boxes.size(), str(_realtime_balance_run), GameManager.difficulty,
+		float(_difficulty_profile.reaction_interval), float(_difficulty_profile.risk_taking),
 	])
 
 func _process(_delta: float) -> void:
@@ -128,13 +136,24 @@ func _process(_delta: float) -> void:
 		_fps_sum += float(fps)
 		_fps_samples += 1
 	var rank: int = RaceManager.get_rank(player)
+	if _last_player_rank > 0 and rank > 0 and rank != _last_player_rank:
+		_rank_change_count += 1
+	_last_player_rank = rank
 	var checkpoint_progress := RaceManager.get_checkpoint_progress(player)
 	var checkpoint_total := RaceManager.get_checkpoint_count()
 	var progress_percent := RaceManager.get_progress_percent(player)
-	hud.set_metrics("Rank %d/%d   CP %d/%d   Progress %d%%   Speed %.1f   FPS %d" % [rank, RaceManager.racers.size(), checkpoint_progress, checkpoint_total, roundi(progress_percent), player.current_speed, fps])
+	hud.set_metrics("%s   Rank %d/%d   CP %d/%d   Progress %d%%   Speed %.1f   FPS %d" % [
+		WildDashDifficultySystem.get_label(GameManager.difficulty), rank, RaceManager.racers.size(), checkpoint_progress,
+		checkpoint_total, roundi(progress_percent), player.current_speed, fps,
+	])
 	hud.set_item_state(ItemSystem.get_display_name(player.get_held_item()), ItemSystem.get_status_text(player))
 
 func _physics_process(delta: float) -> void:
+	if _player_recovery_lock_remaining > 0.0 and player != null:
+		_player_recovery_lock_remaining = maxf(0.0, _player_recovery_lock_remaining - delta)
+		if _player_recovery_lock_remaining <= 0.0:
+			player.set_physics_process(true)
+
 	if RaceManager.active:
 		for racer in RaceManager.racers.duplicate():
 			RaceManager.sync_checkpoint_from_position(racer)
@@ -143,7 +162,13 @@ func _physics_process(delta: float) -> void:
 	if player != null and player.global_position.y < -28.0 and not player.finished:
 		player.reset_motion(RaceManager.get_respawn_position(player))
 		_orient_to_route(player)
-		print("PLAYER TRACK RECOVERY checkpoint=%d" % RaceManager.get_checkpoint_progress(player))
+		_player_recovery_count += 1
+		if DisplayServer.get_name() != "headless":
+			_player_recovery_lock_remaining = float(_difficulty_profile.recovery_penalty_seconds)
+			player.set_physics_process(false)
+		print("PLAYER TRACK RECOVERY checkpoint=%d penalty=%.2fs difficulty=%s" % [
+			RaceManager.get_checkpoint_progress(player), float(_difficulty_profile.recovery_penalty_seconds), GameManager.difficulty,
+		])
 
 	if DisplayServer.get_name() != "headless" or not RaceManager.active:
 		return
@@ -156,16 +181,26 @@ func _physics_process(delta: float) -> void:
 		if racer is WildDashCharacterController:
 			var controller := racer as WildDashCharacterController
 			parts.append("%s cp=%d/%d progress=%.0f%% speed=%.1f item=%s skill_cd=%.1f finished=%s" % [
-				RaceManager.get_racer_label(racer),
-				RaceManager.get_checkpoint_progress(racer),
-				RaceManager.get_checkpoint_count(),
-				RaceManager.get_progress_percent(racer),
-				controller.current_speed,
-				ItemSystem.get_display_name(controller.get_held_item()),
-				controller.skill_cooldown_remaining,
-				str(controller.finished),
+				RaceManager.get_racer_label(racer), RaceManager.get_checkpoint_progress(racer), RaceManager.get_checkpoint_count(),
+				RaceManager.get_progress_percent(racer), controller.current_speed,
+				ItemSystem.get_display_name(controller.get_held_item()), controller.skill_cooldown_remaining, str(controller.finished),
 			])
 	print("GRAND PRIX PROGRESS " + " | ".join(parts))
+
+func _apply_obstacle_difficulty() -> void:
+	if _track == null:
+		return
+	var scale := float(_difficulty_profile.obstacle_speed_scale)
+	var stack: Array[Node] = [_track]
+	var changed := 0
+	while not stack.is_empty():
+		var node := stack.pop_back()
+		for child in node.get_children():
+			stack.append(child)
+			if child is WildDashDynamicObstacle:
+				(child as WildDashDynamicObstacle).set_difficulty_speed_scale(scale)
+				changed += 1
+	print("DIFFICULTY OBSTACLES id=%s scale=%.2f count=%d" % [GameManager.difficulty, scale, changed])
 
 func _spawn_item_boxes() -> void:
 	for route_index in ITEM_BOX_ROUTE_INDICES:
@@ -227,7 +262,9 @@ func _on_any_racer_finished(_racer: Node3D, _rank: int) -> void:
 
 func _on_player_finished(rank: int) -> void:
 	_player_rank = rank
-	print("GRAND PRIX PLAYER FINISH rank=%d elapsed=%.2fs checkpoints=%d/%d" % [rank, RaceManager.get_elapsed_seconds(), RaceManager.get_checkpoint_progress(player), RaceManager.get_checkpoint_count()])
+	print("GRAND PRIX PLAYER FINISH rank=%d elapsed=%.2fs checkpoints=%d/%d rank_changes=%d" % [
+		rank, RaceManager.get_elapsed_seconds(), RaceManager.get_checkpoint_progress(player), RaceManager.get_checkpoint_count(), _rank_change_count,
+	])
 
 func _on_race_completed() -> void:
 	if _player_rank <= 0 and player != null:
@@ -247,10 +284,13 @@ func _on_race_completed() -> void:
 	var field_complete := RaceManager.get_elapsed_seconds()
 	var qualifying_rank := ceili(float(RaceManager.racers.size()) * 0.5)
 	var success := _player_rank > 0 and _player_rank <= qualifying_rank
+	var overtake_events := 0
+	for driver in ai_drivers:
+		overtake_events += driver.get_overtake_count()
 	print("GRAND PRIX COMPLETE racers=%d finishers=%d order=%s" % [RaceManager.racers.size(), RaceManager.finish_order.size(), ", ".join(labels)])
 	print("GRAND PRIX FPS avg=%.1f headless=%s" % [average_fps, str(DisplayServer.get_name() == "headless")])
-	print("RC3 RACE TELEMETRY average_finish=%.2fs field_complete=%.2fs target=80-120 shortcut_users=%d shortcut_saving=%.1fm" % [
-		average_finish, field_complete, _shortcut_users, _get_shortcut_saving(),
+	print("DIFFICULTY TELEMETRY id=%s average_finish=%.2fs field_complete=%.2fs rank_changes=%d overtakes=%d recoveries=%d shortcut_users=%d" % [
+		GameManager.difficulty, average_finish, field_complete, _rank_change_count, overtake_events, _player_recovery_count, _shortcut_users,
 	])
 	finish_mode(success, _player_rank, {
 		"rank": _player_rank,
@@ -263,5 +303,9 @@ func _on_race_completed() -> void:
 		"field_complete_seconds": field_complete,
 		"shortcut_users": _shortcut_users,
 		"shortcut_saving_m": _get_shortcut_saving(),
+		"rank_changes": _rank_change_count,
+		"ai_overtake_events": overtake_events,
+		"player_recoveries": _player_recovery_count,
+		"difficulty": String(GameManager.difficulty),
 		"order": labels,
 	})
