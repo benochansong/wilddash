@@ -104,6 +104,9 @@ jobs:
             grep -E "RC5 (GRAND PRIX ITEM BOXES PASS|PRODUCTION PACE PASS|FINISH POSITION|CHARACTER RESULT|GAMEPLAY TELEMETRY|ALL FINISH|INTERACTION FLOW|CHAIN CC|NORMAL PACE|GRAND PRIX PROBE)" /tmp/rc5-probe-15.log || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          grep "RC5 GAMEPLAY TELEMETRY" /tmp/rc5-probe-15.log | tail -1 | while IFS= read -r line; do echo "::notice title=RC5 Normal Telemetry::$line"; done
+          grep "RC5 NORMAL PACE" /tmp/rc5-probe-15.log | tail -1 | while IFS= read -r line; do echo "::notice title=RC5 Normal Pace::$line"; done
+          grep "RC5 CHARACTER RESULT" /tmp/rc5-probe-15.log | while IFS= read -r line; do echo "::notice title=RC5 Normal Character Result::$line"; done
           if [ "$status" -ne 0 ]; then exit "$status"; fi
           grep -q "RC5 GRAND PRIX ITEM BOXES PASS count=36 target=36" /tmp/rc5-probe-15.log
           grep -q "RC5 ALL FINISH PASS racers=15" /tmp/rc5-probe-15.log
@@ -128,6 +131,8 @@ jobs:
             grep -E "(AI HARD PROFILE|RC5 (GRAND PRIX ITEM BOXES PASS|FINISH POSITION|CHARACTER RESULT|GAMEPLAY TELEMETRY|ALL FINISH|INTERACTION FLOW|CHAIN CC|GRAND PRIX PROBE))" /tmp/rc5-probe-18.log || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          grep "RC5 GAMEPLAY TELEMETRY" /tmp/rc5-probe-18.log | tail -1 | while IFS= read -r line; do echo "::notice title=RC5 Hard Telemetry::$line"; done
+          grep "RC5 CHARACTER RESULT" /tmp/rc5-probe-18.log | while IFS= read -r line; do echo "::notice title=RC5 Hard Character Result::$line"; done
           if [ "$status" -ne 0 ]; then exit "$status"; fi
           grep -q "AI HARD PROFILE" /tmp/rc5-probe-18.log
           grep -q "RC5 GRAND PRIX ITEM BOXES PASS count=36 target=36" /tmp/rc5-probe-18.log
@@ -176,6 +181,7 @@ jobs:
             cat /tmp/rc5-performance-summary.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          while IFS= read -r line; do echo "::notice title=RC5 Performance::$line"; done < /tmp/rc5-performance-summary.txt
 
       - name: Upload RC5 validation telemetry
         if: always()
