@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Download Godot 4.7.1 stable
         run: |
@@ -187,7 +187,7 @@ jobs:
             --headless --path godot \
             | tee /tmp/wilddash-godot-14.log
           grep -q "GRAND PRIX START racers=15 ai=14 checkpoints=11" /tmp/wilddash-godot-14.log
-          grep -q "GRAND PRIX ITEM BOXES READY count=38 stations=11 respawn=4.0s" /tmp/wilddash-godot-14.log
+          grep -q "RC5 GRAND PRIX ITEM BOXES PASS count=36 target=36 stations=11 respawn=4.0s" /tmp/wilddash-godot-14.log
           grep -q "ITEM BOX PICKUP" /tmp/wilddash-godot-14.log
           grep -q "AI ITEM USE" /tmp/wilddash-godot-14.log
           grep -q "15 RACERS PASS" /tmp/wilddash-godot-14.log
