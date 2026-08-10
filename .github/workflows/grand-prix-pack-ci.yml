@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Download Godot 4.7.1 stable
         run: |
@@ -55,7 +55,7 @@ jobs:
           timeout 165s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path godot | tee /tmp/pack-15.log
           grep -q "GRAND PRIX START racers=15 ai=14 checkpoints=11" /tmp/pack-15.log
           grep -q "START GRID PASS columns=4 racers=15" /tmp/pack-15.log
-          grep -q "GRAND PRIX ITEM BOXES READY count=38 stations=11 respawn=4.0s" /tmp/pack-15.log
+          grep -q "RC5 GRAND PRIX ITEM BOXES PASS count=36 target=36 stations=11 respawn=4.0s" /tmp/pack-15.log
           grep -q "15 RACERS PASS" /tmp/pack-15.log
           grep -q "15 RACERS ALL FINISH PASS" /tmp/pack-15.log
           grep -q "AI ITEM USE" /tmp/pack-15.log
@@ -75,7 +75,7 @@ jobs:
           timeout 180s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path godot | tee /tmp/pack-18.log
           grep -q "GRAND PRIX START racers=18 ai=17 checkpoints=11" /tmp/pack-18.log
           grep -q "START GRID PASS columns=4 racers=18" /tmp/pack-18.log
-          grep -q "GRAND PRIX ITEM BOXES READY count=38 stations=11 respawn=3.6s" /tmp/pack-18.log
+          grep -q "RC5 GRAND PRIX ITEM BOXES PASS count=36 target=36 stations=11 respawn=3.6s" /tmp/pack-18.log
           grep -q "18 RACERS PASS" /tmp/pack-18.log
           grep -q "18 RACERS ALL FINISH PASS" /tmp/pack-18.log
           grep -q "AI ITEM USE" /tmp/pack-18.log
