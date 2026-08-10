@@ -1,0 +1,131 @@
+name: WILD DASH Difficulty Upgrade CI
+
+on:
+  push:
+    branches:
+      - gameplay/difficulty-upgrade
+    paths:
+      - "godot/**"
+      - ".github/workflows/difficulty-upgrade.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-difficulty:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Checkout difficulty upgrade
+        uses: actions/checkout@v4
+
+      - name: Download Godot 4.7.1 stable
+        run: |
+          curl -L --fail --retry 3 \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip \
+            -o /tmp/godot.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x /tmp/godot/Godot_v4.7.1-stable_linux.x86_64
+          /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --version
+
+      - name: Import project
+        run: /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --editor --path godot --quit
+
+      - name: Verify difficulty profiles and competitive AI
+        run: |
+          set -o pipefail
+          timeout 30s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot res://tests/difficulty_system_smoke.tscn \
+            | tee /tmp/difficulty-smoke.log
+          grep -q "DIFFICULTY CASUAL PASS" /tmp/difficulty-smoke.log
+          grep -q "DIFFICULTY NORMAL PASS" /tmp/difficulty-smoke.log
+          grep -q "DIFFICULTY HARD PASS" /tmp/difficulty-smoke.log
+          grep -q "AI CORNER PASS" /tmp/difficulty-smoke.log
+          grep -q "AI ITEM DECISION PASS" /tmp/difficulty-smoke.log
+          grep -q "AI SKILL DECISION PASS" /tmp/difficulty-smoke.log
+          grep -q "AI OVERTAKE PASS actual=true" /tmp/difficulty-smoke.log
+          grep -q "AI SHORTCUT PASS" /tmp/difficulty-smoke.log
+          grep -q "AI RECOVERY PASS" /tmp/difficulty-smoke.log
+          grep -q "DIFFICULTY SYSTEM PASS" /tmp/difficulty-smoke.log
+
+      - name: Verify existing character item skill and balance regressions
+        run: |
+          set -o pipefail
+          timeout 25s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path godot res://tests/character_system_smoke.tscn | tee /tmp/difficulty-character.log
+          grep -q "CHARACTER SYSTEM PASS" /tmp/difficulty-character.log
+          timeout 30s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path godot res://tests/item_system_smoke.tscn | tee /tmp/difficulty-item.log
+          grep -q "ITEM SYSTEM SMOKE PASS items=6" /tmp/difficulty-item.log
+          timeout 25s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path godot res://tests/skill_system_smoke.tscn | tee /tmp/difficulty-skill.log
+          grep -q "CHARACTER SKILL SYSTEM PASS" /tmp/difficulty-skill.log
+          timeout 25s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path godot res://tests/rc3_gameplay_balance.tscn | tee /tmp/difficulty-balance.log
+          grep -q "RC3 BALANCE PASS" /tmp/difficulty-balance.log
+
+      - name: CASUAL four AI four-round campaign
+        run: |
+          set -o pipefail
+          export WILDDASH_AUTOTEST=1
+          export WILDDASH_DIFFICULTY=casual
+          export WILDDASH_AI_COUNT=4
+          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-difficulty-casual-4"
+          rm -rf "$XDG_DATA_HOME"
+          timeout 105s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path godot | tee /tmp/difficulty-casual-4.log
+          grep -q "DIFFICULTY CONFIG id=casual ai=4" /tmp/difficulty-casual-4.log
+          grep -q "GRAND PRIX COMPLETE racers=5 finishers=5" /tmp/difficulty-casual-4.log
+          grep -q "AI SHORTCUT ROUTE" /tmp/difficulty-casual-4.log
+          grep -q "AI ITEM USE" /tmp/difficulty-casual-4.log
+          grep -q "AI SKILL USE" /tmp/difficulty-casual-4.log
+          grep -q "RC_FLOW Result" /tmp/difficulty-casual-4.log
+
+      - name: NORMAL ten AI four-round campaign
+        run: |
+          set -o pipefail
+          export WILDDASH_AUTOTEST=1
+          export WILDDASH_DIFFICULTY=normal
+          export WILDDASH_AI_COUNT=10
+          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-difficulty-normal-10"
+          rm -rf "$XDG_DATA_HOME"
+          timeout 120s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path godot | tee /tmp/difficulty-normal-10.log
+          grep -q "DIFFICULTY CONFIG id=normal ai=10" /tmp/difficulty-normal-10.log
+          grep -q "GRAND PRIX COMPLETE racers=11 finishers=11" /tmp/difficulty-normal-10.log
+          grep -q "AI OVERTAKE" /tmp/difficulty-normal-10.log
+          grep -q "AI ITEM USE" /tmp/difficulty-normal-10.log
+          grep -q "AI SKILL USE" /tmp/difficulty-normal-10.log
+          grep -q "RC_FLOW Result" /tmp/difficulty-normal-10.log
+
+      - name: HARD fourteen AI four-round campaign
+        run: |
+          set -o pipefail
+          export WILDDASH_AUTOTEST=1
+          export WILDDASH_DIFFICULTY=hard
+          export WILDDASH_AI_COUNT=14
+          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-difficulty-hard-14"
+          rm -rf "$XDG_DATA_HOME"
+          timeout 145s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path godot | tee /tmp/difficulty-hard-14.log
+          grep -q "DIFFICULTY CONFIG id=hard ai=14" /tmp/difficulty-hard-14.log
+          grep -q "GRAND PRIX COMPLETE racers=15 finishers=15" /tmp/difficulty-hard-14.log
+          grep -q "AI OVERTAKE" /tmp/difficulty-hard-14.log
+          grep -q "AI SHORTCUT ROUTE" /tmp/difficulty-hard-14.log
+          grep -q "AI ITEM USE" /tmp/difficulty-hard-14.log
+          grep -q "AI SKILL USE" /tmp/difficulty-hard-14.log
+          grep -q "RC_FLOW Result" /tmp/difficulty-hard-14.log
+
+      - name: Benchmark 10 25 50 racers after AI changes
+        run: |
+          set -o pipefail
+          for racers in 10 25 50; do
+            export WILDDASH_OPTIMIZED=1
+            export WILDDASH_RACER_COUNT=$racers
+            timeout 20s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+              --headless --path godot res://benchmark/race_benchmark.tscn \
+              | tee "/tmp/difficulty-perf-${racers}.log"
+            grep -q "PERF_RESULT profile=optimized racers=${racers}" "/tmp/difficulty-perf-${racers}.log"
+            grep -q "BENCHMARK RACE COMPLETE profile=optimized racers=${racers}" "/tmp/difficulty-perf-${racers}.log"
+          done
+
+      - name: Upload difficulty validation logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: WILD-DASH-difficulty-upgrade-logs
+          path: /tmp/difficulty-*.log
+          if-no-files-found: error
