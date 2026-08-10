@@ -207,12 +207,12 @@ func _build_ui() -> void:
 	box.add_child(_summary_label)
 
 	var difficulty_label := Label.new()
-	difficulty_label.text = "Difficulty"
+	difficulty_label.text = "Difficulty · Wild 10 racers / Chaos 15 racers / Nightmare 18 racers"
 	box.add_child(difficulty_label)
 	var difficulty := OptionButton.new()
-	difficulty.add_item("Wild")
-	difficulty.add_item("Chaos")
-	difficulty.add_item("Nightmare")
+	difficulty.add_item("Wild · Casual (10 racers)")
+	difficulty.add_item("Chaos · Normal (15 racers)")
+	difficulty.add_item("Nightmare · Hard (18 racers)")
 	difficulty.select(1)
 	difficulty.item_selected.connect(_on_difficulty_selected)
 	box.add_child(difficulty)
@@ -300,7 +300,7 @@ func _on_difficulty_selected(index: int) -> void:
 	_difficulty = DIFFICULTIES[clampi(index, 0, DIFFICULTIES.size() - 1)]
 
 func _start_run() -> void:
-	var requested_ai := GameManager.MIN_AI_COUNT
+	var requested_ai := -1
 	if OS.has_environment("WILDDASH_AI_COUNT"):
 		requested_ai = int(OS.get_environment("WILDDASH_AI_COUNT"))
 	if _chimera_mode:
