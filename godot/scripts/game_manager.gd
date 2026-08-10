@@ -32,15 +32,20 @@ const LOBBY_SCENE := "res://scenes/lobby.tscn"
 const CHARACTER_SELECT_SCENE := "res://scenes/character_select.tscn"
 const SETTINGS_SCENE := "res://scenes/settings.tscn"
 const RESULT_SCENE := "res://scenes/result.tscn"
-const MIN_AI_COUNT := 4
-const MAX_AI_COUNT := 14
+
+const CASUAL_AI_COUNT := 9
+const NORMAL_AI_COUNT := 14
+const HARD_AI_COUNT := 17
+const MIN_AI_COUNT := CASUAL_AI_COUNT
+const MAX_AI_COUNT := HARD_AI_COUNT
+const DEFAULT_AI_COUNT := NORMAL_AI_COUNT
 
 var state: GameState = GameState.BOOT
 var selected_animal: StringName = &"dog"
 var difficulty: StringName = &"chaos"
 var chimera_enabled := false
 var chimera_parts: Dictionary = WildDashChimeraSystem.default_loadout().to_dictionary()
-var ai_count := MIN_AI_COUNT
+var ai_count := DEFAULT_AI_COUNT
 var current_round_index := -1
 var round_active := false
 var campaign_running := false
@@ -63,14 +68,25 @@ func configure_run(
 	animal: StringName,
 	difficulty_id: StringName,
 	parts: Dictionary,
-	requested_ai_count: int = MIN_AI_COUNT,
+	requested_ai_count: int = -1,
 ) -> void:
 	selected_animal = animal if WildDashAnimalCatalog.is_valid(animal) else &"dog"
 	difficulty = difficulty_id
 	if not parts.is_empty():
 		chimera_parts = WildDashChimeraLoadout.from_dictionary(parts).to_dictionary()
-	ai_count = clampi(requested_ai_count, MIN_AI_COUNT, MAX_AI_COUNT)
+	var resolved_ai := get_recommended_ai_count(difficulty_id) if requested_ai_count < 0 else requested_ai_count
+	ai_count = clampi(resolved_ai, MIN_AI_COUNT, MAX_AI_COUNT)
 	SaveManager.set_last_character(selected_animal)
+	print("RACER CONFIG difficulty=%s ai=%d total=%d" % [difficulty, ai_count, ai_count + 1])
+
+func get_recommended_ai_count(difficulty_id: StringName) -> int:
+	match difficulty_id:
+		&"wild":
+			return CASUAL_AI_COUNT
+		&"nightmare":
+			return HARD_AI_COUNT
+		_:
+			return NORMAL_AI_COUNT
 
 func configure_chimera(parts: Dictionary, enabled := true) -> void:
 	chimera_parts = WildDashChimeraLoadout.from_dictionary(parts).to_dictionary()
