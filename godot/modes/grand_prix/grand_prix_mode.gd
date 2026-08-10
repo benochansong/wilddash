@@ -71,10 +71,10 @@ func _ready() -> void:
 		driver.acceleration = 24.0
 		driver.avoidance_distance = 8.2
 
-		var personality := i % 5
-		var risk := [0.90, 0.25, 0.68, 0.72, 0.52][personality]
-		var overtake := [0.95, 0.30, 0.64, 0.58, 0.62][personality]
-		var shortcut_pref := [0.48, 0.20, 0.96, 0.42, 0.55][personality]
+		var personality: int = i % 5
+		var risk: float = float([0.90, 0.25, 0.68, 0.72, 0.52][personality])
+		var overtake: float = float([0.95, 0.30, 0.64, 0.58, 0.62][personality])
+		var shortcut_pref: float = float([0.48, 0.20, 0.96, 0.42, 0.55][personality])
 		var tactics := AI_PACK_TACTICS_SCRIPT.new() as WildDashAIPackTactics
 		tactics.name = "%sPackTactics" % racer.name
 		tactics.configure(racer, driver, personality as WildDashAIPackTactics.Personality, risk, overtake, shortcut_pref)
