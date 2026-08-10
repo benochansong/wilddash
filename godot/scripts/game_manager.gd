@@ -33,11 +33,11 @@ const CHARACTER_SELECT_SCENE := "res://scenes/character_select.tscn"
 const SETTINGS_SCENE := "res://scenes/settings.tscn"
 const RESULT_SCENE := "res://scenes/result.tscn"
 const MIN_AI_COUNT := 4
-const MAX_AI_COUNT := 10
+const MAX_AI_COUNT := 14
 
 var state: GameState = GameState.BOOT
 var selected_animal: StringName = &"dog"
-var difficulty: StringName = &"chaos"
+var difficulty: StringName = WildDashDifficultySystem.NORMAL
 var chimera_enabled := false
 var chimera_parts: Dictionary = WildDashChimeraSystem.default_loadout().to_dictionary()
 var ai_count := MIN_AI_COUNT
@@ -66,11 +66,12 @@ func configure_run(
 	requested_ai_count: int = MIN_AI_COUNT,
 ) -> void:
 	selected_animal = animal if WildDashAnimalCatalog.is_valid(animal) else &"dog"
-	difficulty = difficulty_id
+	difficulty = WildDashDifficultySystem.normalize(difficulty_id)
 	if not parts.is_empty():
 		chimera_parts = WildDashChimeraLoadout.from_dictionary(parts).to_dictionary()
 	ai_count = clampi(requested_ai_count, MIN_AI_COUNT, MAX_AI_COUNT)
 	SaveManager.set_last_character(selected_animal)
+	print("DIFFICULTY SELECTED mode=%s ai=%d" % [WildDashDifficultySystem.get_display_name(difficulty), ai_count])
 
 func configure_chimera(parts: Dictionary, enabled := true) -> void:
 	chimera_parts = WildDashChimeraLoadout.from_dictionary(parts).to_dictionary()
@@ -81,6 +82,9 @@ func disable_chimera() -> void:
 
 func get_chimera_loadout() -> WildDashChimeraLoadout:
 	return WildDashChimeraLoadout.from_dictionary(chimera_parts)
+
+func get_difficulty_profile() -> Dictionary:
+	return WildDashDifficultySystem.get_profile(difficulty)
 
 func set_ai_count(value: int) -> void:
 	ai_count = clampi(value, MIN_AI_COUNT, MAX_AI_COUNT)
@@ -178,7 +182,7 @@ func _load_current_round() -> void:
 		return
 	var scene_path: String = ROUND_SCENES[current_round_index]
 	var mode_id: StringName = ROUND_IDS[current_round_index]
-	print("LOAD MODE index=%d id=%s ai=%d" % [current_round_index + 1, mode_id, ai_count])
+	print("LOAD MODE index=%d id=%s ai=%d difficulty=%s" % [current_round_index + 1, mode_id, ai_count, WildDashDifficultySystem.get_display_name(difficulty)])
 	var error: Error = get_tree().change_scene_to_file(scene_path)
 	if error != OK:
 		push_error("Failed to load round scene %s: %s" % [scene_path, error_string(error)])
