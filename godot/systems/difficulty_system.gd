@@ -82,21 +82,24 @@ static func get_profile(id: StringName) -> Dictionary:
 	return PROFILES[normalize(id)].duplicate(true)
 
 static func get_current_profile() -> Dictionary:
-	var manager := Engine.get_main_loop().root.get_node_or_null("GameManager") if Engine.get_main_loop() is SceneTree else null
-	if manager != null:
-		return get_profile(manager.difficulty)
+	var loop: MainLoop = Engine.get_main_loop()
+	if loop is SceneTree:
+		var tree := loop as SceneTree
+		var manager: Node = tree.root.get_node_or_null("GameManager")
+		if manager != null:
+			return get_profile(StringName(manager.get("difficulty")))
 	return get_profile(NORMAL)
 
 static func get_display_name(id: StringName) -> String:
-	return String(get_profile(id).display_name)
+	return String(get_profile(id)["display_name"])
 
 static func should_take_shortcut(id: StringName, stable_seed: int) -> bool:
-	var probability: float = float(get_profile(id).shortcut_probability)
-	var bucket := abs(stable_seed * 1103515245 + 12345) % 1000
+	var probability: float = float(get_profile(id)["shortcut_probability"])
+	var bucket: int = int(abs(stable_seed * 1103515245 + 12345) % 1000)
 	return float(bucket) / 1000.0 < probability
 
 static func apply_small_ai_variance(base_value: float, stable_seed: int) -> float:
 	# Personality variance is deliberately small: difficulty comes from decisions,
 	# not hidden speed cheats. Range is approximately -1.5% .. +1.5%.
-	var centered := float(abs(stable_seed * 73 + 19) % 31 - 15) / 1000.0
+	var centered: float = float(abs(stable_seed * 73 + 19) % 31 - 15) / 1000.0
 	return base_value * (1.0 + centered)
