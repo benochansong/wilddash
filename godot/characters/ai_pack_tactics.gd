@@ -13,6 +13,10 @@ const THINK_INTERVAL := 0.16 # 6.25 Hz high-level pack decisions.
 const DETECTION_FORWARD := 10.5
 const DETECTION_SIDE := 3.4
 const MAX_LANE_SHIFT := 2.8
+const HARD_RISK_BONUS := 0.12
+const HARD_OVERTAKE_BONUS := 0.10
+const HARD_SHORTCUT_BONUS := 0.10
+const HARD_SPEED_SCALE := 1.02
 
 var _racer: WildDashCharacterController
 var _driver: WildDashAIController
@@ -42,10 +46,25 @@ func configure(
 	_shortcut_preference = clampf(shortcut_preference, 0.0, 1.0)
 	_base_lane = driver.preferred_lane
 	_base_speed = driver.target_speed
+	if GameManager.difficulty == &"nightmare":
+		_risk = clampf(_risk + HARD_RISK_BONUS, 0.0, 1.0)
+		_overtake = clampf(_overtake + HARD_OVERTAKE_BONUS, 0.0, 1.0)
+		_shortcut_preference = clampf(_shortcut_preference + HARD_SHORTCUT_BONUS, 0.0, 1.0)
+		_base_speed *= HARD_SPEED_SCALE
+		_driver.target_speed = _base_speed
+		print("AI HARD PROFILE racer=%s risk=%.2f overtake=%.2f shortcut=%.2f speed_scale=%.2f" % [
+			racer.name, _risk, _overtake, _shortcut_preference, HARD_SPEED_SCALE,
+		])
 	_think_elapsed = float(racer.get_instance_id() % 13) * 0.009
 
 func get_shortcut_preference() -> float:
 	return _shortcut_preference
+
+func get_risk() -> float:
+	return _risk
+
+func get_overtake_preference() -> float:
+	return _overtake
 
 func get_personality_name() -> String:
 	match _personality:
