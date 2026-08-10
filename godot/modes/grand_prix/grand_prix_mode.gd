@@ -100,10 +100,10 @@ func _ready() -> void:
 	# remains practical despite the 2.4 km course. WILDDASH_REALTIME_BALANCE
 	# keeps production pace for manual pacing telemetry.
 	if headless:
-		var player_test_speed := player.max_speed if _realtime_balance_run else 42.0
+		var player_test_speed := player.max_speed if _realtime_balance_run else 50.0
 		var headless_driver := spawn_ai_driver(player, WildDashAIController.AIMode.RACE, player_test_speed, 0.0, 0.0, true)
-		headless_driver.steering_strength = 6.2 if _realtime_balance_run else 11.0
-		headless_driver.acceleration = 24.0 if _realtime_balance_run else 72.0
+		headless_driver.steering_strength = 6.2 if _realtime_balance_run else 12.0
+		headless_driver.acceleration = 24.0 if _realtime_balance_run else 90.0
 		headless_driver.avoidance_distance = 8.2
 		headless_driver.set_race_route(_route_points)
 		var player_item_brain := AI_ITEM_BRAIN_SCRIPT.new() as WildDashAIItemBrain
@@ -115,9 +115,9 @@ func _ready() -> void:
 			for driver in ai_drivers:
 				if driver == headless_driver:
 					continue
-				driver.target_speed *= 2.85
-				driver.acceleration = 70.0
-				driver.steering_strength = 10.5
+				driver.target_speed *= 3.40
+				driver.acceleration = 88.0
+				driver.steering_strength = 11.8
 
 	var camera := CHASE_CAMERA_SCRIPT.new() as Camera3D
 	if camera != null:
