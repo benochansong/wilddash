@@ -1,0 +1,125 @@
+name: WILD DASH Difficulty Upgrade
+
+on:
+  push:
+    branches:
+      - feature/difficulty-upgrade-rc4
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-difficulty:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout difficulty branch
+        uses: actions/checkout@v4
+
+      - name: Download Godot 4.7.1 stable
+        run: |
+          curl -L --fail --retry 3 \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip \
+            -o /tmp/godot.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x /tmp/godot/Godot_v4.7.1-stable_linux.x86_64
+          /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --version
+
+      - name: Import project
+        run: /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --editor --path godot --quit
+
+      - name: Verify difficulty profiles and competitive AI
+        run: |
+          set -o pipefail
+          timeout 25s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot res://tests/difficulty_upgrade_smoke.tscn | tee /tmp/difficulty-smoke.log
+          grep -q "DIFFICULTY CASUAL PASS" /tmp/difficulty-smoke.log
+          grep -q "DIFFICULTY NORMAL PASS" /tmp/difficulty-smoke.log
+          grep -q "DIFFICULTY HARD PASS" /tmp/difficulty-smoke.log
+          grep -q "AI CORNER PASS" /tmp/difficulty-smoke.log
+          grep -q "AI ITEM DECISION PASS" /tmp/difficulty-smoke.log
+          grep -q "AI SKILL DECISION PASS" /tmp/difficulty-smoke.log
+          grep -q "AI OVERTAKE PASS" /tmp/difficulty-smoke.log
+          grep -q "AI SHORTCUT PASS" /tmp/difficulty-smoke.log
+          grep -q "AI RECOVERY PASS" /tmp/difficulty-smoke.log
+          grep -q "DIFFICULTY SYSTEM SMOKE PASS" /tmp/difficulty-smoke.log
+
+      - name: Verify existing item and skill systems
+        run: |
+          set -o pipefail
+          timeout 30s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot res://tests/item_system_smoke.tscn | tee /tmp/difficulty-items.log
+          grep -q "ITEM SYSTEM SMOKE PASS items=6" /tmp/difficulty-items.log
+          timeout 25s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot res://tests/skill_system_smoke.tscn | tee /tmp/difficulty-skills.log
+          grep -q "CHARACTER SKILL SYSTEM PASS" /tmp/difficulty-skills.log
+
+      - name: Run Normal four-round campaign with four AI
+        run: |
+          set -o pipefail
+          export WILDDASH_AUTOTEST=1
+          export WILDDASH_DIFFICULTY=normal
+          export WILDDASH_AI_COUNT=4
+          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-difficulty-4"
+          rm -rf "$XDG_DATA_HOME"
+          timeout 100s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path godot | tee /tmp/difficulty-flow-4.log
+          grep -q "DIFFICULTY SELECTED mode=NORMAL ai=4" /tmp/difficulty-flow-4.log
+          grep -q "GRAND PRIX COMPLETE racers=5 finishers=5" /tmp/difficulty-flow-4.log
+          grep -q "AI SHORTCUT ROUTE" /tmp/difficulty-flow-4.log
+          grep -q "AI ITEM USE" /tmp/difficulty-flow-4.log
+          grep -q "AI SKILL USE" /tmp/difficulty-flow-4.log
+          grep -q "DIFFICULTY TELEMETRY mode=NORMAL" /tmp/difficulty-flow-4.log
+          grep -q "RC_FLOW Result" /tmp/difficulty-flow-4.log
+
+      - name: Run Normal four-round campaign with ten AI
+        run: |
+          set -o pipefail
+          export WILDDASH_AUTOTEST=1
+          export WILDDASH_DIFFICULTY=normal
+          export WILDDASH_AI_COUNT=10
+          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-difficulty-10"
+          rm -rf "$XDG_DATA_HOME"
+          timeout 120s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path godot | tee /tmp/difficulty-flow-10.log
+          grep -q "DIFFICULTY SELECTED mode=NORMAL ai=10" /tmp/difficulty-flow-10.log
+          grep -q "GRAND PRIX COMPLETE racers=11 finishers=11" /tmp/difficulty-flow-10.log
+          grep -q "AI ITEM USE" /tmp/difficulty-flow-10.log
+          grep -q "AI SKILL USE" /tmp/difficulty-flow-10.log
+          grep -q "DIFFICULTY TELEMETRY mode=NORMAL" /tmp/difficulty-flow-10.log
+          grep -q "RC_FLOW Result" /tmp/difficulty-flow-10.log
+
+      - name: Run Hard four-round campaign with fourteen AI
+        run: |
+          set -o pipefail
+          export WILDDASH_AUTOTEST=1
+          export WILDDASH_DIFFICULTY=hard
+          export WILDDASH_AI_COUNT=14
+          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-difficulty-14"
+          rm -rf "$XDG_DATA_HOME"
+          timeout 150s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path godot | tee /tmp/difficulty-flow-14.log
+          grep -q "DIFFICULTY SELECTED mode=HARD ai=14" /tmp/difficulty-flow-14.log
+          grep -q "GRAND PRIX COMPLETE racers=15 finishers=15" /tmp/difficulty-flow-14.log
+          grep -q "AI SHORTCUT ROUTE" /tmp/difficulty-flow-14.log
+          grep -q "AI ITEM USE" /tmp/difficulty-flow-14.log
+          grep -q "AI SKILL USE" /tmp/difficulty-flow-14.log
+          grep -q "DIFFICULTY TELEMETRY mode=HARD" /tmp/difficulty-flow-14.log
+          grep -q "RC_FLOW Result" /tmp/difficulty-flow-14.log
+
+      - name: Benchmark 10 25 50 racers
+        run: |
+          set -o pipefail
+          for racers in 10 25 50; do
+            export WILDDASH_OPTIMIZED=1
+            export WILDDASH_RACER_COUNT=$racers
+            timeout 20s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+              --headless --path godot res://benchmark/race_benchmark.tscn | tee "/tmp/difficulty-perf-${racers}.log"
+            grep -q "PERF_RESULT profile=optimized racers=${racers}" "/tmp/difficulty-perf-${racers}.log"
+            grep -q "BENCHMARK RACE COMPLETE profile=optimized racers=${racers}" "/tmp/difficulty-perf-${racers}.log"
+          done
+
+      - name: Upload difficulty validation logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: WILD-DASH-difficulty-validation-logs
+          path: /tmp/difficulty-*.log
+          if-no-files-found: error
