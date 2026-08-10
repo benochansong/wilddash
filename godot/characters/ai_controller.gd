@@ -265,9 +265,28 @@ func _update_hard_stuck_recovery(delta: float) -> void:
 		RaceManager.get_checkpoint_progress(_racer),
 		progress,
 	])
-	_recover_to_track()
+	_recover_stalled_to_route()
 	_recovery_stagnant_seconds = 0.0
 	_recovery_sample_progress = RaceManager.get_track_progress(_racer)
+
+# Falling below the course is a real checkpoint respawn. A racer that is still
+# near the course but has been stuck for four seconds gets a lighter recovery:
+# snap to its nearest current-route waypoint instead of replaying the whole
+# checkpoint sector. This prevents deterministic corner/obstacle loops without
+# granting normal AI a shortcut during healthy driving.
+func _recover_stalled_to_route() -> void:
+	if _racer == null or _race_route.is_empty():
+		return
+	var nearest := _find_nearest_route_index(_racer.global_position)
+	nearest = clampi(nearest, 1, _race_route.size() - 1)
+	var safe_position := _race_route[nearest] + Vector3.UP * 0.35
+	_racer.reset_motion(safe_position)
+	_route_index = mini(nearest + 1, _race_route.size() - 1)
+	_orient_from_position(safe_position)
+	_reset_recovery_sampling()
+	print("AI ROUTE STALL RECOVERY racer=%s route=%d checkpoint=%d" % [
+		RaceManager.get_racer_label(_racer), nearest, RaceManager.get_checkpoint_progress(_racer),
+	])
 
 func _recover_to_track() -> void:
 	if _racer == null:
@@ -276,16 +295,25 @@ func _recover_to_track() -> void:
 	_racer.reset_motion(respawn)
 	if not _race_route.is_empty():
 		_route_index = mini(_find_nearest_route_index(respawn) + 1, _race_route.size() - 1)
-		var target := _race_route[_route_index]
-		var direction := target - respawn
-		direction.y = 0.0
-		if direction.length_squared() > 0.001:
-			_cached_target_yaw = atan2(-direction.normalized().x, -direction.normalized().z)
-			_racer.rotation.y = _cached_target_yaw
+		_orient_from_position(respawn)
+	_reset_recovery_sampling()
+	print("AI TRACK RECOVERY racer=%s checkpoint=%d" % [RaceManager.get_racer_label(_racer), RaceManager.get_checkpoint_progress(_racer)])
+
+func _orient_from_position(position: Vector3) -> void:
+	if _race_route.is_empty():
+		return
+	var target := _race_route[_route_index]
+	var direction := target - position
+	direction.y = 0.0
+	if direction.length_squared() > 0.001:
+		_cached_target_yaw = atan2(-direction.normalized().x, -direction.normalized().z)
+		_racer.rotation.y = _cached_target_yaw
+
+func _reset_recovery_sampling() -> void:
 	_recovery_sample_elapsed = 0.0
 	_recovery_stagnant_seconds = 0.0
 	_recovery_sample_progress = RaceManager.get_track_progress(_racer)
-	print("AI TRACK RECOVERY racer=%s checkpoint=%d" % [RaceManager.get_racer_label(_racer), RaceManager.get_checkpoint_progress(_racer)])
+	_last_progress = _recovery_sample_progress
 
 func _find_nearest_route_index(position: Vector3) -> int:
 	if _race_route.is_empty():
