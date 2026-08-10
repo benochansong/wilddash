@@ -90,6 +90,10 @@ func _test_super_carrot() -> bool:
 	ItemSystem.grant_item(_a, ItemSystem.SUPER_CARROT)
 	if not ItemSystem.use_held_item(_a):
 		return _fail("Super Carrot could not be used")
+	# ItemSystem is an autoload and refreshes item movement modifiers during
+	# its process tick. Give the smoke test two frames so node process order
+	# cannot make a valid one-frame-later modifier look like a failure.
+	await get_tree().process_frame
 	await get_tree().process_frame
 	if not ItemSystem.has_effect(_a, &"super_carrot"):
 		return _fail("Super Carrot effect missing")
@@ -176,6 +180,7 @@ func _test_ghost_fruit() -> bool:
 	ItemSystem.grant_item(_a, ItemSystem.GHOST_FRUIT)
 	if not ItemSystem.use_held_item(_a):
 		return _fail("Ghost Fruit could not be used")
+	await get_tree().process_frame
 	await get_tree().process_frame
 	if not ItemSystem.has_effect(_a, &"ghost"):
 		return _fail("Ghost Fruit phase state missing")
