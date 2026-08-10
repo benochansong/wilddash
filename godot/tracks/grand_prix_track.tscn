@@ -1,4 +1,4 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://tracks/grand_prix_track.gd" id="1_track"]
 
@@ -9,6 +9,10 @@ roughness = 0.95
 [sub_resource type="StandardMaterial3D" id="RampMaterial"]
 albedo_color = Color(0.96, 0.48, 0.12, 1)
 roughness = 0.72
+
+[sub_resource type="StandardMaterial3D" id="SafetyRailMaterial"]
+albedo_color = Color(0.16, 0.76, 0.84, 1)
+roughness = 0.65
 
 [node name="GrandPrixTrack" type="Node3D"]
 script = ExtResource("1_track")
@@ -26,3 +30,19 @@ rotation = Vector3(0, 0.247812, 0)
 size = Vector3(20, 0.5, 30)
 use_collision = true
 material = SubResource("RunoffMaterial")
+
+[node name="RiverApproachSafetyCollision" type="Node3D" parent="."]
+
+[node name="LeftRail" type="CSGBox3D" parent="RiverApproachSafetyCollision"]
+position = Vector3(-27.5854, -21.85, -875.1141)
+rotation = Vector3(-0.03884, 0.63832, 0)
+size = Vector3(0.35, 1.35, 77.2593)
+use_collision = true
+material = SubResource("SafetyRailMaterial")
+
+[node name="RightRail" type="CSGBox3D" parent="RiverApproachSafetyCollision"]
+position = Vector3(-14.4146, -21.85, -884.8859)
+rotation = Vector3(-0.03884, 0.63832, 0)
+size = Vector3(0.35, 1.35, 77.2593)
+use_collision = true
+material = SubResource("SafetyRailMaterial")
