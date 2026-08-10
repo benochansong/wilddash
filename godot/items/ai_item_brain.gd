@@ -49,9 +49,18 @@ func evaluate_and_use_now() -> bool:
 			utility,
 			RaceManager.get_rank(_racer),
 		])
+		if ItemSystem.is_new_item(item_id):
+			print("AI NEW ITEM USE racer=%s item=%s utility=%.2f" % [
+				RaceManager.get_racer_label(_racer),
+				ItemSystem.get_display_name(item_id),
+				utility,
+			])
 		_last_item = &""
 		_held_age = 0.0
 	return used
+
+func get_utility_score_for_test(item_id: StringName) -> float:
+	return _utility_for_item(item_id)
 
 func _utility_for_item(item_id: StringName) -> float:
 	var rank := RaceManager.get_rank(_racer)
@@ -77,6 +86,31 @@ func _utility_for_item(item_id: StringName) -> float:
 			var progress := RaceManager.get_progress_percent(_racer)
 			var shortcut_window := progress >= 65.0 and progress <= 82.0
 			return 0.42 + (0.38 if struggling else 0.0) + (0.22 if shortcut_window else 0.0) + back_ratio * 0.14
+		ItemSystem.SUPER_CARROT:
+			var chase_distance := ItemSystem.get_nearest_racer_ahead_distance(_racer, 60.0)
+			var midrange_chase := chase_distance >= 10.0 and chase_distance <= 60.0
+			return 0.42 + (0.24 if midrange_chase else 0.0) + (0.10 if _is_long_straight() else 0.0) + back_ratio * 0.24
+		ItemSystem.ACORN_BOMB:
+			var clustered_ahead := ItemSystem.count_racers_ahead(_racer, 18.0, 0.10)
+			if clustered_ahead >= 2:
+				return 0.92
+			if clustered_ahead == 1:
+				return 0.66 + back_ratio * 0.08
+			return 0.20
+		ItemSystem.BANANA_PEEL:
+			return 0.88 if ItemSystem.has_racer_behind(_racer, 9.5) else 0.26 + (0.12 if rank <= 3 else 0.0)
+		ItemSystem.MAGNET:
+			return 0.84 if ItemSystem.is_item_station_ahead(_racer, 34.0) else 0.28 + back_ratio * 0.10
+		ItemSystem.WIND_BOOST:
+			var close_ahead := ItemSystem.count_racers_ahead(_racer, 9.0, 0.15)
+			return 0.90 if close_ahead > 0 else 0.24 + back_ratio * 0.10
+		ItemSystem.GHOST_FRUIT:
+			var body_jam := ItemSystem.count_racers_near(_racer, 6.5)
+			if body_jam >= 2 or _racer.has_blocking_collision():
+				return 0.88
+			if not _is_long_straight():
+				return 0.68
+			return 0.30 + (0.10 if rank <= 3 else 0.0)
 	return 0.0
 
 func _is_long_straight() -> bool:
