@@ -88,7 +88,12 @@ func set_ai_count(value: int) -> void:
 func show_character_select() -> void:
 	set_state(GameState.CHARACTER_SELECT)
 	print("RC_FLOW Character Select")
-	get_tree().change_scene_to_file(CHARACTER_SELECT_SCENE)
+	var error := get_tree().change_scene_to_file(CHARACTER_SELECT_SCENE)
+	if error != OK:
+		push_error("Failed to load Character Select: %s" % error_string(error))
+		return
+	if DisplayServer.get_name() == "headless" and OS.has_environment("WILDDASH_AUTOTEST"):
+		call_deferred("_autotest_start_character_select")
 
 func show_settings() -> void:
 	get_tree().change_scene_to_file(SETTINGS_SCENE)
@@ -155,8 +160,9 @@ func return_to_lobby() -> void:
 	get_tree().change_scene_to_file(LOBBY_SCENE)
 
 func abort_to_lobby() -> void:
-	RaceManager.stop_race()
+	RaceManager.active = false
 	RaceManager.clear_racers()
+	RaceManager.clear_track()
 	return_to_lobby()
 
 func reset_run() -> void:
@@ -192,6 +198,16 @@ func _transition_after_round() -> void:
 	var error: Error = get_tree().change_scene_to_file(RESULT_SCENE)
 	if error != OK:
 		push_error("Failed to load result scene: %s" % error_string(error))
+
+func _autotest_start_character_select() -> void:
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var scene := get_tree().current_scene
+	if scene == null or not scene.has_method("_start_run"):
+		push_error("RC3 autotest could not start Character Select")
+		get_tree().quit(3)
+		return
+	scene.call("_start_run")
 
 func _update_audio_for_state(next_state: GameState) -> void:
 	var audio := get_node_or_null("/root/AudioManager")
