@@ -123,16 +123,17 @@ func _direction_hint(skill_id: StringName) -> Vector2:
 func _shadow_step_ground_is_safe(hint: Vector2) -> bool:
 	if _racer == null or _racer.get_world_3d() == null:
 		return false
-	var forward := -_racer.global_transform.basis.z.normalized()
-	var right := _racer.global_transform.basis.x.normalized()
-	var lateral := clampf(hint.x, -1.0, 1.0)
+	var forward: Vector3 = -_racer.global_transform.basis.z.normalized()
+	var right: Vector3 = _racer.global_transform.basis.x.normalized()
+	var lateral: float = clampf(hint.x, -1.0, 1.0)
 	# The impulse decays quickly, so a 3.2m forward / 2.5m lateral probe is a
 	# conservative destination estimate. Check halfway and destination ground.
-	var offset := forward * 3.2 + right * lateral * 2.5
-	for ratio in [0.5, 1.0]:
-		var point := _racer.global_position + offset * ratio
-		var from := point + Vector3.UP * 2.8
-		var to := point + Vector3.DOWN * 5.5
+	var offset: Vector3 = forward * 3.2 + right * lateral * 2.5
+	for raw_ratio in [0.5, 1.0]:
+		var ratio: float = float(raw_ratio)
+		var point: Vector3 = _racer.global_position + offset * ratio
+		var from: Vector3 = point + Vector3.UP * 2.8
+		var to: Vector3 = point + Vector3.DOWN * 5.5
 		var query := PhysicsRayQueryParameters3D.create(from, to)
 		query.exclude = [_racer.get_rid()]
 		query.collision_mask = 1
