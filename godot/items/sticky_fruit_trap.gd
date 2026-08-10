@@ -23,20 +23,18 @@ func _process(delta: float) -> void:
 	if _life >= 14.0:
 		queue_free()
 
-func _physics_process(_delta: float) -> void:
-	if not _armed:
-		return
-	for racer in RaceManager.racers:
-		if racer == null or racer == owner_racer or not is_instance_valid(racer) or RaceManager.finish_order.has(racer):
-			continue
-		if global_position.distance_to(racer.global_position) <= 1.45:
-			_resolve_hit(racer)
-			return
-
 func _arm_later() -> void:
 	await get_tree().create_timer(0.35).timeout
-	if is_inside_tree():
-		_armed = true
+	if not is_inside_tree():
+		return
+	_armed = true
+	# Cover racers that entered during the arm delay once, then let Area3D
+	# body_entered drive all future hits. This removes the old full-field
+	# physics-frame scan from long-lived traps.
+	for body in get_overlapping_bodies():
+		_resolve_hit(body)
+		if is_queued_for_deletion():
+			return
 
 func _on_body_entered(body: Node) -> void:
 	if _armed:
