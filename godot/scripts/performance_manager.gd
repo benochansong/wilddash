@@ -2,7 +2,7 @@ extends Node
 
 const TARGET_FRAME_SECONDS := 1.0 / 60.0
 
-var optimization_enabled := false
+var optimization_enabled := true
 var benchmark_active := false
 var benchmark_profile := "baseline"
 var racer_count := 0
@@ -24,7 +24,12 @@ var _ai_raycast_calls := 0
 var _ai_lod_samples: Array[int] = [0, 0, 0]
 
 func _ready() -> void:
-	optimization_enabled = _env_enabled("WILDDASH_OPTIMIZED")
+	# Gameplay now uses the scalable AI path by default. Benchmarks can still
+	# force baseline/optimized explicitly with WILDDASH_OPTIMIZED=0/1.
+	if OS.has_environment("WILDDASH_OPTIMIZED"):
+		optimization_enabled = _env_enabled("WILDDASH_OPTIMIZED")
+	else:
+		optimization_enabled = true
 
 func set_optimization_enabled(value: bool) -> void:
 	optimization_enabled = value
