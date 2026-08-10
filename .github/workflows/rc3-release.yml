@@ -1,0 +1,333 @@
+name: WILD DASH 3D RC3 Gameplay Upgrade
+
+on:
+  push:
+    branches:
+      - release/wilddash-3d-rc3
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-rc3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout RC3
+        uses: actions/checkout@v4
+
+      - name: Download Godot 4.7.1 stable
+        run: |
+          curl -L --fail --retry 3 \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip \
+            -o /tmp/godot.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x /tmp/godot/Godot_v4.7.1-stable_linux.x86_64
+          /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --version
+
+      - name: Import RC3 project headlessly
+        run: /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --editor --path godot --quit
+
+      - name: Verify release systems
+        run: |
+          set -o pipefail
+          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-rc3-systems"
+          rm -rf "$XDG_DATA_HOME"
+          timeout 20s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot res://tests/release_candidate_systems.tscn \
+            | tee /tmp/rc3-systems.log
+          grep -q "RC_SYSTEMS PASS" /tmp/rc3-systems.log
+
+      - name: Verify four character skills and AI skill use
+        run: |
+          set -o pipefail
+          timeout 25s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot res://tests/skill_system_smoke.tscn \
+            | tee /tmp/rc3-skills.log
+          grep -q "DOG SKILL PASS" /tmp/rc3-skills.log
+          grep -q "RABBIT SKILL PASS" /tmp/rc3-skills.log
+          grep -q "ELEPHANT SKILL PASS" /tmp/rc3-skills.log
+          grep -q "CAT SKILL PASS" /tmp/rc3-skills.log
+          grep -q "AI SKILL USE PASS" /tmp/rc3-skills.log
+          grep -q "CHARACTER SKILL SYSTEM PASS" /tmp/rc3-skills.log
+
+      - name: Verify Chimera gameplay composition
+        run: |
+          set -o pipefail
+          timeout 20s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot res://tests/chimera_system_smoke.tscn \
+            | tee /tmp/rc3-chimera.log
+          grep -q "CHIMERA HEAD SKILL PASS" /tmp/rc3-chimera.log
+          grep -q "CHIMERA BODY PASSIVE PASS" /tmp/rc3-chimera.log
+          grep -q "CHIMERA TAIL BONUS PASS" /tmp/rc3-chimera.log
+          grep -q "CHIMERA SYSTEM PASS" /tmp/rc3-chimera.log
+
+      - name: Verify Character Select and Chimera Lab
+        run: |
+          set -o pipefail
+          timeout 20s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot res://tests/character_select_chimera_smoke.tscn \
+            | tee /tmp/rc3-character-select.log
+          grep -q "CHARACTER SELECT READY basic=4 chimera=true" /tmp/rc3-character-select.log
+          grep -q "CHARACTER SELECT CHIMERA PASS" /tmp/rc3-character-select.log
+
+      - name: Verify extended track and checkpoints
+        run: |
+          set -o pipefail
+          timeout 25s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot res://tests/grand_prix_track_smoke.tscn \
+            | tee /tmp/rc3-track.log
+          grep -q "GRAND PRIX TRACK LOAD PASS" /tmp/rc3-track.log
+          grep -q "CHECKPOINT PASS count=7" /tmp/rc3-track.log
+          grep -q "FINISH VALIDATION PASS" /tmp/rc3-track.log
+
+      - name: Verify six-item system and AI item use
+        run: |
+          set -o pipefail
+          timeout 30s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot res://tests/item_system_smoke.tscn \
+            | tee /tmp/rc3-items.log
+          grep -q "ITEM BOX PICKUP PASS" /tmp/rc3-items.log
+          grep -q "ITEM INVENTORY PASS" /tmp/rc3-items.log
+          grep -q "DASH BERRY PASS" /tmp/rc3-items.log
+          grep -q "SHIELD PASS" /tmp/rc3-items.log
+          grep -q "TRAP PASS" /tmp/rc3-items.log
+          grep -q "SHOCKWAVE PASS" /tmp/rc3-items.log
+          grep -q "ROCKET PASS" /tmp/rc3-items.log
+          grep -q "FEATHER PASS" /tmp/rc3-items.log
+          grep -q "AI ITEM USE PASS" /tmp/rc3-items.log
+          grep -q "ITEM SYSTEM SMOKE PASS items=6" /tmp/rc3-items.log
+
+      - name: Verify RC3 balance gates
+        run: |
+          set -o pipefail
+          timeout 25s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot res://tests/rc3_gameplay_balance.tscn \
+            | tee /tmp/rc3-balance.log
+          grep -q "RC3 BALANCE TRACK" /tmp/rc3-balance.log
+          grep -q "RC3 BALANCE PASS" /tmp/rc3-balance.log
+
+      - name: Run four-round campaign with four AI
+        run: |
+          set -o pipefail
+          export WILDDASH_AUTOTEST=1
+          export WILDDASH_AI_COUNT=4
+          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-rc3-flow-4"
+          rm -rf "$XDG_DATA_HOME"
+          timeout 90s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot \
+            | tee /tmp/rc3-flow-4.log
+          grep -q "RC_FLOW Launch" /tmp/rc3-flow-4.log
+          grep -q "RC_FLOW Lobby" /tmp/rc3-flow-4.log
+          grep -q "RC_FLOW Character Select" /tmp/rc3-flow-4.log
+          grep -q "RC_FLOW Race" /tmp/rc3-flow-4.log
+          grep -q "GRAND PRIX START racers=5 ai=4" /tmp/rc3-flow-4.log
+          grep -q "AI SHORTCUT ROUTE" /tmp/rc3-flow-4.log
+          grep -q "ITEM BOX PICKUP" /tmp/rc3-flow-4.log
+          grep -q "AI ITEM USE" /tmp/rc3-flow-4.log
+          grep -q "AI SKILL USE" /tmp/rc3-flow-4.log
+          grep -q "CHECKPOINT PASS" /tmp/rc3-flow-4.log
+          grep -q "GRAND PRIX COMPLETE racers=5 finishers=5" /tmp/rc3-flow-4.log
+          grep -q "FRUIT AI PICKUP" /tmp/rc3-flow-4.log
+          grep -q "FLOOR PHASE 1" /tmp/rc3-flow-4.log
+          grep -q "PUSH OUT AI BODY CHECK" /tmp/rc3-flow-4.log
+          grep -q "RC_FLOW Result" /tmp/rc3-flow-4.log
+          grep -q "RC_SAVE result_saved=true" /tmp/rc3-flow-4.log
+
+      - name: Restart and confirm Save v2 load
+        run: |
+          set -o pipefail
+          export WILDDASH_AUTOTEST_LOAD_ONLY=1
+          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-rc3-flow-4"
+          timeout 15s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot \
+            | tee /tmp/rc3-restart.log
+          grep -q "RC_FLOW Lobby" /tmp/rc3-restart.log
+          grep -q "RC_SAVE_LOADED launches=2 campaigns=1 last_character=dog" /tmp/rc3-restart.log
+
+      - name: Stress four-round campaign with ten AI
+        run: |
+          set -o pipefail
+          export WILDDASH_AUTOTEST=1
+          export WILDDASH_AI_COUNT=10
+          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-rc3-flow-10"
+          rm -rf "$XDG_DATA_HOME"
+          timeout 110s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot \
+            | tee /tmp/rc3-flow-10.log
+          grep -q "GRAND PRIX START racers=11 ai=10" /tmp/rc3-flow-10.log
+          grep -q "AI SHORTCUT ROUTE" /tmp/rc3-flow-10.log
+          grep -q "AI ITEM USE" /tmp/rc3-flow-10.log
+          grep -q "AI SKILL USE" /tmp/rc3-flow-10.log
+          grep -q "CHECKPOINT PASS" /tmp/rc3-flow-10.log
+          grep -q "GRAND PRIX COMPLETE racers=11 finishers=11" /tmp/rc3-flow-10.log
+          grep -q "FRUIT AI PICKUP" /tmp/rc3-flow-10.log
+          grep -q "FLOOR PHASE 1" /tmp/rc3-flow-10.log
+          grep -q "PUSH OUT AI BODY CHECK" /tmp/rc3-flow-10.log
+          grep -q "RC_SAVE result_saved=true" /tmp/rc3-flow-10.log
+
+      - name: Measure production-speed Grand Prix pacing
+        run: |
+          set -o pipefail
+          export WILDDASH_AUTOTEST=1
+          export WILDDASH_AI_COUNT=4
+          export WILDDASH_REALTIME_BALANCE=1
+          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-rc3-realtime"
+          rm -rf "$XDG_DATA_HOME"
+          timeout 190s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot \
+            | tee /tmp/rc3-realtime.log
+          telemetry=$(grep "RC3 RACE TELEMETRY" /tmp/rc3-realtime.log | head -1)
+          test -n "$telemetry"
+          avg=$(printf '%s\n' "$telemetry" | sed -E 's/.*average_finish=([0-9.]+)s.*/\1/')
+          echo "RC3 measured average finish: ${avg}s"
+          awk -v value="$avg" 'BEGIN { if (value < 80.0 || value > 120.0) exit 1; }'
+          grep -q "AI SHORTCUT ROUTE" /tmp/rc3-realtime.log
+          grep -q "AI ITEM USE" /tmp/rc3-realtime.log
+          grep -q "AI SKILL USE" /tmp/rc3-realtime.log
+
+      - name: Benchmark 10 25 50 racers before and after optimization
+        run: |
+          set -o pipefail
+          for profile in baseline optimized; do
+            if [ "$profile" = "optimized" ]; then
+              export WILDDASH_OPTIMIZED=1
+            else
+              export WILDDASH_OPTIMIZED=0
+            fi
+            for racers in 10 25 50; do
+              export WILDDASH_RACER_COUNT=$racers
+              log="/tmp/rc3-perf-${profile}-${racers}.log"
+              timeout 20s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+                --headless --path godot res://benchmark/race_benchmark.tscn \
+                | tee "$log"
+              grep -q "PERF_RESULT profile=${profile} racers=${racers}" "$log"
+              grep -q "BENCHMARK RACE COMPLETE profile=${profile} racers=${racers}" "$log"
+            done
+          done
+
+      - name: Upload RC3 validation logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: WILD-DASH-RC3-validation-logs
+          path: /tmp/rc3-*.log
+          if-no-files-found: error
+
+  windows-export:
+    needs: validate-rc3
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout RC3
+        uses: actions/checkout@v4
+
+      - name: Install Godot 4.7.1 editor and export templates
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          Invoke-WebRequest "https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_win64.exe.zip" -OutFile "$env:RUNNER_TEMP\godot.zip"
+          Expand-Archive "$env:RUNNER_TEMP\godot.zip" "$env:RUNNER_TEMP\godot" -Force
+          Invoke-WebRequest "https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_export_templates.tpz" -OutFile "$env:RUNNER_TEMP\templates.zip"
+          Expand-Archive "$env:RUNNER_TEMP\templates.zip" "$env:RUNNER_TEMP\templates" -Force
+          $templateDir = "$env:APPDATA\Godot\export_templates\4.7.1.stable"
+          New-Item -ItemType Directory -Force $templateDir | Out-Null
+          Copy-Item "$env:RUNNER_TEMP\templates\templates\*" $templateDir -Recurse -Force
+          $godot = (Get-ChildItem "$env:RUNNER_TEMP\godot\Godot_v4.7.1-stable_win64.exe").FullName
+          "GODOT_EXE=$godot" | Out-File -FilePath $env:GITHUB_ENV -Append
+          & $godot --version
+
+      - name: Import project on Windows
+        shell: pwsh
+        run: |
+          & $env:GODOT_EXE --headless --editor --path godot --quit
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Export Windows x64 RC3
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force "godot\build\windows" | Out-Null
+          & $env:GODOT_EXE --headless --path godot --export-release "Windows Desktop" "build/windows/WILD_DASH_3D_RC3.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path "godot\build\windows\WILD_DASH_3D_RC3.exe")) { throw "Windows RC3 executable was not generated" }
+
+      - name: Smoke launch exported RC3 executable
+        shell: pwsh
+        run: |
+          $env:WILDDASH_AUTOTEST_LOAD_ONLY = "1"
+          $proc = Start-Process -FilePath "godot\build\windows\WILD_DASH_3D_RC3.exe" -ArgumentList "--headless" -PassThru -Wait
+          Write-Host "RC3 WINDOWS SMOKE EXIT=$($proc.ExitCode)"
+          if ($proc.ExitCode -ne 0) { throw "Exported RC3 executable exited with code $($proc.ExitCode)" }
+
+      - name: Package Windows x64 ZIP and checksum
+        shell: pwsh
+        run: |
+          $dist = "dist"
+          New-Item -ItemType Directory -Force $dist | Out-Null
+          @"
+          WILD DASH 3D RC3 — Gameplay Upgrade
+          Version 0.9.0-rc3
+          Windows x64 / Offline Single Player
+
+          Keyboard: WASD/Arrows, Space Jump, E Skill, Q Item, Esc/P Pause
+          Gamepad: Left Stick/D-Pad, A Jump, X Skill, B Item, Start Pause
+
+          This is a pre-release test build. The executable is currently unsigned,
+          so Windows SmartScreen may display a warning on first launch.
+          "@ | Set-Content "$dist\README_RC3.txt" -Encoding UTF8
+          Copy-Item "godot\build\windows\WILD_DASH_3D_RC3.exe" "$dist\WILD_DASH_3D_RC3.exe"
+          Compress-Archive -Path "$dist\WILD_DASH_3D_RC3.exe","$dist\README_RC3.txt" -DestinationPath "$dist\WILD_DASH_3D_0.9.0-rc3_Windows_x64.zip" -Force
+          $hash = (Get-FileHash "$dist\WILD_DASH_3D_0.9.0-rc3_Windows_x64.zip" -Algorithm SHA256).Hash.ToLower()
+          "$hash  WILD_DASH_3D_0.9.0-rc3_Windows_x64.zip" | Set-Content "$dist\SHA256.txt" -Encoding ASCII
+          Get-ChildItem $dist | Format-Table Name,Length
+          Get-Content "$dist\SHA256.txt"
+
+      - name: Upload Windows RC3 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WILD-DASH-3D-RC3-Windows-x64
+          path: |
+            dist/WILD_DASH_3D_RC3.exe
+            dist/WILD_DASH_3D_0.9.0-rc3_Windows_x64.zip
+            dist/README_RC3.txt
+            dist/SHA256.txt
+          if-no-files-found: error
+
+  publish-prerelease:
+    needs: windows-export
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout RC3
+        uses: actions/checkout@v4
+
+      - name: Download Windows RC3 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: WILD-DASH-3D-RC3-Windows-x64
+          path: dist
+
+      - name: Create or update GitHub pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v0.9.0-rc3
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" \
+              --title "WILD DASH 3D RC3 — Gameplay Upgrade" \
+              --notes-file RELEASE_RC3.md \
+              --prerelease
+          else
+            gh release create "$TAG" \
+              --target "$GITHUB_SHA" \
+              --title "WILD DASH 3D RC3 — Gameplay Upgrade" \
+              --notes-file RELEASE_RC3.md \
+              --prerelease
+          fi
+          gh release upload "$TAG" \
+            dist/WILD_DASH_3D_0.9.0-rc3_Windows_x64.zip \
+            dist/SHA256.txt \
+            --clobber
+          gh release view "$TAG" --json name,tagName,isPrerelease,url
