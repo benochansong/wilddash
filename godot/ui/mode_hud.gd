@@ -75,6 +75,12 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	if _bound_character == null or not is_instance_valid(_bound_character):
 		return
+	var held_item := _bound_character.get_held_item()
+	set_item_state(
+		ItemSystem.get_display_name(held_item),
+		ItemSystem.get_status_text(_bound_character),
+		ItemSystem.get_icon_text(held_item),
+	)
 	var cooldown := _bound_character.skill_cooldown_remaining
 	var status := "READY · E / X" if cooldown <= 0.01 else "%.1f sec" % cooldown
 	set_skill_state(_bound_character.get_skill_icon_text(), _bound_character.get_skill_name(), status)
