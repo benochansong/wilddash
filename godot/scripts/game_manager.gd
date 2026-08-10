@@ -36,7 +36,7 @@ const RESULT_SCENE := "res://scenes/result.tscn"
 const CASUAL_AI_COUNT := 9
 const NORMAL_AI_COUNT := 14
 const HARD_AI_COUNT := 17
-const MIN_AI_COUNT := CASUAL_AI_COUNT
+const MIN_AI_COUNT := 4
 const MAX_AI_COUNT := HARD_AI_COUNT
 const DEFAULT_AI_COUNT := NORMAL_AI_COUNT
 
