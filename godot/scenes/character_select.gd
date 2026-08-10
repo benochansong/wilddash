@@ -2,16 +2,17 @@ extends Node3D
 
 const RACER_SCENE: PackedScene = preload("res://characters/test_racer.tscn")
 const ANIMAL_IDS: Array[StringName] = [&"dog", &"rabbit", &"elephant", &"cat"]
-const DIFFICULTIES: Array[StringName] = [&"wild", &"chaos", &"nightmare"]
+const DIFFICULTIES: Array[StringName] = [WildDashDifficultySystem.CASUAL, WildDashDifficultySystem.NORMAL, WildDashDifficultySystem.HARD]
 
 var _chimera_mode := false
 var _selected_animal: StringName = &"dog"
-var _difficulty: StringName = &"chaos"
+var _difficulty: StringName = WildDashDifficultySystem.NORMAL
 var _loadout: WildDashChimeraLoadout
 var _preview_racer: WildDashCharacterController
 var _summary_label: Label
 var _mode_label: Label
 var _start_button: Button
+var _difficulty_summary: Label
 var _palette_index := 0
 var _pattern_index := 0
 var _slot_labels: Dictionary = {}
@@ -25,7 +26,7 @@ func _ready() -> void:
 	_build_preview_stage()
 	_build_ui()
 	_refresh_preview()
-	print("CHARACTER SELECT READY basic=4 chimera=true")
+	print("CHARACTER SELECT READY basic=4 chimera=true difficulty=casual|normal|hard")
 
 func _process(delta: float) -> void:
 	if _preview_racer != null:
@@ -201,21 +202,27 @@ func _build_ui() -> void:
 	style_row.add_child(pattern_button)
 
 	_summary_label = Label.new()
-	_summary_label.custom_minimum_size = Vector2(0, 150)
+	_summary_label.custom_minimum_size = Vector2(0, 135)
 	_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_summary_label.add_theme_font_size_override("font_size", 16)
 	box.add_child(_summary_label)
 
 	var difficulty_label := Label.new()
-	difficulty_label.text = "Difficulty"
+	difficulty_label.text = "Difficulty — AI 판단력 / 위험 감수 / 장애물 속도 / 경쟁자 수"
 	box.add_child(difficulty_label)
 	var difficulty := OptionButton.new()
-	difficulty.add_item("Wild")
-	difficulty.add_item("Chaos")
-	difficulty.add_item("Nightmare")
+	difficulty.add_item("CASUAL — 6 AI · 입문")
+	difficulty.add_item("NORMAL — 10 AI · 경쟁적")
+	difficulty.add_item("HARD — 14 AI · 숙련자")
 	difficulty.select(1)
 	difficulty.item_selected.connect(_on_difficulty_selected)
 	box.add_child(difficulty)
+
+	_difficulty_summary = Label.new()
+	_difficulty_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_difficulty_summary.modulate = Color(0.78, 0.84, 0.95)
+	box.add_child(_difficulty_summary)
+	_refresh_difficulty_summary()
 
 	_start_button = Button.new()
 	_start_button.text = "START 4-ROUND RUN"
@@ -298,19 +305,34 @@ func _cycle_pattern() -> void:
 
 func _on_difficulty_selected(index: int) -> void:
 	_difficulty = DIFFICULTIES[clampi(index, 0, DIFFICULTIES.size() - 1)]
+	_refresh_difficulty_summary()
+
+func _refresh_difficulty_summary() -> void:
+	if _difficulty_summary == null:
+		return
+	var profile := WildDashDifficultySystem.get_profile(_difficulty)
+	_difficulty_summary.text = "%s · %d AI · Reaction %.2fs · Risk %d%% · Obstacles %d%%" % [
+		WildDashDifficultySystem.get_label(_difficulty),
+		int(profile.ai_count),
+		float(profile.reaction_interval),
+		roundi(float(profile.risk_taking) * 100.0),
+		roundi(float(profile.obstacle_speed_scale) * 100.0),
+	]
 
 func _start_run() -> void:
-	var requested_ai := GameManager.MIN_AI_COUNT
+	var requested_ai := -1
 	if OS.has_environment("WILDDASH_AI_COUNT"):
 		requested_ai = int(OS.get_environment("WILDDASH_AI_COUNT"))
+	if OS.has_environment("WILDDASH_DIFFICULTY"):
+		_difficulty = WildDashDifficultySystem.normalize(StringName(OS.get_environment("WILDDASH_DIFFICULTY")))
 	if _chimera_mode:
 		save_current_selection()
 		GameManager.configure_run(_loadout.body_id, _difficulty, _loadout.to_dictionary(), requested_ai)
-		print("CHARACTER SELECT START chimera head=%s body=%s tail=%s" % [_loadout.head_id, _loadout.body_id, _loadout.tail_id])
+		print("CHARACTER SELECT START chimera head=%s body=%s tail=%s difficulty=%s" % [_loadout.head_id, _loadout.body_id, _loadout.tail_id, _difficulty])
 	else:
 		GameManager.disable_chimera()
 		GameManager.configure_run(_selected_animal, _difficulty, {}, requested_ai)
-		print("CHARACTER SELECT START animal=%s" % _selected_animal)
+		print("CHARACTER SELECT START animal=%s difficulty=%s" % [_selected_animal, _difficulty])
 	GameManager.start_campaign()
 
 func _unhandled_key_input(event: InputEvent) -> void:
