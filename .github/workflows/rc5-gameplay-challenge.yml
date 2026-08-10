@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout RC5 candidate
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Download Godot 4.7.1 stable
         run: |
@@ -93,8 +93,19 @@ jobs:
           export WILDDASH_RC5_RACERS=15
           export WILDDASH_REALTIME_BALANCE=1
           export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-rc5-probe-15"
+          set +e
           timeout 245s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot res://tests/rc5_grand_prix_probe.tscn | tee /tmp/rc5-probe-15.log
+          status=${PIPESTATUS[0]}
+          set -e
+          {
+            echo "## RC5 Normal 15-racer telemetry"
+            echo '```text'
+            grep -E "RC5 (GRAND PRIX ITEM BOXES PASS|PRODUCTION PACE PASS|FINISH POSITION|CHARACTER RESULT|GAMEPLAY TELEMETRY|ALL FINISH|INTERACTION FLOW|CHAIN CC|NORMAL PACE|GRAND PRIX PROBE)" /tmp/rc5-probe-15.log || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$status" -ne 0 ]; then exit "$status"; fi
+          grep -q "RC5 GRAND PRIX ITEM BOXES PASS count=36 target=36" /tmp/rc5-probe-15.log
           grep -q "RC5 ALL FINISH PASS racers=15" /tmp/rc5-probe-15.log
           grep -q "RC5 INTERACTION FLOW PASS" /tmp/rc5-probe-15.log
           grep -q "RC5 NORMAL PACE PASS" /tmp/rc5-probe-15.log
@@ -106,8 +117,20 @@ jobs:
           unset WILDDASH_REALTIME_BALANCE
           export WILDDASH_RC5_RACERS=18
           export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-rc5-probe-18"
+          set +e
           timeout 120s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot res://tests/rc5_grand_prix_probe.tscn | tee /tmp/rc5-probe-18.log
+          status=${PIPESTATUS[0]}
+          set -e
+          {
+            echo "## RC5 Hard 18-racer telemetry"
+            echo '```text'
+            grep -E "(AI HARD PROFILE|RC5 (GRAND PRIX ITEM BOXES PASS|FINISH POSITION|CHARACTER RESULT|GAMEPLAY TELEMETRY|ALL FINISH|INTERACTION FLOW|CHAIN CC|GRAND PRIX PROBE))" /tmp/rc5-probe-18.log || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$status" -ne 0 ]; then exit "$status"; fi
+          grep -q "AI HARD PROFILE" /tmp/rc5-probe-18.log
+          grep -q "RC5 GRAND PRIX ITEM BOXES PASS count=36 target=36" /tmp/rc5-probe-18.log
           grep -q "RC5 ALL FINISH PASS racers=18" /tmp/rc5-probe-18.log
           grep -q "RC5 INTERACTION FLOW PASS" /tmp/rc5-probe-18.log
           grep -q "RC5 GRAND PRIX PROBE PASS racers=18 realtime=false" /tmp/rc5-probe-18.log
@@ -130,6 +153,7 @@ jobs:
       - name: Benchmark 10 25 50 racers baseline and optimized
         run: |
           set -o pipefail
+          : > /tmp/rc5-performance-summary.txt
           for profile in baseline optimized; do
             if [ "$profile" = "optimized" ]; then
               export WILDDASH_OPTIMIZED=1
@@ -143,15 +167,23 @@ jobs:
                 --headless --path godot res://benchmark/race_benchmark.tscn | tee "$log"
               grep -q "PERF_RESULT profile=${profile} racers=${racers}" "$log"
               grep -q "BENCHMARK RACE COMPLETE profile=${profile} racers=${racers}" "$log"
+              grep "PERF_RESULT profile=${profile} racers=${racers}" "$log" >> /tmp/rc5-performance-summary.txt
             done
           done
+          {
+            echo "## RC5 10 / 25 / 50 racer benchmark"
+            echo '```text'
+            cat /tmp/rc5-performance-summary.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload RC5 validation telemetry
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: WILD-DASH-RC5-Gameplay-Challenge-Logs
           path: /tmp/rc5-*.log
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
 
   windows-unsigned-candidate:
@@ -160,7 +192,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout RC5 candidate
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install Godot 4.7.1 and export templates
         shell: pwsh
