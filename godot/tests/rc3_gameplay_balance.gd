@@ -24,9 +24,9 @@ func _ready() -> void:
 		_check(rabbit.skill_name == "SPRING LEAP" and is_equal_approx(rabbit.skill_cooldown, 8.0), "rabbit skill", failures)
 		_check(rabbit.skill_jump_multiplier <= 1.50, "rabbit leap cap", failures)
 		_check(elephant.skill_name == "STAMPEDE" and elephant.skill_cooldown >= 11.0, "elephant cooldown", failures)
-		_check(elephant.skill_contact_force <= 4.5, "elephant push cap", failures)
+		_check(elephant.skill_push_strength <= 4.5, "elephant push cap", failures)
 		_check(cat.skill_name == "SHADOW STEP" and is_equal_approx(cat.skill_cooldown, 8.0), "cat skill", failures)
-		_check(cat.skill_dash_distance <= 5.5 and cat.skill_evasion_duration <= 0.40, "cat dash boundary cap", failures)
+		_check(cat.skill_forward_impulse <= 4.5 and cat.skill_lateral_impulse <= 7.0 and cat.skill_evade_duration <= 0.40, "cat dash boundary cap", failures)
 
 		var max_speed := maxf(maxf(dog.max_speed, rabbit.max_speed), maxf(elephant.max_speed, cat.max_speed))
 		var min_speed := minf(minf(dog.max_speed, rabbit.max_speed), minf(elephant.max_speed, cat.max_speed))
