@@ -11,7 +11,8 @@ const MAX_AI_RACERS := 49
 const QUALIFYING_RANK := 25
 const VERTICAL_SLICE_RACERS := 4
 const CHECKPOINT_ASSIST_RADIUS := 14.0
-const FINISH_ASSIST_RADIUS := 18.0
+const FINISH_LATERAL_ASSIST_RADIUS := 11.0
+const FINISH_CROSSING_MARGIN := 0.35
 
 var racers: Array[Node3D] = []
 var finish_order: Array[Node3D] = []
@@ -123,18 +124,30 @@ func sync_checkpoint_from_position(racer: Node3D) -> bool:
 	return record_checkpoint(racer, expected)
 
 func sync_finish_from_position(racer: Node3D) -> bool:
-	# Like checkpoints, the finish Area3D remains authoritative in normal play.
-	# This seam prevents a fast racer from tunneling through the final trigger.
-	# All seven checkpoints must already be valid, so it cannot be used to cut
-	# the course or finish early.
-	if racer == null or finish_order.has(racer) or not can_finish(racer) or _route_points.is_empty():
+	# Finish fallback is crossing-based, not radius-based. The old 18 m radius
+	# could mark a racer finished before the visible stripe and immediately put
+	# the controller into its finish coast. We now require the racer centre to
+	# move beyond the finish plane while still being inside the final lane.
+	if racer == null or finish_order.has(racer) or not can_finish(racer) or _route_points.size() < 2:
 		return false
 	var finish := _route_points[_route_points.size() - 1]
-	var planar_delta := racer.global_position - finish
-	planar_delta.y = 0.0
-	if planar_delta.length() > FINISH_ASSIST_RADIUS:
+	var previous := _route_points[_route_points.size() - 2]
+	var direction := finish - previous
+	direction.y = 0.0
+	if direction.length_squared() <= 0.0001:
 		return false
-	if absf(racer.global_position.y - finish.y) > 10.0:
+	direction = direction.normalized()
+
+	var planar_delta := racer.global_position - finish
+	var vertical_delta := absf(planar_delta.y)
+	planar_delta.y = 0.0
+	if vertical_delta > 10.0:
+		return false
+	var forward_distance := planar_delta.dot(direction)
+	if forward_distance < FINISH_CROSSING_MARGIN:
+		return false
+	var lateral_delta := planar_delta - direction * forward_distance
+	if lateral_delta.length() > FINISH_LATERAL_ASSIST_RADIUS:
 		return false
 	return record_finish(racer) < MAX_RACERS
 
