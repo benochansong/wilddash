@@ -82,10 +82,29 @@ func _ready() -> void:
 	if not RaceManager.can_finish(racer):
 		_fail("Finish remained blocked after all checkpoints")
 		return
-	var rank := RaceManager.record_finish(racer)
+
+	var finish := route[route.size() - 1]
+	var previous := route[route.size() - 2]
+	var finish_direction := finish - previous
+	finish_direction.y = 0.0
+	finish_direction = finish_direction.normalized()
+	racer.global_position = finish - finish_direction * 2.0 + Vector3.UP
+	if RaceManager.sync_finish_from_position(racer):
+		_fail("Finish was recorded before crossing the visible line")
+		return
+	if RaceManager.finish_order.has(racer):
+		_fail("Racer appeared in finish order before crossing the line")
+		return
+
+	racer.global_position = finish + finish_direction * 1.0 + Vector3.UP
+	if not RaceManager.sync_finish_from_position(racer):
+		_fail("Finish was not recorded after crossing the visible line")
+		return
+	var rank := RaceManager.finish_order.find(racer) + 1
 	if rank != 1:
 		_fail("Validated finish did not record rank 1")
 		return
+	print("FINISH CROSSING PASS before_line_rejected=true after_line_rank=%d" % rank)
 	print("FINISH VALIDATION PASS checkpoints=%d rank=%d" % [
 		RaceManager.get_checkpoint_progress(racer), rank,
 	])
