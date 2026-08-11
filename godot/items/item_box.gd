@@ -1,9 +1,11 @@
 class_name WildDashItemBox
 extends Area3D
 
-const BASE_PICKUP_RADIUS := 4.1
+const AI_PICKUP_RADIUS := 3.3
+const PLAYER_PICKUP_RADIUS := 4.1
 const PLAYER_PICKUP_BONUS := 0.45
-const PICKUP_SCAN_INTERVAL := 0.05
+const PLAYER_SCAN_INTERVAL := 0.04
+const AI_SCAN_INTERVAL := 0.10
 
 @export var respawn_seconds := 5.0
 
@@ -11,7 +13,8 @@ var _active := true
 var _visual_root: Node3D
 var _collision: CollisionShape3D
 var _time := 0.0
-var _scan_elapsed := 0.0
+var _player_scan_elapsed := 0.0
+var _ai_scan_elapsed := 0.0
 var _previous_probe_positions: Dictionary = {}
 
 func _ready() -> void:
@@ -32,26 +35,44 @@ func _process(delta: float) -> void:
 func _physics_process(delta: float) -> void:
 	if not _active:
 		return
-	_scan_elapsed += delta
-	if _scan_elapsed < PICKUP_SCAN_INTERVAL:
+	_player_scan_elapsed += delta
+	_ai_scan_elapsed += delta
+	var scan_player := _player_scan_elapsed >= PLAYER_SCAN_INTERVAL
+	var scan_ai := _ai_scan_elapsed >= AI_SCAN_INTERVAL
+	if not scan_player and not scan_ai:
 		return
-	_scan_elapsed = 0.0
+	if scan_player:
+		_player_scan_elapsed = 0.0
+	if scan_ai:
+		_ai_scan_elapsed = 0.0
+
 	for racer in RaceManager.racers:
-		if racer == null or not is_instance_valid(racer):
+		if racer == null or not is_instance_valid(racer) or RaceManager.finish_order.has(racer):
 			continue
+		var is_human_player := racer is WildDashCharacterController and (racer as WildDashCharacterController).is_player
+		if is_human_player and not scan_player:
+			continue
+		if not is_human_player and not scan_ai:
+			continue
+
 		var probe_position := racer.global_position + Vector3.UP * 0.8
-		var racer_id := racer.get_instance_id()
-		var previous_probe: Vector3 = _previous_probe_positions.get(racer_id, probe_position)
-		_previous_probe_positions[racer_id] = probe_position
-		if RaceManager.finish_order.has(racer):
-			continue
-		var pickup_radius := BASE_PICKUP_RADIUS
+		var pickup_radius := PLAYER_PICKUP_RADIUS if is_human_player else AI_PICKUP_RADIUS
 		if racer.has_method("get_interaction_radius"):
 			pickup_radius = float(racer.call("get_interaction_radius", pickup_radius))
 		pickup_radius = ItemSystem.get_pickup_radius(racer, pickup_radius)
-		if racer is WildDashCharacterController and (racer as WildDashCharacterController).is_player:
+
+		if is_human_player:
 			pickup_radius += PLAYER_PICKUP_BONUS
-		if _distance_point_to_segment(global_position, previous_probe, probe_position) <= pickup_radius:
+			var racer_id := racer.get_instance_id()
+			var previous_probe: Vector3 = _previous_probe_positions.get(racer_id, probe_position)
+			_previous_probe_positions[racer_id] = probe_position
+			if _distance_point_to_segment(global_position, previous_probe, probe_position) <= pickup_radius:
+				if _try_pickup(racer):
+					return
+		elif global_position.distance_to(probe_position) <= pickup_radius:
+			# Preserve RC5's original AI item cadence and radius. The swept/high-
+			# frequency forgiveness is intentionally player-only so fixing a missed
+			# human pickup does not inflate AI combat density or alter balance.
 			if _try_pickup(racer):
 				return
 
@@ -155,6 +176,6 @@ func _build_visual() -> void:
 
 	_collision = CollisionShape3D.new()
 	var shape := SphereShape3D.new()
-	shape.radius = 2.1
+	shape.radius = 1.65
 	_collision.shape = shape
 	add_child(_collision)
