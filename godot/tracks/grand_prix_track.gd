@@ -3,6 +3,7 @@ extends Node3D
 
 const CHECKPOINT_SCRIPT: Script = preload("res://tracks/checkpoint.gd")
 const FINISH_SCRIPT: Script = preload("res://tracks/finish_line.gd")
+const TRACK_GUIDE_FACTORY: Script = preload("res://tracks/track_guide_factory.gd")
 
 const ROUTE_POINTS: Array[Vector3] = [
 	Vector3(0, 0, 80),
@@ -177,6 +178,7 @@ func _build_track() -> void:
 	_build_shortcuts()
 	_build_forest_dressing()
 	_build_environment_pass_2()
+	_build_track_guides()
 
 func _create_segment(
 	node_name: String,
@@ -349,12 +351,16 @@ func _build_road_surface_details() -> void:
 						fence_post_transforms.append(post_transform)
 					else:
 						guardrail_post_transforms.append(post_transform)
+	# Edge lines and center dashes share one static paint batch, freeing the node
+	# budget needed by the two reusable guide MultiMeshes.
+	painted_edge_transforms.append_array(line_transforms)
+	# Bridge/tunnel entry strips use the same warm warning family as structural
+	# curbs, so they can share one draw batch without losing their visual role.
+	curb_warning_transforms.append_array(hazard_transforms)
 	_add_box_multimesh("GrassShoulders", grass_shoulder_transforms, _grass_material)
 	_add_box_multimesh("RoadDustyShoulders", dirt_shoulder_transforms, _dirt_material)
 	_add_box_multimesh("RoadPaintedEdgeLines", painted_edge_transforms, _materials[&"road_edge"])
 	_add_box_multimesh("RoadCurbsWarning", curb_warning_transforms, _materials[&"curb_warning"])
-	_add_box_multimesh("RoadCenterDashes", line_transforms, _materials[&"road_line"])
-	_add_box_multimesh("HazardEntryMarkings", hazard_transforms, _materials[&"hazard"])
 	_add_box_multimesh("GuardrailPosts", guardrail_post_transforms, _rail_material)
 	_add_box_multimesh("WoodStructuresAndProps", fence_post_transforms, _wood_material)
 
@@ -374,6 +380,122 @@ func _track_transform_at(
 	transform = transform.looking_at(origin + direction.normalized(), Vector3.UP)
 	transform.basis = transform.basis.scaled(size)
 	return transform
+
+func _build_track_guides() -> void:
+	var road_arrows: Array[Transform3D] = []
+	# Sparse anticipation marks: no arrows are placed on ordinary straights.
+	_append_road_arrows(road_arrows, 2, 3, [0.64, 0.82]) # Forest sharp bend.
+	_append_road_arrows(road_arrows, 3, 4, [0.72, 0.88]) # Main jump entry.
+	_append_road_arrows(road_arrows, 4, 5, [0.72, 0.88]) # Narrow bridge landing/entry.
+	_append_road_arrows(road_arrows, 6, 7, [0.58]) # Continuation behind obstacle field.
+	_append_road_arrows(road_arrows, 7, 8, [0.62, 0.82]) # Canyon S-curve entry.
+	_append_road_arrows(road_arrows, 9, 10, [0.72]) # Canyon S-curve return.
+	_append_road_arrows(road_arrows, 13, 14, [0.58, 0.78]) # River bridge approach.
+	_append_road_arrows(road_arrows, 15, 16, [0.68]) # Shortcut A/main-route fork.
+	_append_road_arrows(road_arrows, 16, 17, [0.64, 0.82]) # Gate detour sharp turn.
+	_append_road_arrows(road_arrows, 18, 19, [0.58, 0.78]) # Wide hairpin.
+	_append_road_arrows(road_arrows, 20, 21, [0.76, 0.90]) # Multi-jump entry.
+	_append_road_arrows(road_arrows, 22, 23, [0.74]) # Shortcut B/main-route fork.
+	_append_road_arrows(road_arrows, 23, 24, [0.64, 0.82]) # Shortcut B detour turn.
+	_append_road_arrows(road_arrows, 24, 25, [0.66, 0.84]) # Tunnel approach.
+	_append_road_arrows(road_arrows, 26, 27, [0.58, 0.78]) # Final technical section.
+	var arrow_batch: MultiMeshInstance3D = TRACK_GUIDE_FACTORY.create_direction_arrow(
+		_decoration_root, "RoadDirectionArrows", road_arrows, _materials[&"guide_arrow"]
+	)
+	arrow_batch.set_meta(&"coverage", PackedStringArray([
+		"sharp_curve", "hairpin", "s_curve", "branch", "bridge", "tunnel",
+		"jump", "obstacle", "final",
+	]))
+
+	var trackside_guides: Array[Transform3D] = []
+	_append_curve_chevrons(trackside_guides, 3, 3, 0.92) # Forest bend.
+	_append_curve_chevrons(trackside_guides, 8, 4, 1.02) # Canyon S entry.
+	_append_curve_chevrons(trackside_guides, 10, 3, 0.88) # Canyon S return.
+	_append_curve_chevrons(trackside_guides, 14, 5, 1.10) # River bridge turn.
+	_append_curve_chevrons(trackside_guides, 17, 5, 1.14) # Gate detour sharp turn.
+	_append_curve_chevrons(trackside_guides, 19, 4, 1.02) # Wide hairpin.
+	_append_curve_chevrons(trackside_guides, 24, 5, 1.12) # Shortcut B detour.
+	_append_curve_chevrons(trackside_guides, 27, 4, 1.08) # Final chicane.
+	_append_trackside_direction_marker(trackside_guides, 4, 0.78, 0.92) # Jump entry.
+	_append_trackside_direction_marker(trackside_guides, 16, 0.74, 0.94) # Fork A.
+	_append_trackside_direction_marker(trackside_guides, 23, 0.76, 0.94) # Fork B.
+	_append_trackside_direction_marker(trackside_guides, 25, 0.76, 0.92) # Tunnel entry.
+	var trackside_batch: MultiMeshInstance3D = TRACK_GUIDE_FACTORY.create_curve_chevrons(
+		_decoration_root, "TracksideDirectionGuides", trackside_guides,
+		_materials[&"guide_backing"], _materials[&"guide_arrow"]
+	)
+	trackside_batch.set_meta(&"coverage", PackedStringArray([
+		"sharp_curve", "hairpin", "s_curve", "branch", "bridge", "tunnel", "jump", "final",
+	]))
+
+func _append_road_arrows(
+	result: Array[Transform3D],
+	approach_segment: int,
+	direction_segment: int,
+	samples: Array,
+	lateral_offset := 0.0
+) -> void:
+	var approach_a := ROUTE_POINTS[approach_segment]
+	var approach_b := ROUTE_POINTS[approach_segment + 1]
+	var guide_direction := ROUTE_POINTS[direction_segment + 1] - ROUTE_POINTS[direction_segment]
+	for sample in samples:
+		var origin := approach_a.lerp(approach_b, float(sample))
+		origin += _segment_right(approach_segment) * lateral_offset + Vector3.UP * 0.13
+		var transform := Transform3D(Basis.IDENTITY, origin)
+		transform = transform.looking_at(origin + guide_direction.normalized(), Vector3.UP)
+		transform.basis = transform.basis.scaled(Vector3(2.35, 1.0, 3.15))
+		result.append(transform)
+
+func _append_curve_chevrons(
+	result: Array[Transform3D],
+	turn_route_index: int,
+	count: int,
+	scale: float
+) -> void:
+	var point := ROUTE_POINTS[turn_route_index]
+	var next := ROUTE_POINTS[turn_route_index + 1]
+	var turn_sign := _turn_sign(turn_route_index)
+	var outside_side := -turn_sign
+	var outgoing_right := _segment_right(turn_route_index)
+	var width := SEGMENT_WIDTHS[turn_route_index]
+	var face_target := ROUTE_POINTS[turn_route_index - 1].lerp(point, 0.88) + Vector3.UP * 1.25
+	for index in range(count):
+		var t := 0.10 + float(index) * 0.085
+		var origin := point.lerp(next, t) + outgoing_right * outside_side * (width * 0.5 + 1.25)
+		var transform := Transform3D(Basis.IDENTITY, origin)
+		transform = transform.looking_at(face_target, Vector3.UP)
+		transform.basis = transform.basis.scaled(Vector3(turn_sign * scale, scale, turn_sign * scale))
+		result.append(transform)
+
+func _append_trackside_direction_marker(
+	result: Array[Transform3D],
+	turn_route_index: int,
+	approach_t: float,
+	scale: float
+) -> void:
+	var approach_index := turn_route_index - 1
+	var approach_a := ROUTE_POINTS[approach_index]
+	var approach_b := ROUTE_POINTS[turn_route_index]
+	var turn_sign := _turn_sign(turn_route_index)
+	var outside_side := -turn_sign
+	var origin := approach_a.lerp(approach_b, approach_t)
+	origin += _segment_right(approach_index) * outside_side * (SEGMENT_WIDTHS[approach_index] * 0.5 + 1.20)
+	var face_target := approach_a.lerp(approach_b, maxf(0.0, approach_t - 0.28)) + Vector3.UP * 1.25
+	var transform := Transform3D(Basis.IDENTITY, origin)
+	transform = transform.looking_at(face_target, Vector3.UP)
+	transform.basis = transform.basis.scaled(Vector3(turn_sign * scale, scale, turn_sign * scale))
+	result.append(transform)
+
+func _segment_right(segment_index: int) -> Vector3:
+	var direction := ROUTE_POINTS[segment_index + 1] - ROUTE_POINTS[segment_index]
+	direction.y = 0.0
+	direction = direction.normalized()
+	return Vector3(-direction.z, 0.0, direction.x)
+
+func _turn_sign(route_index: int) -> float:
+	var outgoing := ROUTE_POINTS[route_index + 1] - ROUTE_POINTS[route_index]
+	outgoing.y = 0.0
+	return 1.0 if outgoing.normalized().dot(_segment_right(route_index - 1)) >= 0.0 else -1.0
 
 func _add_box_multimesh(node_name: String, transforms: Array[Transform3D], material: Material) -> void:
 	if transforms.is_empty():
@@ -1155,6 +1277,8 @@ func _configure_environment_lod_and_visibility() -> void:
 	_set_visibility_range("EnvironmentWarningDetails", 0.0, 260.0)
 	_set_visibility_range("EnvironmentEventDetails", 0.0, 360.0)
 	_set_visibility_range("TracksideRoundProps", 0.0, 170.0)
+	_set_visibility_range("RoadDirectionArrows", 0.0, 360.0)
+	_set_visibility_range("TracksideDirectionGuides", 0.0, 420.0)
 	_set_visibility_range("RiverWetRockAccents", 0.0, 260.0)
 	_set_visibility_range("BridgeRiver", 0.0, 760.0)
 	_set_visibility_range("LongRiver", 0.0, 760.0)

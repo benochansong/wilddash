@@ -94,6 +94,23 @@ func _ready() -> void:
 	print("ROAD READABILITY PASS main_route_edges=%d dusty_shoulders=%d collision=false" % [
 		road_edges.multimesh.instance_count, dusty_shoulders.multimesh.instance_count,
 	])
+	var road_arrows := decoration.get_node_or_null("RoadDirectionArrows") as MultiMeshInstance3D
+	var trackside_guides := decoration.get_node_or_null("TracksideDirectionGuides") as MultiMeshInstance3D
+	if road_arrows == null or road_arrows.multimesh == null or road_arrows.multimesh.instance_count < 24:
+		_fail("Road-surface direction arrow coverage is incomplete")
+		return
+	if trackside_guides == null or trackside_guides.multimesh == null or trackside_guides.multimesh.instance_count < 34:
+		_fail("Trackside direction marker/chevron coverage is incomplete")
+		return
+	var arrow_coverage: PackedStringArray = road_arrows.get_meta(&"coverage", PackedStringArray())
+	var marker_coverage: PackedStringArray = trackside_guides.get_meta(&"coverage", PackedStringArray())
+	for zone in ["sharp_curve", "hairpin", "s_curve", "branch", "bridge", "tunnel", "jump", "final"]:
+		if not arrow_coverage.has(zone) or not marker_coverage.has(zone):
+			_fail("Direction guidance coverage missing for zone: %s" % zone)
+			return
+	print("DIRECTION GUIDE PASS road_arrows=%d trackside_guides=%d static_multimesh=true" % [
+		road_arrows.multimesh.instance_count, trackside_guides.multimesh.instance_count,
+	])
 
 	var pass_2_visual_nodes: Array[String] = [
 		"RoadSurface_Shortcuts", "EnvironmentStructuralProps",
