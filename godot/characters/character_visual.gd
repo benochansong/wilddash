@@ -4,6 +4,8 @@ extends Node3D
 ## Stable visual contract between gameplay and imported 3D character assets.
 ## CharacterController never talks to Skeleton3D, AnimationPlayer, or GLB nodes directly.
 ## Placeholder scenes can use lightweight procedural motion until production rigs arrive.
+## RC5 character-detail pass also keeps facial geometry behind this contract so
+## gameplay code remains independent from eyes/nose/mouth implementation details.
 
 @export var animation_player_path: NodePath
 @export var animation_tree_path: NodePath
@@ -26,6 +28,7 @@ var _procedural_root: Node3D
 var _procedural_base_position := Vector3.ZERO
 var _procedural_base_rotation := Vector3.ZERO
 var _procedural_base_scale := Vector3.ONE
+var _face_detail: WildDashCharacterFaceDetail
 
 func _ready() -> void:
 	_animation_player = _resolve_animation_player()
@@ -35,6 +38,8 @@ func _ready() -> void:
 		if playback is AnimationNodeStateMachinePlayback:
 			_state_machine = playback
 	_resolve_procedural_root()
+	_resolve_face_detail()
+	set_lod_level(_lod_level)
 	play_state(&"Idle")
 
 func _process(_delta: float) -> void:
@@ -45,6 +50,8 @@ func _process(_delta: float) -> void:
 func set_lod_level(level: int) -> void:
 	_lod_level = clampi(level, 0, 2)
 	_lod_tick = 0
+	if _face_detail:
+		_face_detail.set_detail_lod(_lod_level)
 
 func update_locomotion(speed: float, grounded: bool) -> void:
 	_lod_tick += 1
@@ -96,6 +103,9 @@ func _resolve_animation_tree() -> AnimationTree:
 	if not animation_tree_path.is_empty():
 		return get_node_or_null(animation_tree_path) as AnimationTree
 	return find_child("AnimationTree", true, false) as AnimationTree
+
+func _resolve_face_detail() -> void:
+	_face_detail = find_child("FaceDetail", true, false) as WildDashCharacterFaceDetail
 
 func _resolve_procedural_root() -> void:
 	if not procedural_placeholder:

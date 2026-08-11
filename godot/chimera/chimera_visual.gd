@@ -3,6 +3,7 @@ extends WildDashCharacterVisual
 
 ## Lightweight modular preview/runtime visual. Production GLB parts can replace the
 ## generated meshes later without changing CharacterController or ChimeraSystem.
+## RC5 detail pass gives the hybrid a full inherited face plus chimera-only crest/horns.
 
 var loadout: WildDashChimeraLoadout
 var _model_root: Node3D
@@ -23,6 +24,7 @@ func configure_loadout(value: WildDashChimeraLoadout) -> void:
 	loadout = value.duplicate_loadout() if value != null else WildDashChimeraSystem.default_loadout()
 	if is_inside_tree():
 		_rebuild_parts()
+		call_deferred("_refresh_face_lod")
 
 func get_loadout() -> WildDashChimeraLoadout:
 	return loadout
@@ -66,6 +68,10 @@ func _rebuild_parts() -> void:
 	_build_head(loadout.head_id)
 	_build_tail(loadout.tail_id)
 	_build_pattern(loadout.pattern_id)
+
+func _refresh_face_lod() -> void:
+	_resolve_face_detail()
+	set_lod_level(_lod_level)
 
 func _build_body(source: StringName) -> void:
 	var definition := WildDashAnimalCatalog.get_definition(source)
@@ -123,6 +129,35 @@ func _build_head(source: StringName) -> void:
 				ear.position = Vector3(x, 1.90, -0.32)
 				ear.scale = Vector3(0.75, 1.0, 0.55)
 				_head_anchor.add_child(ear)
+
+	var face := WildDashCharacterFaceDetail.new()
+	face.name = "FaceDetail"
+	face.position = head.position
+	face.species = source
+	face.face_scale = 1.05 if source == &"elephant" else 1.0
+	_head_anchor.add_child(face)
+	_build_chimera_head_accents(color)
+
+func _build_chimera_head_accents(base_color: Color) -> void:
+	var horn_color := Color(0.20, 0.13, 0.10, 1.0)
+	for side in [-1.0, 1.0]:
+		var horn := _mesh_instance(_cone_mesh(0.105, 0.42), horn_color)
+		horn.name = "ChimeraHorn"
+		horn.position = Vector3(side * 0.30, 2.05, -0.26)
+		horn.rotation.z = side * deg_to_rad(18.0)
+		_head_anchor.add_child(horn)
+
+	var crest_colors := [
+		base_color.lightened(0.12),
+		Color(0.10, 0.62, 0.64, 1.0),
+		Color(0.96, 0.44, 0.14, 1.0),
+	]
+	for i in range(3):
+		var crest := _mesh_instance(_cone_mesh(0.09, 0.34 + i * 0.04), crest_colors[i])
+		crest.name = "ChimeraCrest"
+		crest.position = Vector3((i - 1) * 0.11, 2.11 + i * 0.025, -0.04 + i * 0.045)
+		crest.rotation.x = deg_to_rad(-12.0 - i * 5.0)
+		_head_anchor.add_child(crest)
 
 func _build_tail(source: StringName) -> void:
 	var definition := WildDashAnimalCatalog.get_definition(source)

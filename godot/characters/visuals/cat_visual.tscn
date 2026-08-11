@@ -1,6 +1,7 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://characters/character_visual.gd" id="1_visual"]
+[ext_resource type="Script" path="res://characters/character_face_detail.gd" id="2_face"]
 
 [sub_resource type="StandardMaterial3D" id="MatFur"]
 albedo_color = Color(0.66, 0.36, 0.88, 1)
@@ -70,6 +71,11 @@ mesh = SubResource("BodyMesh")
 [node name="Head" type="MeshInstance3D" parent="ImportedModel"]
 position = Vector3(0, 1.05, -0.58)
 mesh = SubResource("HeadMesh")
+
+[node name="FaceDetail" type="Node3D" parent="ImportedModel"]
+position = Vector3(0, 1.05, -0.58)
+script = ExtResource("2_face")
+species = &"cat"
 
 [node name="Muzzle" type="MeshInstance3D" parent="ImportedModel"]
 position = Vector3(0, 0.98, -0.89)
