@@ -16,6 +16,7 @@ static func has_required_materials() -> bool:
 	for key: StringName in [
 		&"asphalt", &"dirt", &"grass", &"rock", &"wood", &"metal",
 		&"concrete", &"water", &"hazard", &"finish", &"wet_rock",
+		&"dirt_road", &"bridge_road", &"tunnel_road", &"road_edge",
 	]:
 		if not palette.has(key) or palette[key] == null:
 			return false
@@ -26,8 +27,9 @@ static func _build_palette() -> Dictionary:
 	var concrete := _surface(Color("4a545b"), Color("303940"), 0.94, 0.36, 0.10, 0.01, 0.0, 0.10)
 	var finish := _standard(Color("20a8c8"), 0.48, Color("20a8c8") * 0.10, 0.12)
 	return {
-		&"asphalt": _surface(Color("343b43"), Color("252b31"), 0.93, 0.42, 0.13, 0.10),
-		&"dirt": _surface(Color("9b6947"), Color("72482f"), 0.98, 0.24, 0.19, 0.05, 0.0, 0.08),
+		&"asphalt": _surface(Color("303840"), Color("20272d"), 0.94, 0.42, 0.11, 0.10),
+		&"dirt": _surface(Color("a87550"), Color("7b5138"), 0.99, 0.24, 0.18, 0.04, 0.0, 0.08),
+		&"dirt_road": _surface(Color("625048"), Color("453b37"), 0.96, 0.30, 0.12, 0.08, 0.0, 0.12),
 		&"grass": _surface(Color("527f40"), Color("315d35"), 1.0, 0.35, 0.15, 0.02),
 		&"rock": _surface(Color("775d4c"), Color("4c3c36"), 0.97, 0.28, 0.22, 0.02, 0.0, 0.28),
 		&"wood": _surface(Color("714b2e"), Color("49301f"), 0.92, 0.76, 0.13, 0.02, 0.34, 0.05),
@@ -35,6 +37,8 @@ static func _build_palette() -> Dictionary:
 		&"concrete": concrete,
 		&"bridge": metal,
 		&"tunnel": concrete,
+		&"bridge_road": _surface(Color("384247"), Color("262f34"), 0.84, 0.38, 0.10, 0.08),
+		&"tunnel_road": _surface(Color("2d343a"), Color("20272c"), 0.96, 0.34, 0.09, 0.08),
 		&"water": _water(),
 		&"wet_rock": _surface(Color("53666a"), Color("33494e"), 0.40, 0.42, 0.12, 0.03, 0.0, 0.16),
 		&"hazard": _standard(Color("ed5d46"), 0.64, Color("ed5d46") * 0.08),
@@ -43,6 +47,7 @@ static func _build_palette() -> Dictionary:
 		&"curb_light": _standard(Color("e7ddd0"), 0.78),
 		&"curb_warning": _standard(Color("ed704d"), 0.72),
 		&"road_line": _standard(Color("f3e8c8"), 0.66, Color("f3e8c8") * 0.08),
+		&"road_edge": _standard(Color("f0e7d5"), 0.72, Color("f0e7d5") * 0.06),
 		&"guardrail": metal,
 		&"foliage": _surface(Color("407b42"), Color("27543a"), 0.98, 0.55, 0.14, 0.02),
 		&"foliage_light": _surface(Color("709747"), Color("41713d"), 0.98, 0.60, 0.12, 0.02),

@@ -65,6 +65,7 @@ func _ready() -> void:
 		return
 	var required_visual_nodes: Array[String] = [
 		"RoadSurface_Asphalt", "RoadSurface_Dirt", "GrassShoulders",
+		"RoadDustyShoulders", "RoadPaintedEdgeLines",
 		"ForestTrunks", "ForestCrownClusters", "CanyonLayeredCliffs",
 		"CanyonOutcropsAndLooseRock", "BridgeStructure", "BridgeCrossBraces",
 		"TunnelWallSegments", "TunnelCeilingPanels", "TunnelGuideLights",
@@ -73,6 +74,14 @@ func _ready() -> void:
 		if decoration.get_node_or_null(node_name) == null:
 			_fail("Missing environment visual node: %s" % node_name)
 			return
+	var road_edges := decoration.get_node_or_null("RoadPaintedEdgeLines") as MultiMeshInstance3D
+	var dusty_shoulders := decoration.get_node_or_null("RoadDustyShoulders") as MultiMeshInstance3D
+	if road_edges == null or road_edges.multimesh == null or road_edges.multimesh.instance_count < 50:
+		_fail("Main-route painted edge continuity is incomplete")
+		return
+	if dusty_shoulders == null or dusty_shoulders.multimesh == null or dusty_shoulders.multimesh.instance_count < 20:
+		_fail("Forest/Canyon dusty shoulder hierarchy is incomplete")
+		return
 	var road_collision := collision_root.get_node_or_null("Road_00_Meadow_Straight_Collision") as CSGBox3D
 	var tunnel_collision := collision_root.get_node_or_null("TunnelRoof") as CSGBox3D
 	if road_collision == null or road_collision.visible or not road_collision.use_collision:
@@ -82,6 +91,9 @@ func _ready() -> void:
 		_fail("Tunnel visual/collision separation invalid")
 		return
 	print("ENVIRONMENT FOUNDATION PASS materials=6 road_collision_separate=true decoration_collision=false")
+	print("ROAD READABILITY PASS main_route_edges=%d dusty_shoulders=%d collision=false" % [
+		road_edges.multimesh.instance_count, dusty_shoulders.multimesh.instance_count,
+	])
 
 	var pass_2_visual_nodes: Array[String] = [
 		"RoadSurface_Shortcuts", "EnvironmentStructuralProps",
@@ -130,6 +142,15 @@ func _ready() -> void:
 	var palette := WildDashEnvironmentMaterialLibrary.get_palette()
 	if palette[&"metal"] != palette[&"bridge"] or palette[&"finish"] != palette[&"event_blue"]:
 		_fail("Environment material aliases are not reusing shared resources")
+		return
+	if palette[&"dirt_road"] == palette[&"dirt"] or palette[&"bridge_road"] == palette[&"bridge"] or palette[&"tunnel_road"] == palette[&"tunnel"]:
+		_fail("Road surfaces are not visually separated from terrain/structures")
+		return
+	var canyon_road := decoration.get_node_or_null("RoadSurface_Dirt") as MultiMeshInstance3D
+	var bridge_road := decoration.get_node_or_null("RoadSurface_Bridge") as MultiMeshInstance3D
+	var tunnel_road := decoration.get_node_or_null("RoadSurface_Tunnel") as MultiMeshInstance3D
+	if canyon_road.material_override != palette[&"dirt_road"] or bridge_road.material_override != palette[&"bridge_road"] or tunnel_road.material_override != palette[&"tunnel_road"]:
+		_fail("Zone road surfaces are not using readability materials")
 		return
 	var world_environment := track.get_node_or_null("GrandPrixWorldEnvironment") as WorldEnvironment
 	if world_environment == null or world_environment.environment == null:

@@ -77,6 +77,7 @@ var _wood_material: Material
 var _decoration_root: Node3D
 var _collision_root: Node3D
 var _road_visual_batches: Dictionary
+var _road_rock_border_transforms: Array[Transform3D] = []
 
 func _ready() -> void:
 	_materials = WildDashEnvironmentMaterialLibrary.get_palette()
@@ -216,11 +217,11 @@ func _create_segment(
 
 func _road_material_for_segment(index: int) -> Material:
 	if index == 5 or index == 14:
-		return _bridge_material
+		return _materials[&"bridge_road"]
 	if index == 25:
-		return _tunnel_material
+		return _materials[&"tunnel_road"]
 	if index >= 7 and index <= 13:
-		return _dirt_material
+		return _materials[&"dirt_road"]
 	return _road_material
 
 func _road_material_key_for_segment(index: int) -> StringName:
@@ -235,7 +236,15 @@ func _road_material_key_for_segment(index: int) -> StringName:
 func _flush_road_visual_batches() -> void:
 	for material_key: StringName in _road_visual_batches:
 		var transforms: Array[Transform3D] = _road_visual_batches[material_key]
-		var palette_key: StringName = &"dirt" if material_key == &"shortcut" else material_key
+		var palette_key := material_key
+		if material_key == &"shortcut":
+			palette_key = &"dirt"
+		elif material_key == &"dirt":
+			palette_key = &"dirt_road"
+		elif material_key == &"bridge":
+			palette_key = &"bridge_road"
+		elif material_key == &"tunnel":
+			palette_key = &"tunnel_road"
 		_add_box_multimesh(
 			"RoadSurface_%s" % String(material_key).capitalize(),
 			transforms,
@@ -243,8 +252,9 @@ func _flush_road_visual_batches() -> void:
 		)
 
 func _build_road_surface_details() -> void:
-	var shoulder_transforms: Array[Transform3D] = []
-	var curb_light_transforms: Array[Transform3D] = []
+	var grass_shoulder_transforms: Array[Transform3D] = []
+	var dirt_shoulder_transforms: Array[Transform3D] = []
+	var painted_edge_transforms: Array[Transform3D] = []
 	var curb_warning_transforms: Array[Transform3D] = []
 	var line_transforms: Array[Transform3D] = []
 	var hazard_transforms: Array[Transform3D] = []
@@ -258,12 +268,46 @@ func _build_road_surface_details() -> void:
 		var is_bridge := index == 5 or index == 14
 		var is_tunnel := index == 25
 		var is_canyon := index >= 7 and index <= 13
-		if not is_bridge and not is_tunnel and not is_canyon:
+		var is_forest := index >= 2 and index <= 4
+		if not is_bridge and not is_tunnel:
 			for side in [-1.0, 1.0]:
-				shoulder_transforms.append(_track_transform_at(
-					a, b, 0.5, side * (width * 0.5 + 1.15), -0.28,
-					Vector3(2.3, 0.24, length)
-				))
+				if is_forest:
+					dirt_shoulder_transforms.append(_track_transform_at(
+						a, b, 0.5, side * (width * 0.5 + 0.78), -0.25,
+						Vector3(1.55, 0.22, length)
+					))
+					grass_shoulder_transforms.append(_track_transform_at(
+						a, b, 0.5, side * (width * 0.5 + 2.10), -0.30,
+						Vector3(1.10, 0.20, length)
+					))
+				elif is_canyon:
+					dirt_shoulder_transforms.append(_track_transform_at(
+						a, b, 0.5, side * (width * 0.5 + 0.92), -0.28,
+						Vector3(1.85, 0.20, length)
+					))
+					for rock_index in range(3):
+						var rock_t := 0.18 + float(rock_index) * 0.32
+						var rock_scale := Vector3(
+							0.75 + float((index + rock_index) % 3) * 0.18,
+							0.38 + float((index + rock_index) % 2) * 0.12,
+							0.88 + float((index * 2 + rock_index) % 3) * 0.16
+						)
+						var rock_transform := _track_transform_at(
+							a, b, rock_t, side * (width * 0.5 + 1.75), 0.02 + rock_scale.y * 0.35,
+							rock_scale
+						)
+						rock_transform.basis = rock_transform.basis.rotated(Vector3.UP, float(index + rock_index) * 0.31 * side)
+						_road_rock_border_transforms.append(rock_transform)
+				else:
+					grass_shoulder_transforms.append(_track_transform_at(
+						a, b, 0.5, side * (width * 0.5 + 1.15), -0.28,
+						Vector3(2.3, 0.24, length)
+					))
+		for side in [-1.0, 1.0]:
+			painted_edge_transforms.append(_track_transform_at(
+				a, b, 0.5, side * (width * 0.5 - 0.42), 0.105,
+				Vector3(0.20, 0.045, maxf(0.5, length - 0.35))
+			))
 		if not is_tunnel:
 			for side in [-1.0, 1.0]:
 				var curb_transform := _track_transform_at(
@@ -272,8 +316,6 @@ func _build_road_surface_details() -> void:
 				)
 				if is_canyon or is_bridge:
 					curb_warning_transforms.append(curb_transform)
-				else:
-					curb_light_transforms.append(curb_transform)
 		if not is_canyon:
 			var dash_count := maxi(2, int(length / 14.0))
 			for dash_index in range(dash_count):
@@ -307,8 +349,9 @@ func _build_road_surface_details() -> void:
 						fence_post_transforms.append(post_transform)
 					else:
 						guardrail_post_transforms.append(post_transform)
-	_add_box_multimesh("GrassShoulders", shoulder_transforms, _grass_material)
-	_add_box_multimesh("RoadCurbsLight", curb_light_transforms, _materials[&"curb_light"])
+	_add_box_multimesh("GrassShoulders", grass_shoulder_transforms, _grass_material)
+	_add_box_multimesh("RoadDustyShoulders", dirt_shoulder_transforms, _dirt_material)
+	_add_box_multimesh("RoadPaintedEdgeLines", painted_edge_transforms, _materials[&"road_edge"])
 	_add_box_multimesh("RoadCurbsWarning", curb_warning_transforms, _materials[&"curb_warning"])
 	_add_box_multimesh("RoadCenterDashes", line_transforms, _materials[&"road_line"])
 	_add_box_multimesh("HazardEntryMarkings", hazard_transforms, _materials[&"hazard"])
@@ -640,11 +683,8 @@ func _build_canyon_section() -> void:
 	outcrop_mesh.height = 2.0
 	outcrop_mesh.radial_segments = 7
 	outcrop_mesh.rings = 4
-	var outcrop_multimesh := MultiMesh.new()
-	outcrop_multimesh.transform_format = MultiMesh.TRANSFORM_3D
-	outcrop_multimesh.mesh = outcrop_mesh
-	outcrop_multimesh.instance_count = 34
-	for i in range(outcrop_multimesh.instance_count):
+	var outcrop_transforms: Array[Transform3D] = []
+	for i in range(34):
 		var anchor_index := 7 + (i % 7)
 		var anchor := ROUTE_POINTS[anchor_index]
 		var side := -1.0 if i % 2 == 0 else 1.0
@@ -659,12 +699,11 @@ func _build_canyon_section() -> void:
 		var outcrop_direction := _route_direction(anchor_index)
 		var outcrop_right := Vector3(-outcrop_direction.z, 0.0, outcrop_direction.x)
 		var position := anchor + outcrop_right * side * distance + outcrop_direction * float((i % 5) - 2) * 3.8 + Vector3.UP * (0.1 + scale.y * 0.45)
-		outcrop_multimesh.set_instance_transform(i, Transform3D(basis, position))
-	var outcrops := MultiMeshInstance3D.new()
-	outcrops.name = "CanyonOutcropsAndLooseRock"
-	outcrops.multimesh = outcrop_multimesh
-	outcrops.material_override = _rock_material
-	_decoration_root.add_child(outcrops)
+		outcrop_transforms.append(Transform3D(basis, position))
+	# Road-border stones share this visual-only rock batch so the Canyon reads
+	# as Road -> Dusty Shoulder -> Rock Border without adding collision or nodes.
+	outcrop_transforms.append_array(_road_rock_border_transforms)
+	_add_mesh_multimesh("CanyonOutcropsAndLooseRock", outcrop_mesh, outcrop_transforms, _rock_material)
 
 func _build_multi_jump() -> void:
 	# Low hurdles make the normal jump viable while Rabbit can clear them with
