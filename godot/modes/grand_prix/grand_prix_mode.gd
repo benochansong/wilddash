@@ -279,7 +279,38 @@ func _on_any_racer_finished(_racer: Node3D, _rank: int) -> void:
 
 func _on_player_finished(rank: int) -> void:
 	_player_rank = rank
-	print("GRAND PRIX PLAYER FINISH rank=%d elapsed=%.2fs checkpoints=%d/%d" % [rank, RaceManager.get_elapsed_seconds(), RaceManager.get_checkpoint_progress(player), RaceManager.get_checkpoint_count()])
+	var elapsed := RaceManager.get_elapsed_seconds()
+	print("GRAND PRIX PLAYER FINISH rank=%d elapsed=%.2fs checkpoints=%d/%d" % [rank, elapsed, RaceManager.get_checkpoint_progress(player), RaceManager.get_checkpoint_count()])
+	# Human players should move on as soon as their own result is known. The
+	# GameManager already provides a short 1.2 s result beat before loading the
+	# next round, so waiting for every trailing AI racer only creates dead time.
+	# Headless CI deliberately keeps the old all-finish path for telemetry and
+	# 15/18-racer completion regression gates.
+	if DisplayServer.get_name() == "headless":
+		return
+	var qualifying_rank := ceili(float(RaceManager.racers.size()) * 0.5)
+	var success := rank > 0 and rank <= qualifying_rank
+	var labels: Array[String] = []
+	for racer: Node3D in RaceManager.finish_order:
+		labels.append(RaceManager.get_racer_label(racer))
+	print("GRAND PRIX PLAYER RESULT ADVANCE rank=%d finishers_now=%d/%d" % [rank, RaceManager.finish_order.size(), RaceManager.racers.size()])
+	finish_mode(success, rank, {
+		"rank": rank,
+		"racers": RaceManager.racers.size(),
+		"finishers": RaceManager.finish_order.size(),
+		"finishers_at_player_finish": RaceManager.finish_order.size(),
+		"checkpoints": RaceManager.get_checkpoint_count(),
+		"track_length_m": RaceManager.get_track_length(),
+		"item_boxes": _item_boxes.size(),
+		"item_stations": ITEM_BOX_ROUTE_INDICES.size(),
+		"player_finish_seconds": elapsed,
+		"field_complete_seconds": elapsed,
+		"shortcut_a_users": _shortcut_a_users,
+		"shortcut_b_users": _shortcut_b_users,
+		"shortcut_a_saving_m": _track.get_shortcut_a_saving(),
+		"shortcut_b_saving_m": _track.get_shortcut_b_saving(),
+		"order": labels,
+	})
 
 func _on_race_completed() -> void:
 	if _player_rank <= 0 and player != null:
