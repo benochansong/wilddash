@@ -18,6 +18,7 @@ const START_GRID_Z_SPACING := 3.15
 
 const SHORTCUT_A_SKIP_ROUTE_INDEX := 17
 const SHORTCUT_B_SKIP_ROUTE_INDEX := 24
+const FINISH_RUNOUT_DISTANCE := 12.0
 const PLAYER_MAX_SPEED_SCALE := 1.10
 const PLAYER_CRUISE_SPEED_SCALE := 1.06
 const PLAYER_ACCELERATION_SCALE := 1.08
@@ -95,7 +96,7 @@ func _ready() -> void:
 				_shortcut_b_users += 1
 				print("AI SHORTCUT B ROUTE racer=%s personality=Shortcut saving=%.1fm" % [racer.name, _track.get_shortcut_b_saving()])
 		else:
-			driver.set_race_route(_route_points)
+			driver.set_race_route(_build_race_route_with_runout())
 
 		var item_brain := AI_ITEM_BRAIN_SCRIPT.new() as WildDashAIItemBrain
 		item_brain.name = "%sItemBrain" % racer.name
@@ -111,7 +112,7 @@ func _ready() -> void:
 		headless_driver.steering_strength = 6.2 if _realtime_balance_run else 12.0
 		headless_driver.acceleration = 24.0 if _realtime_balance_run else 90.0
 		headless_driver.avoidance_distance = 8.2
-		headless_driver.set_race_route(_route_points)
+		headless_driver.set_race_route(_build_race_route_with_runout())
 		var player_item_brain := AI_ITEM_BRAIN_SCRIPT.new() as WildDashAIItemBrain
 		player_item_brain.name = "PlayerTestItemBrain"
 		player_item_brain.configure(player, headless_driver)
@@ -144,9 +145,9 @@ func _ready() -> void:
 	RaceManager.start_race()
 	print("START GRID PASS columns=4 racers=%d spacing_x=%.2f spacing_z=%.2f" % [RaceManager.racers.size(), START_GRID_X_SPACING, START_GRID_Z_SPACING])
 	print("MODE START id=grand_prix ai=%d" % ai_racers.size())
-	print("GRAND PRIX START racers=%d ai=%d checkpoints=%d length=%.1fm item_boxes=%d realtime_balance=%s" % [
+	print("GRAND PRIX START racers=%d ai=%d checkpoints=%d length=%.1fm item_boxes=%d realtime_balance=%s finish_runout=%.1fm" % [
 		RaceManager.racers.size(), ai_racers.size(), RaceManager.get_checkpoint_count(),
-		RaceManager.get_track_length(), _item_boxes.size(), str(_realtime_balance_run),
+		RaceManager.get_track_length(), _item_boxes.size(), str(_realtime_balance_run), FINISH_RUNOUT_DISTANCE,
 	])
 
 func _get_start_grid_offset(slot: int) -> Vector3:
@@ -230,12 +231,30 @@ func _spawn_item_boxes() -> void:
 		_item_boxes.size(), ITEM_BOX_ROUTE_INDICES.size(), respawn, WIDE_ITEM_STATIONS.size(), ITEM_BOX_ROUTE_INDICES[0], ITEM_BOX_ROUTE_INDICES[-1],
 	])
 
+func _build_race_route_with_runout() -> Array[Vector3]:
+	var route: Array[Vector3] = _route_points.duplicate()
+	_append_finish_runout(route)
+	return route
+
 func _build_shortcut_route(skip_route_index: int) -> Array[Vector3]:
 	var route: Array[Vector3] = []
 	for i in range(_route_points.size()):
 		if i != skip_route_index:
 			route.append(_route_points[i])
+	_append_finish_runout(route)
 	return route
+
+func _append_finish_runout(route: Array[Vector3]) -> void:
+	if _route_points.size() < 2:
+		return
+	var finish := _route_points[_route_points.size() - 1]
+	var previous := _route_points[_route_points.size() - 2]
+	var direction := finish - previous
+	direction.y = 0.0
+	if direction.length_squared() <= 0.001:
+		return
+	direction = direction.normalized()
+	route.append(finish + direction * FINISH_RUNOUT_DISTANCE)
 
 func _apply_grand_prix_player_pace(racer: WildDashCharacterController) -> void:
 	if racer == null:
