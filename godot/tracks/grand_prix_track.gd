@@ -61,24 +61,37 @@ const SHORTCUT_B_SKIP_ROUTE_INDEX := 24
 const SHORTCUT_B_EXIT_ROUTE_INDEX := 25
 
 var _track_length := 0.0
-var _road_material: StandardMaterial3D
-var _rail_material: StandardMaterial3D
-var _marker_material: StandardMaterial3D
-var _obstacle_material: StandardMaterial3D
-var _shortcut_material: StandardMaterial3D
-var _water_material: StandardMaterial3D
-var _rock_material: StandardMaterial3D
+var _materials: Dictionary
+var _road_material: Material
+var _dirt_material: Material
+var _grass_material: Material
+var _rail_material: Material
+var _marker_material: Material
+var _obstacle_material: Material
+var _shortcut_material: Material
+var _water_material: Material
+var _rock_material: Material
+var _bridge_material: Material
+var _tunnel_material: Material
+var _wood_material: Material
 var _decoration_root: Node3D
 var _collision_root: Node3D
+var _road_visual_batches: Dictionary
 
 func _ready() -> void:
-	_road_material = _make_material(Color(0.12, 0.17, 0.24), 0.92)
-	_rail_material = _make_material(Color(0.16, 0.76, 0.84), 0.65)
+	_materials = WildDashTrackMaterials.build_palette()
+	_road_material = _materials[&"asphalt"]
+	_dirt_material = _materials[&"dirt"]
+	_grass_material = _materials[&"grass"]
+	_rail_material = _materials[&"guardrail"]
 	_marker_material = _make_material(Color(0.9, 1.0, 0.18), 0.55, true)
 	_obstacle_material = _make_material(Color(1.0, 0.28, 0.42), 0.72)
-	_shortcut_material = _make_material(Color(0.22, 0.42, 0.28), 0.9)
-	_water_material = _make_material(Color(0.05, 0.32, 0.56), 0.35)
-	_rock_material = _make_material(Color(0.32, 0.24, 0.19), 0.96)
+	_shortcut_material = _materials[&"dirt"]
+	_water_material = _materials[&"water"]
+	_rock_material = _materials[&"rock"]
+	_bridge_material = _materials[&"bridge"]
+	_tunnel_material = _materials[&"tunnel"]
+	_wood_material = _materials[&"wood"]
 	_build_track()
 	RaceManager.configure_track(get_route_points(), get_checkpoint_positions())
 	print("GRAND PRIX TRACK READY route_points=%d checkpoints=%d length=%.1fm nodes=%d" % [
@@ -119,6 +132,16 @@ func _build_track() -> void:
 	_collision_root = Node3D.new()
 	_collision_root.name = "GameplayCollision"
 	add_child(_collision_root)
+	var asphalt_visuals: Array[Transform3D] = []
+	var dirt_visuals: Array[Transform3D] = []
+	var bridge_visuals: Array[Transform3D] = []
+	var tunnel_visuals: Array[Transform3D] = []
+	_road_visual_batches = {
+		&"asphalt": asphalt_visuals,
+		&"dirt": dirt_visuals,
+		&"bridge": bridge_visuals,
+		&"tunnel": tunnel_visuals,
+	}
 
 	_track_length = 0.0
 	for i in range(ROUTE_POINTS.size() - 1):
@@ -128,11 +151,14 @@ func _build_track() -> void:
 		_track_length += a.distance_to(b)
 		_create_segment(
 			"Road_%02d_%s" % [i, SEGMENT_NAMES[i].replace(" ", "_")],
-			a, b, width, 0.5, _road_material, true, -0.22
+			a, b, width, 0.5, _road_material_for_segment(i), true, -0.22,
+			_road_material_key_for_segment(i)
 		)
 		if RAIL_SEGMENT_INDICES.has(i):
 			_create_guardrails(i, a, b, width)
 
+	_flush_road_visual_batches()
+	_build_road_surface_details()
 	_build_start_line()
 	_build_checkpoints()
 	_build_finish_line()
@@ -153,17 +179,168 @@ func _create_segment(
 	height: float,
 	material: Material,
 	collision: bool,
-	vertical_offset := 0.0
+	vertical_offset := 0.0,
+	visual_batch: StringName = &""
 ) -> CSGBox3D:
-	var segment := CSGBox3D.new()
-	segment.name = node_name
-	segment.size = Vector3(width, height, a.distance_to(b))
-	segment.use_collision = collision
-	segment.material = material
-	segment.position = (a + b) * 0.5 + Vector3.UP * vertical_offset
-	_collision_root.add_child(segment)
-	segment.look_at(b + Vector3.UP * vertical_offset, Vector3.UP)
-	return segment
+	var visual: CSGBox3D = null
+	var segment_size := Vector3(width, height, a.distance_to(b))
+	if visual_batch != &"":
+		_road_visual_batches[visual_batch].append(_track_transform_at(
+			a, b, 0.5, 0.0, vertical_offset, segment_size
+		))
+	else:
+		visual = CSGBox3D.new()
+		visual.name = node_name + "_Visual"
+		visual.size = segment_size
+		visual.use_collision = false
+		visual.material = material
+		visual.position = (a + b) * 0.5 + Vector3.UP * vertical_offset
+		_decoration_root.add_child(visual)
+		visual.look_at(b + Vector3.UP * vertical_offset, Vector3.UP)
+	if collision:
+		var collision_shape := CSGBox3D.new()
+		collision_shape.name = node_name + "_Collision"
+		collision_shape.size = segment_size
+		collision_shape.use_collision = true
+		collision_shape.visible = false
+		collision_shape.position = (a + b) * 0.5 + Vector3.UP * vertical_offset
+		_collision_root.add_child(collision_shape)
+		collision_shape.look_at(b + Vector3.UP * vertical_offset, Vector3.UP)
+	return visual
+
+func _road_material_for_segment(index: int) -> Material:
+	if index == 5 or index == 14:
+		return _bridge_material
+	if index == 25:
+		return _tunnel_material
+	if index >= 7 and index <= 13:
+		return _dirt_material
+	return _road_material
+
+func _road_material_key_for_segment(index: int) -> StringName:
+	if index == 5 or index == 14:
+		return &"bridge"
+	if index == 25:
+		return &"tunnel"
+	if index >= 7 and index <= 13:
+		return &"dirt"
+	return &"asphalt"
+
+func _flush_road_visual_batches() -> void:
+	for material_key: StringName in _road_visual_batches:
+		var transforms: Array[Transform3D] = _road_visual_batches[material_key]
+		_add_box_multimesh(
+			"RoadSurface_%s" % String(material_key).capitalize(),
+			transforms,
+			_materials[material_key]
+		)
+
+func _build_road_surface_details() -> void:
+	var shoulder_transforms: Array[Transform3D] = []
+	var curb_light_transforms: Array[Transform3D] = []
+	var curb_warning_transforms: Array[Transform3D] = []
+	var line_transforms: Array[Transform3D] = []
+	var hazard_transforms: Array[Transform3D] = []
+	var guardrail_post_transforms: Array[Transform3D] = []
+	var fence_post_transforms: Array[Transform3D] = []
+	for index in range(ROUTE_POINTS.size() - 1):
+		var a := ROUTE_POINTS[index]
+		var b := ROUTE_POINTS[index + 1]
+		var width := SEGMENT_WIDTHS[index]
+		var length := a.distance_to(b)
+		var is_bridge := index == 5 or index == 14
+		var is_tunnel := index == 25
+		var is_canyon := index >= 7 and index <= 13
+		if not is_bridge and not is_tunnel and not is_canyon:
+			for side in [-1.0, 1.0]:
+				shoulder_transforms.append(_track_transform_at(
+					a, b, 0.5, side * (width * 0.5 + 1.15), -0.28,
+					Vector3(2.3, 0.24, length)
+				))
+		if not is_tunnel:
+			for side in [-1.0, 1.0]:
+				var curb_transform := _track_transform_at(
+					a, b, 0.5, side * (width * 0.5 - 0.18), 0.09,
+					Vector3(0.34, 0.12, length)
+				)
+				if is_canyon or is_bridge:
+					curb_warning_transforms.append(curb_transform)
+				else:
+					curb_light_transforms.append(curb_transform)
+		if not is_canyon:
+			var dash_count := maxi(2, int(length / 14.0))
+			for dash_index in range(dash_count):
+				var t := (float(dash_index) + 0.5) / float(dash_count)
+				line_transforms.append(_track_transform_at(
+					a, b, t, 0.0, 0.10, Vector3(0.18, 0.055, 4.2)
+				))
+		if is_bridge or is_tunnel:
+			for stripe_index in range(4):
+				hazard_transforms.append(_track_transform_at(
+					a, b, 0.06 + float(stripe_index) * 0.025, 0.0, 0.105,
+					Vector3(width * 0.82, 0.06, 0.28)
+				))
+		if RAIL_SEGMENT_INDICES.has(index):
+			for side in [-1.0, 1.0]:
+				var beam_transform := _track_transform_at(
+					a, b, 0.5, side * (width * 0.5 + 0.2), 1.0,
+					Vector3(0.22, 0.42, length)
+				)
+				if index >= 2 and index <= 4:
+					fence_post_transforms.append(beam_transform)
+				else:
+					guardrail_post_transforms.append(beam_transform)
+				for post_index in range(3):
+					var post_transform := _track_transform_at(
+						a, b, 0.15 + float(post_index) * 0.35,
+						side * (width * 0.5 + 0.2), 0.55,
+						Vector3(0.26, 1.2, 0.26)
+					)
+					if index >= 2 and index <= 4:
+						fence_post_transforms.append(post_transform)
+					else:
+						guardrail_post_transforms.append(post_transform)
+	_add_box_multimesh("GrassShoulders", shoulder_transforms, _grass_material)
+	_add_box_multimesh("RoadCurbsLight", curb_light_transforms, _materials[&"curb_light"])
+	_add_box_multimesh("RoadCurbsWarning", curb_warning_transforms, _materials[&"curb_warning"])
+	_add_box_multimesh("RoadCenterDashes", line_transforms, _materials[&"road_line"])
+	_add_box_multimesh("HazardEntryMarkings", hazard_transforms, _materials[&"hazard"])
+	_add_box_multimesh("GuardrailPosts", guardrail_post_transforms, _rail_material)
+	_add_box_multimesh("ForestFencePosts", fence_post_transforms, _wood_material)
+
+func _track_transform_at(
+	a: Vector3,
+	b: Vector3,
+	t: float,
+	lateral_offset: float,
+	vertical_offset: float,
+	size: Vector3
+) -> Transform3D:
+	var direction := b - a
+	var planar := Vector3(direction.x, 0.0, direction.z).normalized()
+	var right := Vector3(-planar.z, 0.0, planar.x)
+	var origin := a.lerp(b, t) + right * lateral_offset + Vector3.UP * vertical_offset
+	var transform := Transform3D(Basis.IDENTITY, origin)
+	transform = transform.looking_at(origin + direction.normalized(), Vector3.UP)
+	transform.basis = transform.basis.scaled(size)
+	return transform
+
+func _add_box_multimesh(node_name: String, transforms: Array[Transform3D], material: Material) -> void:
+	if transforms.is_empty():
+		return
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3.ONE
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.mesh = mesh
+	multimesh.instance_count = transforms.size()
+	for index in range(transforms.size()):
+		multimesh.set_instance_transform(index, transforms[index])
+	var instance := MultiMeshInstance3D.new()
+	instance.name = node_name
+	instance.multimesh = multimesh
+	instance.material_override = material
+	_decoration_root.add_child(instance)
 
 func _create_guardrails(index: int, a: Vector3, b: Vector3, width: float) -> void:
 	var planar := b - a
@@ -174,14 +351,16 @@ func _create_guardrails(index: int, a: Vector3, b: Vector3, width: float) -> voi
 	var right := Vector3(-direction.z, 0.0, direction.x)
 	var midpoint := (a + b) * 0.5 + Vector3.UP * 0.65
 	for side in [-1.0, 1.0]:
-		var rail := CSGBox3D.new()
-		rail.name = "Rail_%02d_%s" % [index, "L" if side < 0.0 else "R"]
-		rail.size = Vector3(0.35, 1.35, a.distance_to(b))
-		rail.use_collision = true
-		rail.material = _rail_material
-		rail.position = midpoint + right * (width * 0.5 + 0.2) * side
-		_collision_root.add_child(rail)
-		rail.look_at(b + right * (width * 0.5 + 0.2) * side + Vector3.UP * 0.65, Vector3.UP)
+		var rail_position: Vector3 = midpoint + right * (width * 0.5 + 0.2) * side
+		var rail_target: Vector3 = b + right * (width * 0.5 + 0.2) * side + Vector3.UP * 0.65
+		var rail_collision := CSGBox3D.new()
+		rail_collision.name = "Rail_%02d_%s_Collision" % [index, "L" if side < 0.0 else "R"]
+		rail_collision.size = Vector3(0.35, 1.35, a.distance_to(b))
+		rail_collision.use_collision = true
+		rail_collision.visible = false
+		rail_collision.position = rail_position
+		_collision_root.add_child(rail_collision)
+		rail_collision.look_at(rail_target, Vector3.UP)
 
 func _build_start_line() -> void:
 	_create_marker("StartLine", ROUTE_POINTS[0], ROUTE_POINTS[1], SEGMENT_WIDTHS[0])
@@ -305,41 +484,127 @@ func _add_dynamic_box(
 	_collision_root.add_child(body)
 
 func _build_bridge_details() -> void:
-	# Existing forest bridge river.
 	var first_midpoint := (ROUTE_POINTS[5] + ROUTE_POINTS[6]) * 0.5
 	_add_visual_box(
 		"BridgeRiver", Vector3(first_midpoint.x, -5.0, first_midpoint.z),
 		Vector3(95, 0.3, 95), _water_material
 	)
-	# New long-race river crossing.
 	var river_midpoint := (ROUTE_POINTS[14] + ROUTE_POINTS[15]) * 0.5
 	_add_visual_box(
 		"LongRiver", Vector3(river_midpoint.x, -28.0, river_midpoint.z),
 		Vector3(140, 0.35, 125), _water_material
 	)
+	var structure_transforms: Array[Transform3D] = []
+	var brace_transforms: Array[Transform3D] = []
+	for bridge_data in [[5, -5.0], [14, -28.0]]:
+		var index := int(bridge_data[0])
+		var water_height := float(bridge_data[1])
+		var a := ROUTE_POINTS[index]
+		var b := ROUTE_POINTS[index + 1]
+		var width := SEGMENT_WIDTHS[index]
+		var length := a.distance_to(b)
+		for side in [-1.0, 1.0]:
+			structure_transforms.append(_track_transform_at(
+				a, b, 0.5, side * (width * 0.5 - 0.35), -0.62,
+				Vector3(0.55, 0.75, length)
+			))
+			structure_transforms.append(_track_transform_at(
+				a, b, 0.5, side * width * 0.28, -0.92,
+				Vector3(0.38, 0.42, length)
+			))
+		for support_index in range(3):
+			var t := 0.2 + float(support_index) * 0.3
+			var deck_height := a.lerp(b, t).y
+			var support_height := maxf(2.0, deck_height - water_height - 0.4)
+			for side in [-1.0, 1.0]:
+				structure_transforms.append(_track_transform_at(
+					a, b, t, side * width * 0.34, -support_height * 0.5,
+					Vector3(0.58, support_height, 0.58)
+				))
+			var center := a.lerp(b, t)
+			var direction := (b - a).normalized()
+			var planar := Vector3(direction.x, 0.0, direction.z).normalized()
+			var right := Vector3(-planar.z, 0.0, planar.x)
+			var left_top := center - right * width * 0.34 + Vector3.DOWN * 0.7
+			var right_low := center + right * width * 0.34 + Vector3.DOWN * (support_height - 0.4)
+			var right_top := center + right * width * 0.34 + Vector3.DOWN * 0.7
+			var left_low := center - right * width * 0.34 + Vector3.DOWN * (support_height - 0.4)
+			brace_transforms.append(_beam_transform(left_top, right_low, 0.18))
+			brace_transforms.append(_beam_transform(right_top, left_low, 0.18))
+	_add_box_multimesh("BridgeStructure", structure_transforms, _bridge_material)
+	_add_box_multimesh("BridgeCrossBraces", brace_transforms, _materials[&"curb_warning"])
+
+func _beam_transform(from: Vector3, to: Vector3, thickness: float) -> Transform3D:
+	var midpoint := (from + to) * 0.5
+	var transform := Transform3D(Basis.IDENTITY, midpoint)
+	transform = transform.looking_at(to, Vector3.UP)
+	transform.basis = transform.basis.scaled(Vector3(thickness, thickness, from.distance_to(to)))
+	return transform
 
 func _build_canyon_section() -> void:
-	# Decorative cliff masses are one MultiMesh and carry no collision.
-	# Gameplay boundaries remain the simplified rails under GameplayCollision.
-	var rock_mesh := BoxMesh.new()
-	rock_mesh.size = Vector3(8.0, 14.0, 8.0)
-	var multimesh := MultiMesh.new()
-	multimesh.transform_format = MultiMesh.TRANSFORM_3D
-	multimesh.mesh = rock_mesh
-	multimesh.instance_count = 14
-	for i in range(multimesh.instance_count):
-		var anchor_index := 7 + (i % 4)
+	# Low-sided tapered columns read as layered rock instead of stacked boxes.
+	# They are visual-only; the existing hidden rails remain the gameplay boundary.
+	var cliff_mesh := CylinderMesh.new()
+	cliff_mesh.top_radius = 0.68
+	cliff_mesh.bottom_radius = 1.0
+	cliff_mesh.height = 1.0
+	cliff_mesh.radial_segments = 6
+	cliff_mesh.rings = 1
+	var cliff_multimesh := MultiMesh.new()
+	cliff_multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	cliff_multimesh.mesh = cliff_mesh
+	cliff_multimesh.instance_count = 28
+	for i in range(cliff_multimesh.instance_count):
+		var anchor_index := 7 + (i % 7)
 		var anchor := ROUTE_POINTS[anchor_index]
 		var side := -1.0 if i % 2 == 0 else 1.0
-		var scale_y := 0.75 + float(i % 4) * 0.16
-		var basis := Basis.IDENTITY.scaled(Vector3(1.0, scale_y, 1.0))
-		var position := anchor + Vector3(side * (14.0 + float(i % 3) * 5.0), 2.0 + scale_y * 4.0, float(i - 7) * 3.0)
-		multimesh.set_instance_transform(i, Transform3D(basis, position))
-	var instance := MultiMeshInstance3D.new()
-	instance.name = "CanyonCliffDressing"
-	instance.multimesh = multimesh
-	instance.material_override = _rock_material
-	_decoration_root.add_child(instance)
+		var width_scale := 5.2 + float((i * 5) % 7) * 0.72
+		var depth_scale := 4.5 + float((i * 3) % 6) * 0.66
+		var height_scale := 9.0 + float((i * 7) % 9) * 1.35
+		var rotation := float((i * 37) % 180) * PI / 180.0
+		var basis := Basis(Vector3.UP, rotation).scaled(Vector3(width_scale, height_scale, depth_scale))
+		var lateral := side * (15.0 + float(i % 4) * 4.2)
+		var along_offset := float((i % 5) - 2) * 4.5
+		var cliff_direction := _route_direction(anchor_index)
+		var cliff_right := Vector3(-cliff_direction.z, 0.0, cliff_direction.x)
+		var position := anchor + cliff_right * lateral + cliff_direction * along_offset + Vector3.UP * (height_scale * 0.42 - 2.0)
+		cliff_multimesh.set_instance_transform(i, Transform3D(basis, position))
+	var cliffs := MultiMeshInstance3D.new()
+	cliffs.name = "CanyonLayeredCliffs"
+	cliffs.multimesh = cliff_multimesh
+	cliffs.material_override = _rock_material
+	_decoration_root.add_child(cliffs)
+
+	var outcrop_mesh := SphereMesh.new()
+	outcrop_mesh.radius = 1.0
+	outcrop_mesh.height = 2.0
+	outcrop_mesh.radial_segments = 7
+	outcrop_mesh.rings = 4
+	var outcrop_multimesh := MultiMesh.new()
+	outcrop_multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	outcrop_multimesh.mesh = outcrop_mesh
+	outcrop_multimesh.instance_count = 34
+	for i in range(outcrop_multimesh.instance_count):
+		var anchor_index := 7 + (i % 7)
+		var anchor := ROUTE_POINTS[anchor_index]
+		var side := -1.0 if i % 2 == 0 else 1.0
+		var scale := Vector3(
+			1.0 + float((i * 3) % 5) * 0.35,
+			0.65 + float((i * 7) % 4) * 0.26,
+			1.15 + float((i * 5) % 6) * 0.31
+		)
+		var basis := Basis(Vector3.UP, float(i) * 0.63).scaled(scale)
+		var road_edge := SEGMENT_WIDTHS[min(anchor_index, SEGMENT_WIDTHS.size() - 1)] * 0.5
+		var distance := road_edge + 1.6 + float(i % 4) * 4.1
+		var outcrop_direction := _route_direction(anchor_index)
+		var outcrop_right := Vector3(-outcrop_direction.z, 0.0, outcrop_direction.x)
+		var position := anchor + outcrop_right * side * distance + outcrop_direction * float((i % 5) - 2) * 3.8 + Vector3.UP * (0.1 + scale.y * 0.45)
+		outcrop_multimesh.set_instance_transform(i, Transform3D(basis, position))
+	var outcrops := MultiMeshInstance3D.new()
+	outcrops.name = "CanyonOutcropsAndLooseRock"
+	outcrops.multimesh = outcrop_multimesh
+	outcrops.material_override = _rock_material
+	_decoration_root.add_child(outcrops)
 
 func _build_multi_jump() -> void:
 	# Low hurdles make the normal jump viable while Rabbit can clear them with
@@ -376,7 +641,7 @@ func _build_tunnel() -> void:
 		wall.size = Vector3(0.6, 5.0, length)
 		wall.position = midpoint + right * 6.0 * side + Vector3.UP * 2.0
 		wall.use_collision = true
-		wall.material = _rail_material
+		wall.visible = false
 		_collision_root.add_child(wall)
 		wall.look_at(b + right * 6.0 * side + Vector3.UP * 2.0, Vector3.UP)
 	var roof := CSGBox3D.new()
@@ -384,9 +649,57 @@ func _build_tunnel() -> void:
 	roof.size = Vector3(12.5, 0.6, length)
 	roof.position = midpoint + Vector3.UP * 4.6
 	roof.use_collision = true
-	roof.material = _rail_material
+	roof.visible = false
 	_collision_root.add_child(roof)
 	roof.look_at(b + Vector3.UP * 4.6, Vector3.UP)
+
+	var wall_panel_transforms: Array[Transform3D] = []
+	var ceiling_panel_transforms: Array[Transform3D] = []
+	var support_transforms: Array[Transform3D] = []
+	var light_transforms: Array[Transform3D] = []
+	var edge_marking_transforms: Array[Transform3D] = []
+	var exit_glow_transforms: Array[Transform3D] = []
+	var panel_count := 8
+	for panel_index in range(panel_count):
+		var t := (float(panel_index) + 0.5) / float(panel_count)
+		ceiling_panel_transforms.append(_track_transform_at(
+			a, b, t, 0.0, 4.58,
+			Vector3(12.0, 0.34, length / float(panel_count) * 0.91)
+		))
+		for side in [-1.0, 1.0]:
+			wall_panel_transforms.append(_track_transform_at(
+				a, b, t, side * 6.0, 2.0,
+				Vector3(0.38, 4.7, length / float(panel_count) * 0.91)
+			))
+			edge_marking_transforms.append(_track_transform_at(
+				a, b, t, side * 5.68, 0.22,
+				Vector3(0.22, 0.28, length / float(panel_count) * 0.70)
+			))
+		if panel_index % 2 == 0:
+			support_transforms.append(_track_transform_at(
+				a, b, t, 0.0, 4.48, Vector3(12.4, 0.36, 0.42)
+			))
+		for side in [-1.0, 1.0]:
+			light_transforms.append(_track_transform_at(
+				a, b, t, side * 4.35, 4.18, Vector3(0.34, 0.10, 1.35)
+			))
+	for portal_t in [0.015, 0.985]:
+		for side in [-1.0, 1.0]:
+			support_transforms.append(_track_transform_at(
+				a, b, portal_t, side * 5.75, 2.1, Vector3(0.78, 4.8, 0.78)
+			))
+		support_transforms.append(_track_transform_at(
+			a, b, portal_t, 0.0, 4.65, Vector3(12.4, 0.72, 0.78)
+		))
+	exit_glow_transforms.append(_track_transform_at(
+		a, b, 0.975, 0.0, 4.08, Vector3(9.6, 0.12, 0.26)
+	))
+	_add_box_multimesh("TunnelWallSegments", wall_panel_transforms, _tunnel_material)
+	_add_box_multimesh("TunnelCeilingPanels", ceiling_panel_transforms, _tunnel_material)
+	_add_box_multimesh("TunnelFramesAndCeilingSupports", support_transforms, _materials[&"bridge"])
+	_add_box_multimesh("TunnelGuideLights", light_transforms, _materials[&"tunnel_light"])
+	_add_box_multimesh("TunnelEdgeMarkings", edge_marking_transforms, _materials[&"curb_warning"])
+	_add_box_multimesh("TunnelExitGlow", exit_glow_transforms, _materials[&"tunnel_light"])
 
 func _build_shortcuts() -> void:
 	var a_entry := ROUTE_POINTS[SHORTCUT_A_ENTRY_ROUTE_INDEX]
@@ -406,30 +719,94 @@ func _build_shortcuts() -> void:
 
 func _build_forest_dressing() -> void:
 	var trunk_mesh := CylinderMesh.new()
-	trunk_mesh.top_radius = 0.55
-	trunk_mesh.bottom_radius = 0.7
-	trunk_mesh.height = 5.0
+	trunk_mesh.top_radius = 0.36
+	trunk_mesh.bottom_radius = 0.58
+	trunk_mesh.height = 1.0
 	trunk_mesh.radial_segments = 7
+	trunk_mesh.rings = 1
+	var crown_mesh := SphereMesh.new()
+	crown_mesh.radius = 1.0
+	crown_mesh.height = 2.0
+	crown_mesh.radial_segments = 8
+	crown_mesh.rings = 5
+	var trunk_transforms: Array[Transform3D] = []
+	var crown_transforms: Array[Transform3D] = []
+	var bush_transforms: Array[Transform3D] = []
+	var forest_rock_transforms: Array[Transform3D] = []
+	var log_transforms: Array[Transform3D] = []
+	for i in range(18):
+		var anchor_index := 2 + (i % 3)
+		var anchor := ROUTE_POINTS[anchor_index]
+		var side := -1.0 if i % 2 == 0 else 1.0
+		var road_edge := SEGMENT_WIDTHS[anchor_index] * 0.5
+		var distance := road_edge + 4.0 + float((i * 5) % 5) * 2.0
+		var along_offset := float((i * 7) % 11 - 5) * 5.2
+		var route_direction := _route_direction(anchor_index)
+		var route_right := Vector3(-route_direction.z, 0.0, route_direction.x)
+		var base_position := anchor + route_right * side * distance + route_direction * along_offset
+		var height := 4.6 + float((i * 3) % 6) * 0.55
+		var thickness := 0.72 + float((i * 7) % 4) * 0.11
+		var rotation := float((i * 43) % 180) * PI / 180.0
+		var trunk_basis := Basis(Vector3.UP, rotation).scaled(Vector3(thickness, height, thickness))
+		trunk_transforms.append(Transform3D(trunk_basis, base_position + Vector3.UP * height * 0.5))
+		for cluster_index in range(3):
+			var cluster_angle := rotation + float(cluster_index) * TAU / 3.0
+			var cluster_offset := Vector3(cos(cluster_angle), 0.0, sin(cluster_angle)) * (0.65 + float(i % 3) * 0.13)
+			var cluster_scale := Vector3(
+				1.7 + float((i + cluster_index) % 4) * 0.22,
+				1.25 + float((i * 2 + cluster_index) % 3) * 0.20,
+				1.55 + float((i * 3 + cluster_index) % 4) * 0.18
+			)
+			var crown_basis := Basis(Vector3.UP, cluster_angle).scaled(cluster_scale)
+			var crown_height := height * (0.73 + float(cluster_index) * 0.10)
+			crown_transforms.append(Transform3D(
+				crown_basis, base_position + cluster_offset + Vector3.UP * crown_height
+			))
+		if i < 12:
+			var bush_scale := Vector3(1.1 + float(i % 3) * 0.25, 0.55 + float(i % 2) * 0.16, 0.9 + float((i * 3) % 4) * 0.18)
+			var bush_position := base_position + Vector3(side * 1.8, bush_scale.y * 0.55, float((i % 3) - 1) * 1.6)
+			bush_transforms.append(Transform3D(Basis.IDENTITY.scaled(bush_scale), bush_position))
+		if i < 10:
+			var rock_scale := Vector3(0.45 + float(i % 3) * 0.2, 0.28 + float(i % 2) * 0.12, 0.55 + float((i * 2) % 3) * 0.16)
+			forest_rock_transforms.append(Transform3D(
+				Basis(Vector3.UP, rotation).scaled(rock_scale),
+				base_position + Vector3(-side * 2.1, rock_scale.y * 0.45, float(i % 2) * 2.0)
+			))
+		if i < 4:
+			var log_basis := Basis(Vector3.FORWARD, PI * 0.5).rotated(Vector3.UP, rotation).scaled(Vector3(0.55, 3.0, 0.55))
+			log_transforms.append(Transform3D(log_basis, base_position + Vector3(side * 2.5, 0.42, -2.2)))
+	_add_mesh_multimesh("ForestTrunks", trunk_mesh, trunk_transforms, _wood_material)
+	_add_mesh_multimesh("ForestCrownClusters", crown_mesh, crown_transforms, _materials[&"foliage"])
+	_add_mesh_multimesh("ForestBushes", crown_mesh, bush_transforms, _materials[&"foliage_light"])
+	_add_mesh_multimesh("ForestFloorRocks", crown_mesh, forest_rock_transforms, _rock_material)
+	_add_mesh_multimesh("ForestFallenLogs", trunk_mesh, log_transforms, _wood_material)
+
+func _add_mesh_multimesh(
+	node_name: String,
+	mesh: Mesh,
+	transforms: Array[Transform3D],
+	material: Material
+) -> void:
+	if transforms.is_empty():
+		return
 	var multimesh := MultiMesh.new()
 	multimesh.transform_format = MultiMesh.TRANSFORM_3D
-	multimesh.mesh = trunk_mesh
-	multimesh.instance_count = 12
-	var anchor := ROUTE_POINTS[3]
-	for i in range(multimesh.instance_count):
-		var side := -1.0 if i % 2 == 0 else 1.0
-		var x_offset := 11.0 + float(i % 3) * 3.0
-		var z_offset := float(i - 6) * 9.0
-		var height_scale := 0.85 + float(i % 3) * 0.16
-		var basis := Basis.IDENTITY.scaled(Vector3(1.0, height_scale, 1.0))
-		multimesh.set_instance_transform(
-			i,
-			Transform3D(basis, anchor + Vector3(side * x_offset, 2.0, z_offset))
-		)
-	var trees := MultiMeshInstance3D.new()
-	trees.name = "ForestTrees"
-	trees.multimesh = multimesh
-	trees.material_override = _make_material(Color(0.12, 0.46, 0.2), 0.95)
-	_decoration_root.add_child(trees)
+	multimesh.mesh = mesh
+	multimesh.instance_count = transforms.size()
+	for index in range(transforms.size()):
+		multimesh.set_instance_transform(index, transforms[index])
+	var instance := MultiMeshInstance3D.new()
+	instance.name = node_name
+	instance.multimesh = multimesh
+	instance.material_override = material
+	_decoration_root.add_child(instance)
+
+func _route_direction(route_index: int) -> Vector3:
+	var previous := ROUTE_POINTS[maxi(0, route_index - 1)]
+	var next := ROUTE_POINTS[mini(ROUTE_POINTS.size() - 1, route_index + 1)]
+	var direction := next - previous
+	direction.y = 0.0
+	return direction.normalized()
 
 func _add_visual_box(node_name: String, world_position: Vector3, size: Vector3, material: Material) -> void:
 	var visual := CSGBox3D.new()

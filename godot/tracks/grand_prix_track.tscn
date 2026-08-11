@@ -17,32 +17,62 @@ roughness = 0.65
 [node name="GrandPrixTrack" type="Node3D"]
 script = ExtResource("1_track")
 
-[node name="JumpRamp" type="CSGBox3D" parent="."]
+[node name="JumpRampVisual" type="CSGBox3D" parent="."]
+position = Vector3(-31.9, 6.3, -228.8)
+rotation = Vector3(0.16, -0.745, 0)
+size = Vector3(7, 0.5, 8)
+use_collision = false
+material = SubResource("RampMaterial")
+
+[node name="JumpRampCollision" type="CSGBox3D" parent="."]
+visible = false
 position = Vector3(-31.9, 6.3, -228.8)
 rotation = Vector3(0.16, -0.745, 0)
 size = Vector3(7, 0.5, 8)
 use_collision = true
-material = SubResource("RampMaterial")
 
-[node name="FinishRunoff" type="CSGBox3D" parent="."]
+[node name="FinishRunoffVisual" type="CSGBox3D" parent="."]
+position = Vector3(10.3208, -0.22, -1866.542)
+rotation = Vector3(0, 0.247812, 0)
+size = Vector3(20, 0.5, 30)
+use_collision = false
+material = SubResource("RunoffMaterial")
+
+[node name="FinishRunoffCollision" type="CSGBox3D" parent="."]
+visible = false
 position = Vector3(10.3208, -0.22, -1866.542)
 rotation = Vector3(0, 0.247812, 0)
 size = Vector3(20, 0.5, 30)
 use_collision = true
-material = SubResource("RunoffMaterial")
 
 [node name="RiverApproachSafetyCollision" type="Node3D" parent="."]
 
 [node name="LeftRail" type="CSGBox3D" parent="RiverApproachSafetyCollision"]
+visible = false
 position = Vector3(-27.5854, -21.85, -875.1141)
 rotation = Vector3(-0.03884, 0.63832, 0)
 size = Vector3(0.35, 1.35, 77.2593)
 use_collision = true
-material = SubResource("SafetyRailMaterial")
 
 [node name="RightRail" type="CSGBox3D" parent="RiverApproachSafetyCollision"]
+visible = false
 position = Vector3(-14.4146, -21.85, -884.8859)
 rotation = Vector3(-0.03884, 0.63832, 0)
 size = Vector3(0.35, 1.35, 77.2593)
 use_collision = true
+
+[node name="RiverApproachSafetyVisual" type="Node3D" parent="."]
+
+[node name="LeftRail" type="CSGBox3D" parent="RiverApproachSafetyVisual"]
+position = Vector3(-27.5854, -21.85, -875.1141)
+rotation = Vector3(-0.03884, 0.63832, 0)
+size = Vector3(0.35, 1.35, 77.2593)
+use_collision = false
+material = SubResource("SafetyRailMaterial")
+
+[node name="RightRail" type="CSGBox3D" parent="RiverApproachSafetyVisual"]
+position = Vector3(-14.4146, -21.85, -884.8859)
+rotation = Vector3(-0.03884, 0.63832, 0)
+size = Vector3(0.35, 1.35, 77.2593)
+use_collision = false
 material = SubResource("SafetyRailMaterial")

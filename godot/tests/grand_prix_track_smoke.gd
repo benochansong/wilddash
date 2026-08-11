@@ -58,6 +58,31 @@ func _ready() -> void:
 		return
 	print("TRACK NODE BUDGET PASS nodes=%d max=%d" % [runtime_nodes, MAX_RUNTIME_NODES])
 
+	var decoration := track.get_node_or_null("DecorationGeometry")
+	var collision_root := track.get_node_or_null("GameplayCollision")
+	if decoration == null or collision_root == null:
+		_fail("Environment visual/collision roots are not separated")
+		return
+	var required_visual_nodes: Array[String] = [
+		"RoadSurface_Asphalt", "RoadSurface_Dirt", "GrassShoulders",
+		"ForestTrunks", "ForestCrownClusters", "CanyonLayeredCliffs",
+		"CanyonOutcropsAndLooseRock", "BridgeStructure", "BridgeCrossBraces",
+		"TunnelWallSegments", "TunnelCeilingPanels", "TunnelGuideLights",
+	]
+	for node_name in required_visual_nodes:
+		if decoration.get_node_or_null(node_name) == null:
+			_fail("Missing environment visual node: %s" % node_name)
+			return
+	var road_collision := collision_root.get_node_or_null("Road_00_Meadow_Straight_Collision") as CSGBox3D
+	var tunnel_collision := collision_root.get_node_or_null("TunnelRoof") as CSGBox3D
+	if road_collision == null or road_collision.visible or not road_collision.use_collision:
+		_fail("Road visual/collision separation invalid")
+		return
+	if tunnel_collision == null or tunnel_collision.visible or not tunnel_collision.use_collision:
+		_fail("Tunnel visual/collision separation invalid")
+		return
+	print("ENVIRONMENT FOUNDATION PASS materials=6 road_collision_separate=true decoration_collision=false")
+
 	var racer := RACER_SCENE.instantiate() as WildDashCharacterController
 	racer.name = "CheckpointTester"
 	racer.is_player = true
