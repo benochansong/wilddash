@@ -79,7 +79,7 @@ var _collision_root: Node3D
 var _road_visual_batches: Dictionary
 
 func _ready() -> void:
-	_materials = WildDashTrackMaterials.build_palette()
+	_materials = WildDashEnvironmentMaterialLibrary.get_palette()
 	_road_material = _materials[&"asphalt"]
 	_dirt_material = _materials[&"dirt"]
 	_grass_material = _materials[&"grass"]
@@ -92,7 +92,9 @@ func _ready() -> void:
 	_bridge_material = _materials[&"bridge"]
 	_tunnel_material = _materials[&"tunnel"]
 	_wood_material = _materials[&"wood"]
+	_build_environment_lighting()
 	_build_track()
+	_configure_environment_lod_and_visibility()
 	RaceManager.configure_track(get_route_points(), get_checkpoint_positions())
 	print("GRAND PRIX TRACK READY route_points=%d checkpoints=%d length=%.1fm nodes=%d" % [
 		ROUTE_POINTS.size(), CHECKPOINT_ROUTE_INDICES.size(), _track_length, get_runtime_node_count(),
@@ -128,6 +130,7 @@ func get_runtime_node_count() -> int:
 func _build_track() -> void:
 	_decoration_root = Node3D.new()
 	_decoration_root.name = "DecorationGeometry"
+	_decoration_root.process_mode = Node.PROCESS_MODE_DISABLED
 	add_child(_decoration_root)
 	_collision_root = Node3D.new()
 	_collision_root.name = "GameplayCollision"
@@ -789,6 +792,7 @@ func _build_forest_dressing() -> void:
 	crown_mesh.rings = 5
 	var trunk_transforms: Array[Transform3D] = []
 	var crown_transforms: Array[Transform3D] = []
+	var far_crown_transforms: Array[Transform3D] = []
 	var bush_transforms: Array[Transform3D] = []
 	var forest_rock_transforms: Array[Transform3D] = []
 	var log_transforms: Array[Transform3D] = []
@@ -807,6 +811,11 @@ func _build_forest_dressing() -> void:
 		var rotation := float((i * 43) % 180) * PI / 180.0
 		var trunk_basis := Basis(Vector3.UP, rotation).scaled(Vector3(thickness, height, thickness))
 		trunk_transforms.append(Transform3D(trunk_basis, base_position + Vector3.UP * height * 0.5))
+		var far_scale := Vector3(2.15 + float(i % 3) * 0.20, 1.75 + float(i % 2) * 0.18, 2.05 + float((i * 2) % 3) * 0.17)
+		far_crown_transforms.append(Transform3D(
+			Basis(Vector3.UP, rotation).scaled(far_scale),
+			base_position + Vector3.UP * height * 0.84
+		))
 		for cluster_index in range(3):
 			var cluster_angle := rotation + float(cluster_index) * TAU / 3.0
 			var cluster_offset := Vector3(cos(cluster_angle), 0.0, sin(cluster_angle)) * (0.65 + float(i % 3) * 0.13)
@@ -835,6 +844,12 @@ func _build_forest_dressing() -> void:
 			log_transforms.append(Transform3D(log_basis, base_position + Vector3(side * 2.5, 0.42, -2.2)))
 	_add_mesh_multimesh("ForestTrunks", trunk_mesh, trunk_transforms, _wood_material)
 	_add_mesh_multimesh("ForestCrownClusters", crown_mesh, crown_transforms, _materials[&"foliage"])
+	var far_crown_mesh := SphereMesh.new()
+	far_crown_mesh.radius = 1.0
+	far_crown_mesh.height = 2.0
+	far_crown_mesh.radial_segments = 6
+	far_crown_mesh.rings = 3
+	_add_mesh_multimesh("ForestFarCanopies", far_crown_mesh, far_crown_transforms, _materials[&"foliage"])
 	_add_mesh_multimesh("ForestBushes", crown_mesh, bush_transforms, _materials[&"foliage_light"])
 	_add_mesh_multimesh("ForestFloorRocks", crown_mesh, forest_rock_transforms, _rock_material)
 	_add_mesh_multimesh("ForestFallenLogs", trunk_mesh, log_transforms, _wood_material)
@@ -875,6 +890,7 @@ func _build_environment_pass_2() -> void:
 	var reeds: Array[Transform3D] = []
 	var wet_rocks: Array[Transform3D] = []
 	var rocks: Array[Transform3D] = []
+	var round_props: Array[Transform3D] = []
 
 	# River banks sit at water level, well below the bridge driving deck.
 	for bridge_data in [[5, -5.0, 42.0], [14, -28.0, 58.0]]:
@@ -991,7 +1007,11 @@ func _build_environment_pass_2() -> void:
 		structural.append(_track_transform_at(prop_a, prop_b, 0.52, prop_side * (prop_width * 0.5 + 2.3), 1.25, Vector3(0.22, 2.5, 0.22)))
 		event_details.append(_track_transform_at(prop_a, prop_b, 0.52, prop_side * (prop_width * 0.5 + 2.3), 2.22, Vector3(1.7, 0.72, 0.16)))
 		for cone_index in range(2):
-			warnings.append(_track_transform_at(prop_a, prop_b, 0.42 + float(cone_index) * 0.19, prop_side * (prop_width * 0.5 + 0.85), 0.32, Vector3(0.38, 0.64, 0.38)))
+			round_props.append(_track_transform_at(
+				prop_a, prop_b, 0.42 + float(cone_index) * 0.19,
+				prop_side * (prop_width * 0.5 + 0.85), 0.32,
+				Vector3(0.82 + float(cone_index) * 0.08, 0.64 + float(cone_index) * 0.07, 0.82 + float(cone_index) * 0.08)
+			))
 
 	_append_box_multimesh("RoadSurface_Shortcuts", dirt_banks)
 	_append_box_multimesh("GrassShoulders", reeds)
@@ -1000,6 +1020,13 @@ func _build_environment_pass_2() -> void:
 	_add_box_multimesh("EnvironmentStructuralProps", structural, _bridge_material)
 	_add_box_multimesh("EnvironmentWarningDetails", warnings, _materials[&"hazard"])
 	_add_box_multimesh("EnvironmentEventDetails", event_details, _materials[&"event_blue"])
+	var cone_mesh := CylinderMesh.new()
+	cone_mesh.top_radius = 0.14
+	cone_mesh.bottom_radius = 0.38
+	cone_mesh.height = 1.0
+	cone_mesh.radial_segments = 7
+	cone_mesh.rings = 1
+	_add_mesh_multimesh("TracksideRoundProps", cone_mesh, round_props, _materials[&"hazard"])
 	var wet_rock_mesh := SphereMesh.new()
 	wet_rock_mesh.radius = 1.0
 	wet_rock_mesh.height = 2.0
@@ -1029,6 +1056,80 @@ func _append_multimesh_transforms(node_name: String, transforms: Array[Transform
 		multimesh.set_instance_transform(index, previous[index])
 	for index in range(transforms.size()):
 		multimesh.set_instance_transform(previous.size() + index, transforms[index])
+
+func _build_environment_lighting() -> void:
+	var world_environment := WorldEnvironment.new()
+	world_environment.name = "GrandPrixWorldEnvironment"
+	var environment := Environment.new()
+	var sky_material := ProceduralSkyMaterial.new()
+	sky_material.sky_top_color = Color("5c8fc2")
+	sky_material.sky_horizon_color = Color("c8dce5")
+	sky_material.ground_bottom_color = Color("33484b")
+	sky_material.ground_horizon_color = Color("b5c5b3")
+	sky_material.sun_angle_max = 18.0
+	var sky := Sky.new()
+	sky.sky_material = sky_material
+	environment.background_mode = Environment.BG_SKY
+	environment.sky = sky
+	environment.background_energy_multiplier = 0.82
+	environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	environment.ambient_light_color = Color("b9cbd4")
+	environment.ambient_light_energy = 0.68
+	environment.ambient_light_sky_contribution = 0.72
+	environment.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
+	environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	environment.tonemap_exposure = 1.04
+	environment.fog_enabled = true
+	environment.fog_light_color = Color("b9ced4")
+	environment.fog_light_energy = 0.46
+	environment.fog_density = 0.0016
+	environment.fog_height = -35.0
+	environment.fog_height_density = 0.018
+	environment.fog_aerial_perspective = 0.22
+	# The project uses gl_compatibility; SSAO is intentionally left disabled.
+	environment.ssao_enabled = false
+	world_environment.environment = environment
+	add_child(world_environment)
+
+	var parent_sun := get_parent().get_node_or_null("Sun") as DirectionalLight3D
+	if parent_sun != null:
+		parent_sun.light_color = Color("fff0d8")
+		parent_sun.light_energy = 1.08
+		parent_sun.shadow_opacity = 0.72
+		parent_sun.directional_shadow_max_distance = 155.0
+
+func _configure_environment_lod_and_visibility() -> void:
+	_set_visibility_range("ForestTrunks", 0.0, 235.0)
+	_set_visibility_range("ForestCrownClusters", 0.0, 235.0)
+	_set_visibility_range("ForestFarCanopies", 175.0, 520.0)
+	_set_visibility_range("ForestBushes", 0.0, 115.0)
+	_set_visibility_range("ForestFloorRocks", 0.0, 95.0)
+	_set_visibility_range("ForestFallenLogs", 0.0, 130.0)
+	_set_visibility_range("CanyonOutcropsAndLooseRock", 0.0, 270.0)
+	_set_visibility_range("CanyonLayeredCliffs", 0.0, 680.0)
+	_set_visibility_range("BridgeCrossBraces", 0.0, 260.0)
+	_set_visibility_range("BridgeStructure", 0.0, 520.0)
+	_set_visibility_range("TunnelWallSegments", 0.0, 300.0)
+	_set_visibility_range("TunnelCeilingPanels", 0.0, 300.0)
+	_set_visibility_range("TunnelGuideLights", 0.0, 260.0)
+	_set_visibility_range("EnvironmentStructuralProps", 0.0, 310.0)
+	_set_visibility_range("EnvironmentWarningDetails", 0.0, 260.0)
+	_set_visibility_range("EnvironmentEventDetails", 0.0, 360.0)
+	_set_visibility_range("TracksideRoundProps", 0.0, 170.0)
+	_set_visibility_range("RiverWetRockAccents", 0.0, 260.0)
+	_set_visibility_range("BridgeRiver", 0.0, 760.0)
+	_set_visibility_range("LongRiver", 0.0, 760.0)
+
+func _set_visibility_range(node_name: String, begin: float, end: float) -> void:
+	var geometry := _decoration_root.get_node_or_null(node_name) as GeometryInstance3D
+	if geometry == null:
+		return
+	geometry.visibility_range_begin = begin
+	geometry.visibility_range_end = end
+	geometry.visibility_range_begin_margin = 25.0 if begin > 0.0 else 0.0
+	geometry.visibility_range_end_margin = 35.0
+	geometry.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+	geometry.extra_cull_margin = 4.0
 
 func _add_visual_box(node_name: String, world_position: Vector3, size: Vector3, material: Material) -> void:
 	var visual := CSGBox3D.new()

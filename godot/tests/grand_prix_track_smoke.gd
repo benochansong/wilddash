@@ -124,6 +124,43 @@ func _ready() -> void:
 		return
 	print("ENVIRONMENT PASS 2 PASS water=animated obstacles=compound gates=timing_preserved ramps=collision_preserved shortcuts=readable finish=aligned")
 
+	if not WildDashEnvironmentMaterialLibrary.has_required_materials():
+		_fail("Environment material library is incomplete")
+		return
+	var palette := WildDashEnvironmentMaterialLibrary.get_palette()
+	if palette[&"metal"] != palette[&"bridge"] or palette[&"finish"] != palette[&"event_blue"]:
+		_fail("Environment material aliases are not reusing shared resources")
+		return
+	var world_environment := track.get_node_or_null("GrandPrixWorldEnvironment") as WorldEnvironment
+	if world_environment == null or world_environment.environment == null:
+		_fail("Grand Prix WorldEnvironment missing")
+		return
+	if world_environment.environment.background_mode != Environment.BG_SKY:
+		_fail("Grand Prix sky environment missing")
+		return
+	if world_environment.environment.ssao_enabled:
+		_fail("SSAO must remain disabled for the gl_compatibility renderer")
+		return
+	var far_forest := decoration.get_node_or_null("ForestFarCanopies") as GeometryInstance3D
+	var near_bushes := decoration.get_node_or_null("ForestBushes") as GeometryInstance3D
+	var round_props := decoration.get_node_or_null("TracksideRoundProps") as GeometryInstance3D
+	if far_forest == null or far_forest.visibility_range_begin <= 0.0:
+		_fail("Forest far-silhouette LOD missing")
+		return
+	if near_bushes == null or near_bushes.visibility_range_end <= 0.0:
+		_fail("Near vegetation culling range missing")
+		return
+	if round_props == null or round_props.visibility_range_end <= 0.0:
+		_fail("Trackside prop visibility range missing")
+		return
+	if decoration.process_mode != Node.PROCESS_MODE_DISABLED:
+		_fail("Static decoration root must not process")
+		return
+	if _has_unexpected_visual_collision(decoration):
+		_fail("Decoration tree contains gameplay collision")
+		return
+	print("ENVIRONMENT PASS 3 PASS materials=shared lighting=compatibility_safe lod=near_mid_far culling=true decoration_process=false")
+
 	var racer := RACER_SCENE.instantiate() as WildDashCharacterController
 	racer.name = "CheckpointTester"
 	racer.is_player = true
@@ -180,3 +217,13 @@ func _fail(message: String) -> void:
 	push_error(message)
 	print("GRAND PRIX TRACK FAIL " + message)
 	get_tree().quit(1)
+
+func _has_unexpected_visual_collision(node: Node) -> bool:
+	if node is CollisionObject3D or node is CollisionShape3D:
+		return true
+	if node is CSGShape3D and (node as CSGShape3D).use_collision:
+		return true
+	for child in node.get_children():
+		if _has_unexpected_visual_collision(child):
+			return true
+	return false

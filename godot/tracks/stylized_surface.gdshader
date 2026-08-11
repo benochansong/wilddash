@@ -7,6 +7,8 @@ uniform float roughness_value : hint_range(0.0, 1.0) = 0.9;
 uniform float detail_scale : hint_range(0.01, 8.0) = 1.0;
 uniform float detail_strength : hint_range(0.0, 0.5) = 0.12;
 uniform float wear_strength : hint_range(0.0, 0.5) = 0.08;
+uniform float directional_strength : hint_range(0.0, 0.5) = 0.0;
+uniform float layering_strength : hint_range(0.0, 0.5) = 0.0;
 
 varying vec3 local_position;
 
@@ -26,7 +28,10 @@ void fragment() {
 	float aggregate = mix(broad_noise, fine_noise, 0.35);
 	float variation = (aggregate - 0.5) * 2.0 * detail_strength;
 	float worn_path = (1.0 - smoothstep(0.08, 0.48, abs(local_position.x))) * wear_strength;
+	float directional_grain = sin(local_position.z * detail_scale * 7.0 + broad_noise * 3.0) * directional_strength;
+	float layered_color = sin(local_position.y * detail_scale * 4.0 + fine_noise * 2.0) * layering_strength;
 	vec3 surface_color = mix(base_color.rgb, variation_color.rgb, clamp(0.5 + variation, 0.0, 1.0));
+	surface_color *= 1.0 + directional_grain * 0.12 + layered_color * 0.10;
 	surface_color = mix(surface_color, surface_color * 1.12, worn_path);
 	ALBEDO = surface_color;
 	ROUGHNESS = clamp(roughness_value + (fine_noise - 0.5) * 0.08, 0.05, 1.0);
