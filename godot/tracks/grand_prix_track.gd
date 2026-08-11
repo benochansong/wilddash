@@ -136,11 +136,13 @@ func _build_track() -> void:
 	var dirt_visuals: Array[Transform3D] = []
 	var bridge_visuals: Array[Transform3D] = []
 	var tunnel_visuals: Array[Transform3D] = []
+	var shortcut_visuals: Array[Transform3D] = []
 	_road_visual_batches = {
 		&"asphalt": asphalt_visuals,
 		&"dirt": dirt_visuals,
 		&"bridge": bridge_visuals,
 		&"tunnel": tunnel_visuals,
+		&"shortcut": shortcut_visuals,
 	}
 
 	_track_length = 0.0
@@ -170,6 +172,7 @@ func _build_track() -> void:
 	_build_tunnel()
 	_build_shortcuts()
 	_build_forest_dressing()
+	_build_environment_pass_2()
 
 func _create_segment(
 	node_name: String,
@@ -229,10 +232,11 @@ func _road_material_key_for_segment(index: int) -> StringName:
 func _flush_road_visual_batches() -> void:
 	for material_key: StringName in _road_visual_batches:
 		var transforms: Array[Transform3D] = _road_visual_batches[material_key]
+		var palette_key: StringName = &"dirt" if material_key == &"shortcut" else material_key
 		_add_box_multimesh(
 			"RoadSurface_%s" % String(material_key).capitalize(),
 			transforms,
-			_materials[material_key]
+			_materials[palette_key]
 		)
 
 func _build_road_surface_details() -> void:
@@ -306,7 +310,7 @@ func _build_road_surface_details() -> void:
 	_add_box_multimesh("RoadCenterDashes", line_transforms, _materials[&"road_line"])
 	_add_box_multimesh("HazardEntryMarkings", hazard_transforms, _materials[&"hazard"])
 	_add_box_multimesh("GuardrailPosts", guardrail_post_transforms, _rail_material)
-	_add_box_multimesh("ForestFencePosts", fence_post_transforms, _wood_material)
+	_add_box_multimesh("WoodStructuresAndProps", fence_post_transforms, _wood_material)
 
 func _track_transform_at(
 	a: Vector3,
@@ -432,7 +436,7 @@ func _add_static_box(node_name: String, world_position: Vector3, size: Vector3) 
 	obstacle.position = world_position
 	obstacle.size = size
 	obstacle.use_collision = true
-	obstacle.material = _obstacle_material
+	obstacle.visible = false
 	_collision_root.add_child(obstacle)
 
 func _build_dynamic_obstacles() -> void:
@@ -471,17 +475,70 @@ func _add_dynamic_box(
 	body.collision_layer = 1
 	body.collision_mask = 2
 	var mesh_instance := MeshInstance3D.new()
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	mesh_instance.mesh = mesh
-	mesh_instance.material_override = _obstacle_material
+	mesh_instance.name = "MechanicalVisual"
+	mesh_instance.mesh = _build_dynamic_obstacle_mesh(size, motion)
 	body.add_child(mesh_instance)
 	var collision := CollisionShape3D.new()
+	collision.name = "GameplayCollision"
 	var shape := BoxShape3D.new()
 	shape.size = size
 	collision.shape = shape
 	body.add_child(collision)
 	_collision_root.add_child(body)
+
+func _build_dynamic_obstacle_mesh(
+	size: Vector3,
+	motion: WildDashDynamicObstacle.MotionType
+) -> ArrayMesh:
+	var result := ArrayMesh.new()
+	var body_transforms: Array[Transform3D] = []
+	var warning_transforms: Array[Transform3D] = []
+	var metal_transforms: Array[Transform3D] = []
+	body_transforms.append(_local_box_transform(Vector3.ZERO, size))
+	if motion == WildDashDynamicObstacle.MotionType.ROTATE:
+		metal_transforms.append(_local_box_transform(Vector3.ZERO, Vector3(0.85, 1.25, 1.35)))
+		for side in [-1.0, 1.0]:
+			metal_transforms.append(_local_box_transform(
+				Vector3(side * size.x * 0.48, 0.0, 0.0), Vector3(0.48, size.y * 1.25, size.z * 1.3)
+			))
+		for stripe in range(5):
+			warning_transforms.append(_local_box_transform(
+				Vector3(-size.x * 0.32 + float(stripe) * size.x * 0.16, size.y * 0.52, 0.0),
+				Vector3(size.x * 0.075, 0.07, size.z * 1.05),
+				Vector3(0.0, 0.0, -0.55 if stripe % 2 == 0 else 0.55)
+			))
+	else:
+		metal_transforms.append(_local_box_transform(
+			Vector3(0.0, -size.y * 0.42, 0.0), Vector3(size.x * 1.18, 0.20, size.z * 1.35)
+		))
+		for stripe in range(4):
+			warning_transforms.append(_local_box_transform(
+				Vector3(-size.x * 0.32 + float(stripe) * size.x * 0.21, 0.0, size.z * 0.52),
+				Vector3(size.x * 0.12, size.y * 0.82, 0.08),
+				Vector3(0.0, 0.0, -0.48)
+			))
+	_append_box_surface(result, body_transforms, _obstacle_material)
+	_append_box_surface(result, metal_transforms, _bridge_material)
+	_append_box_surface(result, warning_transforms, _materials[&"curb_warning"])
+	return result
+
+func _append_box_surface(mesh: ArrayMesh, transforms: Array[Transform3D], material: Material) -> void:
+	if transforms.is_empty():
+		return
+	var primitive := BoxMesh.new()
+	primitive.size = Vector3.ONE
+	var surface := SurfaceTool.new()
+	surface.set_material(material)
+	for transform in transforms:
+		surface.append_from(primitive, 0, transform)
+	surface.commit(mesh)
+
+func _local_box_transform(
+	position: Vector3,
+	size: Vector3,
+	rotation := Vector3.ZERO
+) -> Transform3D:
+	return Transform3D(Basis.from_euler(rotation).scaled(size), position)
 
 func _build_bridge_details() -> void:
 	var first_midpoint := (ROUTE_POINTS[5] + ROUTE_POINTS[6]) * 0.5
@@ -622,7 +679,7 @@ func _build_multi_jump() -> void:
 		hurdle.size = Vector3(7.2, 0.65 + float(i) * 0.12, 0.85)
 		hurdle.position = point + Vector3.UP * 0.22
 		hurdle.use_collision = true
-		hurdle.material = _obstacle_material
+		hurdle.visible = false
 		_collision_root.add_child(hurdle)
 		hurdle.look_at(point + tangent.normalized() * 5.0 + Vector3.UP * 0.22, Vector3.UP)
 
@@ -704,7 +761,7 @@ func _build_tunnel() -> void:
 func _build_shortcuts() -> void:
 	var a_entry := ROUTE_POINTS[SHORTCUT_A_ENTRY_ROUTE_INDEX]
 	var a_exit := ROUTE_POINTS[SHORTCUT_A_EXIT_ROUTE_INDEX]
-	_create_segment("ShortcutA_RiskyMid", a_entry, a_exit, 6.2, 0.42, _shortcut_material, true, -0.18)
+	_create_segment("ShortcutA_RiskyMid", a_entry, a_exit, 6.2, 0.42, _shortcut_material, true, -0.18, &"shortcut")
 	_add_dynamic_box(
 		"ShortcutASweeper", (a_entry + a_exit) * 0.5 + Vector3.UP * 0.8,
 		Vector3(5.0, 0.55, 0.7), WildDashDynamicObstacle.MotionType.ROTATE, 1.8, 0.0
@@ -712,10 +769,11 @@ func _build_shortcuts() -> void:
 
 	var b_entry := ROUTE_POINTS[SHORTCUT_B_ENTRY_ROUTE_INDEX]
 	var b_exit := ROUTE_POINTS[SHORTCUT_B_EXIT_ROUTE_INDEX]
-	_create_segment("ShortcutB_ComebackLine", b_entry, b_exit, 5.8, 0.42, _shortcut_material, true, -0.18)
+	_create_segment("ShortcutB_ComebackLine", b_entry, b_exit, 5.8, 0.42, _shortcut_material, true, -0.18, &"shortcut")
 	# A low hurdle keeps the second shortcut skill/item-friendly rather than Rabbit-only.
 	var midpoint := (b_entry + b_exit) * 0.5
 	_add_static_box("ShortcutBJumpBlock", midpoint + Vector3.UP * 0.45, Vector3(4.5, 0.9, 1.0))
+	_add_box_multimesh("RoadSurface_Shortcuts", _road_visual_batches[&"shortcut"], _dirt_material)
 
 func _build_forest_dressing() -> void:
 	var trunk_mesh := CylinderMesh.new()
@@ -807,6 +865,170 @@ func _route_direction(route_index: int) -> Vector3:
 	var direction := next - previous
 	direction.y = 0.0
 	return direction.normalized()
+
+func _build_environment_pass_2() -> void:
+	var structural: Array[Transform3D] = []
+	var warnings: Array[Transform3D] = []
+	var event_details: Array[Transform3D] = []
+	var wood_props: Array[Transform3D] = []
+	var dirt_banks: Array[Transform3D] = []
+	var reeds: Array[Transform3D] = []
+	var wet_rocks: Array[Transform3D] = []
+	var rocks: Array[Transform3D] = []
+
+	# River banks sit at water level, well below the bridge driving deck.
+	for bridge_data in [[5, -5.0, 42.0], [14, -28.0, 58.0]]:
+		var route_index := int(bridge_data[0])
+		var water_height := float(bridge_data[1])
+		var bank_offset := float(bridge_data[2])
+		var a := ROUTE_POINTS[route_index]
+		var b := ROUTE_POINTS[route_index + 1]
+		var direction := _route_direction(route_index)
+		var right := Vector3(-direction.z, 0.0, direction.x)
+		var river_center := (a + b) * 0.5
+		var crossing_length := a.distance_to(b) + 36.0
+		for side in [-1.0, 1.0]:
+			var bank_position: Vector3 = Vector3(river_center.x, water_height + 0.16, river_center.z) + right * side * bank_offset
+			var bank_transform := Transform3D(Basis.IDENTITY, bank_position)
+			bank_transform = bank_transform.looking_at(bank_position + direction, Vector3.UP)
+			bank_transform.basis = bank_transform.basis.scaled(Vector3(13.0, 0.55, crossing_length))
+			dirt_banks.append(bank_transform)
+			for reed_index in range(8):
+				var along := (float(reed_index) - 3.5) * crossing_length / 9.0
+				var reed_position: Vector3 = bank_position + direction * along - right * side * (4.5 + float(reed_index % 3))
+				reeds.append(_local_box_transform(
+					reed_position + Vector3.UP * (0.65 + float(reed_index % 2) * 0.18),
+					Vector3(0.12, 1.3 + float(reed_index % 2) * 0.36, 0.12),
+					Vector3(0.0, float(reed_index) * 0.47, 0.08 * side)
+				))
+		for rock_index in range(14):
+			var rock_side := -1.0 if rock_index % 2 == 0 else 1.0
+			var rock_position := Vector3(river_center.x, water_height + 0.38, river_center.z)
+			rock_position += right * rock_side * (bank_offset - 6.0 - float(rock_index % 4) * 2.4)
+			rock_position += direction * (float(rock_index) - 6.5) * crossing_length / 17.0
+			var rock_scale := Vector3(1.1 + float(rock_index % 3) * 0.42, 0.55 + float(rock_index % 2) * 0.24, 1.3 + float((rock_index * 2) % 4) * 0.33)
+			wet_rocks.append(Transform3D(Basis(Vector3.UP, float(rock_index) * 0.61).scaled(rock_scale), rock_position))
+
+	# Preserve the authored river-approach safety rail silhouette as visual-only metalwork.
+	structural.append(_local_box_transform(Vector3(-27.5854, -21.85, -875.1141), Vector3(0.35, 1.35, 77.2593), Vector3(-0.03884, 0.63832, 0.0)))
+	structural.append(_local_box_transform(Vector3(-14.4146, -21.85, -884.8859), Vector3(0.35, 1.35, 77.2593), Vector3(-0.03884, 0.63832, 0.0)))
+
+	# Static obstacle collision remains unchanged and hidden; these compound forms carry no collision.
+	wood_props.append(_local_box_transform(ROUTE_POINTS[3] + Vector3(3.2, 1.0, 0), Vector3(2.4, 2.0, 2.4), Vector3(0.0, 0.28, 0.0)))
+	wood_props.append(_local_box_transform(ROUTE_POINTS[3] + Vector3(-3.0, 0.8, -12), Vector3(2.0, 1.6, 3.0), Vector3(0.0, -0.22, 0.0)))
+	structural.append(_local_box_transform(ROUTE_POINTS[6] + Vector3(-4.0, 0.9, 2.0), Vector3(2.4, 1.8, 2.4), Vector3(0.0, 0.18, 0.0)))
+	structural.append(_local_box_transform(ROUTE_POINTS[6] + Vector3(3.6, 0.7, -8.0), Vector3(3.0, 1.4, 2.2), Vector3(0.0, -0.31, 0.0)))
+	rocks.append(Transform3D(Basis(Vector3.UP, 0.41).scaled(Vector3(3.2, 1.8, 3.0)), ROUTE_POINTS[19] + Vector3(6.0, 1.25, -3.0)))
+	for final_offset in [Vector3(-3.3, 0.8, 7.0), Vector3(3.3, 0.8, -5.0)]:
+		structural.append(_local_box_transform(ROUTE_POINTS[27] + final_offset, Vector3(2.2, 1.6, 3.0)))
+		warnings.append(_local_box_transform(ROUTE_POINTS[27] + final_offset + Vector3.UP * 0.84, Vector3(2.28, 0.14, 3.08)))
+	wood_props.append(_local_box_transform((ROUTE_POINTS[23] + ROUTE_POINTS[25]) * 0.5 + Vector3.UP * 0.45, Vector3(4.5, 0.9, 1.0)))
+
+	# Stationary frames make all three moving gates legible while their moving collision timing stays untouched.
+	for gate_index in [16, 17, 18]:
+		var gate_width := SEGMENT_WIDTHS[min(gate_index, SEGMENT_WIDTHS.size() - 1)]
+		var gate_a := ROUTE_POINTS[gate_index - 1]
+		var gate_b := ROUTE_POINTS[gate_index]
+		for side in [-1.0, 1.0]:
+			structural.append(_track_transform_at(gate_a, gate_b, 1.0, side * gate_width * 0.43, 2.35, Vector3(0.48, 4.7, 0.48)))
+			warnings.append(_track_transform_at(gate_a, gate_b, 1.0, side * gate_width * 0.43, 4.65, Vector3(0.68, 0.32, 0.68)))
+		structural.append(_track_transform_at(gate_a, gate_b, 1.0, 0.0, 4.55, Vector3(gate_width * 0.88, 0.42, 0.50)))
+		structural.append(_track_transform_at(gate_a, gate_b, 1.0, 0.0, 0.18, Vector3(gate_width * 0.76, 0.16, 1.15)))
+
+	# Main ramp and multi-jump dressing. Collision transforms and jump physics are not modified.
+	warnings.append(_local_box_transform(Vector3(-31.9, 6.3, -228.8), Vector3(7.0, 0.50, 8.0), Vector3(0.16, -0.745, 0.0)))
+	for side in [-1.0, 1.0]:
+		structural.append(_local_box_transform(Vector3(-31.9, 5.78, -228.8) + Vector3(side * 2.9, 0.0, 0.0), Vector3(0.38, 0.85, 7.4), Vector3(0.16, -0.745, 0.0)))
+	for arrow_index in range(3):
+		event_details.append(_local_box_transform(Vector3(-31.9, 6.63, -227.4 - float(arrow_index) * 1.8), Vector3(2.2, 0.06, 0.34), Vector3(0.16, -0.745, 0.0)))
+	for jump_index in range(3):
+		var anchor_index := 21 + mini(jump_index, 1)
+		var jump_a := ROUTE_POINTS[anchor_index]
+		var jump_b := ROUTE_POINTS[anchor_index + 1]
+		var jump_t := clampf(0.28 + float(jump_index) * 0.23, 0.15, 0.82)
+		var jump_height := 0.65 + float(jump_index) * 0.12
+		warnings.append(_track_transform_at(jump_a, jump_b, jump_t, 0.0, 0.22, Vector3(7.2, jump_height, 0.85)))
+		for side in [-1.0, 1.0]:
+			structural.append(_track_transform_at(jump_a, jump_b, jump_t, side * 3.25, 0.10, Vector3(0.32, jump_height + 0.25, 1.25)))
+		event_details.append(_track_transform_at(jump_a, jump_b, maxf(0.12, jump_t - 0.08), 0.0, 0.12, Vector3(2.6, 0.06, 0.38)))
+
+	# Shortcut entrances use restrained signs, broken fence rhythm, dirt banks, and rock gaps.
+	for shortcut_index in [SHORTCUT_A_ENTRY_ROUTE_INDEX, SHORTCUT_B_ENTRY_ROUTE_INDEX]:
+		var shortcut_a := ROUTE_POINTS[shortcut_index - 1]
+		var shortcut_b := ROUTE_POINTS[shortcut_index]
+		var shortcut_width := SEGMENT_WIDTHS[min(shortcut_index, SEGMENT_WIDTHS.size() - 1)]
+		for side in [-1.0, 1.0]:
+			wood_props.append(_track_transform_at(shortcut_a, shortcut_b, 1.0, side * (shortcut_width * 0.33), 0.75, Vector3(0.22, 1.5, 0.22)))
+			event_details.append(_track_transform_at(shortcut_a, shortcut_b, 1.0, side * (shortcut_width * 0.33), 1.42, Vector3(1.15, 0.52, 0.12)))
+			rocks.append(Transform3D(Basis(Vector3.UP, side * 0.36).scaled(Vector3(1.25, 0.75, 1.4)), shortcut_b + Vector3(side * shortcut_width * 0.46, 0.65, -2.0)))
+
+	# Final straight gains stronger event rhythm while the visible stripe stays aligned to finish detection.
+	var finish := ROUTE_POINTS[ROUTE_POINTS.size() - 1]
+	var finish_previous := ROUTE_POINTS[ROUTE_POINTS.size() - 2]
+	var finish_width := SEGMENT_WIDTHS[SEGMENT_WIDTHS.size() - 1]
+	for side in [-1.0, 1.0]:
+		structural.append(_track_transform_at(finish_previous, finish, 1.0, side * finish_width * 0.46, 2.65, Vector3(0.72, 5.3, 0.72)))
+		event_details.append(_track_transform_at(finish_previous, finish, 0.70, side * finish_width * 0.47, 0.72, Vector3(0.52, 1.45, 7.0)))
+		warnings.append(_track_transform_at(finish_previous, finish, 0.83, side * finish_width * 0.40, 1.65, Vector3(0.16, 3.3, 0.62)))
+	structural.append(_track_transform_at(finish_previous, finish, 1.0, 0.0, 5.15, Vector3(finish_width * 0.94, 0.62, 0.72)))
+	for checker in range(10):
+		var checker_side := -finish_width * 0.42 + float(checker) * finish_width * 0.84 / 9.0
+		var checker_transform := _track_transform_at(finish_previous, finish, 1.0, checker_side, 5.17, Vector3(finish_width * 0.075, 0.66, 0.76))
+		if checker % 2 == 0:
+			warnings.append(checker_transform)
+		else:
+			event_details.append(checker_transform)
+	for approach_index in range(4):
+		event_details.append(_track_transform_at(finish_previous, finish, 0.28 + float(approach_index) * 0.16, 0.0, 0.12, Vector3(3.8, 0.06, 0.46)))
+
+	# Sparse trackside signs, posts, crate stacks, and cones reinforce zone identity without hiding racers.
+	for prop_data in [[1, -1.0], [6, 1.0], [12, -1.0], [20, 1.0], [27, -1.0]]:
+		var prop_index := int(prop_data[0])
+		var prop_side := float(prop_data[1])
+		var prop_a := ROUTE_POINTS[prop_index]
+		var prop_b := ROUTE_POINTS[prop_index + 1]
+		var prop_width := SEGMENT_WIDTHS[prop_index]
+		structural.append(_track_transform_at(prop_a, prop_b, 0.52, prop_side * (prop_width * 0.5 + 2.3), 1.25, Vector3(0.22, 2.5, 0.22)))
+		event_details.append(_track_transform_at(prop_a, prop_b, 0.52, prop_side * (prop_width * 0.5 + 2.3), 2.22, Vector3(1.7, 0.72, 0.16)))
+		for cone_index in range(2):
+			warnings.append(_track_transform_at(prop_a, prop_b, 0.42 + float(cone_index) * 0.19, prop_side * (prop_width * 0.5 + 0.85), 0.32, Vector3(0.38, 0.64, 0.38)))
+
+	_append_box_multimesh("RoadSurface_Shortcuts", dirt_banks)
+	_append_box_multimesh("GrassShoulders", reeds)
+	_append_box_multimesh("WoodStructuresAndProps", wood_props)
+	_append_mesh_multimesh("CanyonOutcropsAndLooseRock", rocks)
+	_add_box_multimesh("EnvironmentStructuralProps", structural, _bridge_material)
+	_add_box_multimesh("EnvironmentWarningDetails", warnings, _materials[&"hazard"])
+	_add_box_multimesh("EnvironmentEventDetails", event_details, _materials[&"event_blue"])
+	var wet_rock_mesh := SphereMesh.new()
+	wet_rock_mesh.radius = 1.0
+	wet_rock_mesh.height = 2.0
+	wet_rock_mesh.radial_segments = 7
+	wet_rock_mesh.rings = 4
+	_add_mesh_multimesh("RiverWetRockAccents", wet_rock_mesh, wet_rocks, _materials[&"wet_rock"])
+
+func _append_box_multimesh(node_name: String, transforms: Array[Transform3D]) -> void:
+	_append_multimesh_transforms(node_name, transforms)
+
+func _append_mesh_multimesh(node_name: String, transforms: Array[Transform3D]) -> void:
+	_append_multimesh_transforms(node_name, transforms)
+
+func _append_multimesh_transforms(node_name: String, transforms: Array[Transform3D]) -> void:
+	if transforms.is_empty():
+		return
+	var instance := _decoration_root.get_node_or_null(node_name) as MultiMeshInstance3D
+	if instance == null or instance.multimesh == null:
+		push_warning("Missing environment batch: %s" % node_name)
+		return
+	var multimesh := instance.multimesh
+	var previous: Array[Transform3D] = []
+	for index in range(multimesh.instance_count):
+		previous.append(multimesh.get_instance_transform(index))
+	multimesh.instance_count = previous.size() + transforms.size()
+	for index in range(previous.size()):
+		multimesh.set_instance_transform(index, previous[index])
+	for index in range(transforms.size()):
+		multimesh.set_instance_transform(previous.size() + index, transforms[index])
 
 func _add_visual_box(node_name: String, world_position: Vector3, size: Vector3, material: Material) -> void:
 	var visual := CSGBox3D.new()

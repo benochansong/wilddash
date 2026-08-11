@@ -83,6 +83,47 @@ func _ready() -> void:
 		return
 	print("ENVIRONMENT FOUNDATION PASS materials=6 road_collision_separate=true decoration_collision=false")
 
+	var pass_2_visual_nodes: Array[String] = [
+		"RoadSurface_Shortcuts", "EnvironmentStructuralProps",
+		"EnvironmentWarningDetails", "EnvironmentEventDetails", "RiverWetRockAccents",
+	]
+	for node_name in pass_2_visual_nodes:
+		if decoration.get_node_or_null(node_name) == null:
+			_fail("Missing environment pass-2 visual node: %s" % node_name)
+			return
+	var bridge_river := decoration.get_node_or_null("BridgeRiver") as CSGBox3D
+	if bridge_river == null or not (bridge_river.material is ShaderMaterial):
+		_fail("River is not using the lightweight animated water material")
+		return
+	var static_collision := collision_root.get_node_or_null("ForestBlockA") as CSGBox3D
+	if static_collision == null or static_collision.visible or not static_collision.use_collision:
+		_fail("Static obstacle visual/collision separation invalid")
+		return
+	var moving_gate := collision_root.get_node_or_null("MovingGateA") as WildDashDynamicObstacle
+	if moving_gate == null:
+		_fail("Moving gate gameplay body missing")
+		return
+	var gate_visual := moving_gate.get_node_or_null("MechanicalVisual") as MeshInstance3D
+	var gate_collision := moving_gate.get_node_or_null("GameplayCollision") as CollisionShape3D
+	if gate_visual == null or not (gate_visual.mesh is ArrayMesh) or gate_visual.mesh.get_surface_count() < 3:
+		_fail("Moving gate mechanical visual is not a compound mesh")
+		return
+	if gate_collision == null or not (gate_collision.shape is BoxShape3D):
+		_fail("Moving gate gameplay collision is not the preserved primitive shape")
+		return
+	if not is_equal_approx(moving_gate.motion_speed, 1.15) or not is_equal_approx(moving_gate.amplitude, 5.2):
+		_fail("Moving gate timing changed")
+		return
+	var jump_collision := track.get_node_or_null("JumpRampCollision") as CSGBox3D
+	var multi_jump_collision := collision_root.get_node_or_null("MultiJumpHurdle_01") as CSGBox3D
+	if jump_collision == null or jump_collision.visible or not jump_collision.use_collision:
+		_fail("Main jump ramp collision changed")
+		return
+	if multi_jump_collision == null or multi_jump_collision.visible or not multi_jump_collision.use_collision:
+		_fail("Multi-jump collision/visual separation invalid")
+		return
+	print("ENVIRONMENT PASS 2 PASS water=animated obstacles=compound gates=timing_preserved ramps=collision_preserved shortcuts=readable finish=aligned")
+
 	var racer := RACER_SCENE.instantiate() as WildDashCharacterController
 	racer.name = "CheckpointTester"
 	racer.is_player = true

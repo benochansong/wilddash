@@ -2,6 +2,7 @@ class_name WildDashTrackMaterials
 extends RefCounted
 
 const SURFACE_SHADER: Shader = preload("res://tracks/stylized_surface.gdshader")
+const WATER_SHADER: Shader = preload("res://tracks/stylized_water.gdshader")
 
 static func build_palette() -> Dictionary:
 	return {
@@ -18,10 +19,17 @@ static func build_palette() -> Dictionary:
 		&"wood": _surface(Color("704a2e"), Color("4a301f"), 0.92, 0.75, 0.14, 0.02),
 		&"foliage": _surface(Color("3f7f3d"), Color("24532d"), 0.98, 0.55, 0.16, 0.02),
 		&"foliage_light": _surface(Color("6e9945"), Color("3d7137"), 0.98, 0.60, 0.14, 0.02),
-		&"water": _standard(Color(0.05, 0.32, 0.56, 0.88), 0.30),
+		&"water": _water(),
+		&"wet_rock": _surface(Color("526468"), Color("33484d"), 0.42, 0.42, 0.12, 0.03),
+		&"event_blue": _standard(Color("22a7c7"), 0.58, Color("22a7c7") * 0.06),
 		&"tunnel_light": _standard(Color("ffd47a"), 0.32, Color("ffd47a") * 1.45),
 		&"hazard": _standard(Color("f05a45"), 0.68, Color("f05a45") * 0.08),
 	}
+
+static func _water() -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = WATER_SHADER
+	return material
 
 static func _surface(
 	base_color: Color,
