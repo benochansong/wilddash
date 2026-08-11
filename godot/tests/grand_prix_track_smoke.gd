@@ -96,7 +96,7 @@ func _ready() -> void:
 	])
 	var road_arrows := decoration.get_node_or_null("RoadDirectionArrows") as MultiMeshInstance3D
 	var trackside_guides := decoration.get_node_or_null("TracksideDirectionGuides") as MultiMeshInstance3D
-	if road_arrows == null or road_arrows.multimesh == null or road_arrows.multimesh.instance_count < 24:
+	if road_arrows == null or road_arrows.multimesh == null or road_arrows.multimesh.instance_count < 34:
 		_fail("Road-surface direction arrow coverage is incomplete")
 		return
 	if trackside_guides == null or trackside_guides.multimesh == null or trackside_guides.multimesh.instance_count < 34:
@@ -111,6 +111,31 @@ func _ready() -> void:
 	print("DIRECTION GUIDE PASS road_arrows=%d trackside_guides=%d static_multimesh=true" % [
 		road_arrows.multimesh.instance_count, trackside_guides.multimesh.instance_count,
 	])
+	var shortcut_wear := decoration.get_node_or_null("ShortcutWearMarks") as MultiMeshInstance3D
+	if shortcut_wear == null or shortcut_wear.multimesh == null or shortcut_wear.multimesh.instance_count < 10:
+		_fail("Shortcut worn-path hierarchy is incomplete")
+		return
+	var special_coverage: PackedStringArray = decoration.get_meta(&"special_readability_coverage", PackedStringArray())
+	for zone in ["shortcut", "jump", "bridge", "tunnel", "obstacle", "final", "finish"]:
+		if not special_coverage.has(zone):
+			_fail("Special-section readability coverage missing: %s" % zone)
+			return
+	var finish_position := route[route.size() - 1]
+	var finish_line := track.get_node_or_null("FinishLine") as Area3D
+	var finish_stripe := decoration.get_node_or_null("FinishStripe") as CSGBox3D
+	if finish_line == null or finish_stripe == null:
+		_fail("Finish detection or visual stripe missing")
+		return
+	var finish_xz := Vector2(finish_position.x, finish_position.z)
+	if Vector2(finish_line.position.x, finish_line.position.z).distance_to(finish_xz) > 0.01 or Vector2(finish_stripe.position.x, finish_stripe.position.z).distance_to(finish_xz) > 0.01:
+		_fail("Visual finish stripe and finish detection are misaligned")
+		return
+	var structural_batch := decoration.get_node_or_null("EnvironmentStructuralProps") as MultiMeshInstance3D
+	var finish_gate_position: Vector3 = structural_batch.get_meta(&"finish_gate_position", Vector3(INF, INF, INF)) if structural_batch != null else Vector3(INF, INF, INF)
+	if Vector2(finish_gate_position.x, finish_gate_position.z).distance_to(finish_xz) > 0.01:
+		_fail("Visual finish gantry anchor is not aligned to the finish plane")
+		return
+	print("SPECIAL READABILITY PASS shortcut_wear=%d coverage=7 finish_aligned=true" % shortcut_wear.multimesh.instance_count)
 
 	var pass_2_visual_nodes: Array[String] = [
 		"RoadSurface_Shortcuts", "EnvironmentStructuralProps",

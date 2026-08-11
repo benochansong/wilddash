@@ -18,6 +18,7 @@ static func has_required_materials() -> bool:
 		&"concrete", &"water", &"hazard", &"finish", &"wet_rock",
 		&"dirt_road", &"bridge_road", &"tunnel_road", &"road_edge",
 		&"guide_backing", &"guide_arrow",
+		&"shortcut_wear",
 	]:
 		if not palette.has(key) or palette[key] == null:
 			return false
@@ -51,6 +52,7 @@ static func _build_palette() -> Dictionary:
 		&"road_edge": _standard(Color("f0e7d5"), 0.72, Color("f0e7d5") * 0.06),
 		&"guide_backing": _standard(Color("20282d"), 0.82),
 		&"guide_arrow": _standard(Color("f6bf45"), 0.60, Color("f6bf45") * 0.08),
+		&"shortcut_wear": _surface(Color("76503b"), Color("52382e"), 1.0, 0.30, 0.16, 0.10, 0.0, 0.10),
 		&"guardrail": metal,
 		&"foliage": _surface(Color("407b42"), Color("27543a"), 0.98, 0.55, 0.14, 0.02),
 		&"foliage_light": _surface(Color("709747"), Color("41713d"), 0.98, 0.60, 0.12, 0.02),

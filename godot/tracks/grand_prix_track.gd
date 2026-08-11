@@ -179,6 +179,7 @@ func _build_track() -> void:
 	_build_forest_dressing()
 	_build_environment_pass_2()
 	_build_track_guides()
+	_build_special_section_readability()
 
 func _create_segment(
 	node_name: String,
@@ -496,6 +497,207 @@ func _turn_sign(route_index: int) -> float:
 	var outgoing := ROUTE_POINTS[route_index + 1] - ROUTE_POINTS[route_index]
 	outgoing.y = 0.0
 	return 1.0 if outgoing.normalized().dot(_segment_right(route_index - 1)) >= 0.0 else -1.0
+
+func _build_special_section_readability() -> void:
+	var shortcut_wear: Array[Transform3D] = []
+	var wood_details: Array[Transform3D] = []
+	var structural_details: Array[Transform3D] = []
+	var warning_details: Array[Transform3D] = []
+	var event_details: Array[Transform3D] = []
+	var road_paint: Array[Transform3D] = []
+	var extra_arrows: Array[Transform3D] = []
+	var extra_trackside_guides: Array[Transform3D] = []
+	var tunnel_lights: Array[Transform3D] = []
+	var tunnel_exit_glow: Array[Transform3D] = []
+
+	# Shortcuts remain discoverable natural openings, but their broken wear and
+	# incomplete fences stay visually quieter than the main route's continuous edges.
+	for shortcut_data in [
+		[SHORTCUT_A_ENTRY_ROUTE_INDEX, SHORTCUT_A_EXIT_ROUTE_INDEX, 6.2],
+		[SHORTCUT_B_ENTRY_ROUTE_INDEX, SHORTCUT_B_EXIT_ROUTE_INDEX, 5.8],
+	]:
+		var entry_index := int(shortcut_data[0])
+		var exit_index := int(shortcut_data[1])
+		var width := float(shortcut_data[2])
+		var a := ROUTE_POINTS[entry_index]
+		var b := ROUTE_POINTS[exit_index]
+		for patch_index in range(5):
+			var patch_t := 0.14 + float(patch_index) * 0.18
+			var patch_width := width * (0.48 + float(patch_index % 2) * 0.08)
+			shortcut_wear.append(_track_transform_at(
+				a, b, patch_t, (-0.28 if patch_index % 2 == 0 else 0.24), 0.055,
+				Vector3(patch_width, 0.035, 6.0 + float(patch_index % 3) * 1.4)
+			))
+		for side in [-1.0, 1.0]:
+			for fence_index in range(3):
+				var fence_t := 0.22 + float(fence_index) * 0.29
+				var post_height := 0.85 + float((fence_index + entry_index) % 3) * 0.22
+				wood_details.append(_guide_transform_at(
+					a, b, fence_t, side * (width * 0.5 + 0.75), post_height * 0.5,
+					Vector3(0.16, post_height, 0.16)
+				))
+				if fence_index != 1:
+					wood_details.append(_guide_transform_at(
+						a, b, fence_t + 0.08, side * (width * 0.5 + 0.75), 0.68,
+						Vector3(0.12, 0.16, 7.5)
+					))
+		# One restrained wooden sign marks the opening without competing with main-route arrows.
+		wood_details.append(_guide_transform_at(a, b, 0.06, width * 0.5 + 1.0, 0.72, Vector3(0.18, 1.44, 0.18)))
+		event_details.append(_guide_transform_at(a, b, 0.06, width * 0.5 + 1.0, 1.30, Vector3(0.82, 0.36, 0.10)))
+
+	# Main ramp and multi-jump landing continuity.
+	_append_road_arrows(extra_arrows, 4, 4, [0.28, 0.46])
+	_append_road_arrows(extra_arrows, 22, 23, [0.88])
+	for side in [-1.0, 1.0]:
+		structural_details.append(_track_transform_at(
+			ROUTE_POINTS[22], ROUTE_POINTS[23], 0.91, side * (SEGMENT_WIDTHS[22] * 0.5 - 0.38),
+			0.58, Vector3(0.28, 1.18, 8.5)
+		))
+	for landing_t in [0.34, 0.50, 0.66]:
+		event_details.append(_track_transform_at(
+			ROUTE_POINTS[4], ROUTE_POINTS[5], landing_t, 0.0, 0.125, Vector3(3.4, 0.045, 0.34)
+		))
+
+	# Both bridges telegraph the width reduction before the structural deck begins.
+	for bridge_index in [5, 14]:
+		var approach_index: int = int(bridge_index) - 1
+		_append_narrowing_edges(road_paint, approach_index, SEGMENT_WIDTHS[bridge_index], 0.58)
+		for approach_t in [0.72, 0.82, 0.92]:
+			warning_details.append(_track_transform_at(
+				ROUTE_POINTS[approach_index], ROUTE_POINTS[bridge_index], approach_t, 0.0, 0.12,
+				Vector3(SEGMENT_WIDTHS[approach_index] * 0.72, 0.045, 0.24)
+			))
+		for side in [-1.0, 1.0]:
+			structural_details.append(_track_transform_at(
+				ROUTE_POINTS[bridge_index], ROUTE_POINTS[bridge_index + 1], 0.025,
+				side * (SEGMENT_WIDTHS[bridge_index] * 0.5 + 0.05), 1.35,
+				Vector3(0.42, 2.7, 0.42)
+			))
+		# Compact blue bridge plaque on the safer outer side.
+		event_details.append(_track_transform_at(
+			ROUTE_POINTS[approach_index], ROUTE_POINTS[bridge_index], 0.86,
+			SEGMENT_WIDTHS[approach_index] * 0.5 + 1.0, 1.65, Vector3(1.35, 0.62, 0.12)
+		))
+
+	# Tunnel approach narrows into the portal; interior lights and edge markings
+	# lead continuously to a brighter, wider exit silhouette.
+	_append_narrowing_edges(road_paint, 24, SEGMENT_WIDTHS[25], 0.60)
+	for approach_t in [0.76, 0.86, 0.94]:
+		warning_details.append(_track_transform_at(
+			ROUTE_POINTS[24], ROUTE_POINTS[25], approach_t, 0.0, 0.12,
+			Vector3(SEGMENT_WIDTHS[24] * 0.70, 0.045, 0.24)
+		))
+	for tunnel_t in [0.03, 0.13, 0.87, 0.97]:
+		for side in [-1.0, 1.0]:
+			tunnel_lights.append(_track_transform_at(
+				ROUTE_POINTS[25], ROUTE_POINTS[26], tunnel_t, side * 4.35, 4.15,
+				Vector3(0.42, 0.12, 1.65)
+			))
+	for side in [-1.0, 1.0]:
+		tunnel_exit_glow.append(_track_transform_at(
+			ROUTE_POINTS[25], ROUTE_POINTS[26], 0.982, side * 5.35, 2.25,
+			Vector3(0.16, 4.3, 0.30)
+		))
+
+	# Obstacle-field continuation is visible above and beside the blockers.
+	_append_road_arrows(extra_arrows, 6, 7, [0.78, 0.90])
+	_append_trackside_direction_marker(extra_trackside_guides, 7, 0.58, 0.90)
+	var obstacle_a := ROUTE_POINTS[6]
+	var obstacle_b := ROUTE_POINTS[7]
+	for side in [-1.0, 1.0]:
+		structural_details.append(_track_transform_at(
+			obstacle_a, obstacle_b, 0.55, side * (SEGMENT_WIDTHS[6] * 0.42), 2.35,
+			Vector3(0.34, 4.7, 0.34)
+		))
+	structural_details.append(_track_transform_at(
+		obstacle_a, obstacle_b, 0.55, 0.0, 4.55, Vector3(SEGMENT_WIDTHS[6] * 0.82, 0.36, 0.38)
+	))
+	event_details.append(_track_transform_at(
+		obstacle_a, obstacle_b, 0.55, 0.0, 4.42, Vector3(5.6, 0.58, 0.12)
+	))
+
+	# The final section builds intensity from warm inner edges to repeated arrows,
+	# flags, checkered approach bars, and the existing aligned finish gantry.
+	for final_index in [26, 27, 28]:
+		var final_length := ROUTE_POINTS[final_index].distance_to(ROUTE_POINTS[final_index + 1])
+		for side in [-1.0, 1.0]:
+			warning_details.append(_track_transform_at(
+				ROUTE_POINTS[final_index], ROUTE_POINTS[final_index + 1], 0.5,
+				side * (SEGMENT_WIDTHS[final_index] * 0.5 - 0.72), 0.13,
+				Vector3(0.16, 0.045, final_length - 0.4)
+			))
+	_append_road_arrows(extra_arrows, 27, 28, [0.22, 0.48, 0.72])
+	var finish_a := ROUTE_POINTS[28]
+	var finish_b := ROUTE_POINTS[29]
+	for flag_index in range(4):
+		var flag_t := 0.18 + float(flag_index) * 0.20
+		for side in [-1.0, 1.0]:
+			structural_details.append(_track_transform_at(
+				finish_a, finish_b, flag_t, side * (SEGMENT_WIDTHS[28] * 0.5 + 0.65),
+				1.45, Vector3(0.16, 2.9, 0.16)
+			))
+			var flag_transform := _track_transform_at(
+				finish_a, finish_b, flag_t, side * (SEGMENT_WIDTHS[28] * 0.5 + 0.26),
+				2.35, Vector3(0.75, 0.72, 0.10)
+			)
+			if (flag_index + int(side)) % 2 == 0:
+				event_details.append(flag_transform)
+			else:
+				warning_details.append(flag_transform)
+	for accent_index in range(6):
+		var accent_transform := _track_transform_at(
+			finish_a, finish_b, 0.52 + float(accent_index) * 0.075, 0.0, 0.135,
+			Vector3(SEGMENT_WIDTHS[28] * 0.70, 0.045, 0.26)
+		)
+		if accent_index % 2 == 0:
+			warning_details.append(accent_transform)
+		else:
+			event_details.append(accent_transform)
+
+	_add_box_multimesh("ShortcutWearMarks", shortcut_wear, _materials[&"shortcut_wear"])
+	_append_box_multimesh("WoodStructuresAndProps", wood_details)
+	_append_box_multimesh("EnvironmentStructuralProps", structural_details)
+	_append_box_multimesh("EnvironmentWarningDetails", warning_details)
+	_append_box_multimesh("EnvironmentEventDetails", event_details)
+	_append_box_multimesh("RoadPaintedEdgeLines", road_paint)
+	_append_multimesh_transforms("RoadDirectionArrows", extra_arrows)
+	_append_multimesh_transforms("TracksideDirectionGuides", extra_trackside_guides)
+	_append_box_multimesh("TunnelGuideLights", tunnel_lights)
+	_append_box_multimesh("TunnelGuideLights", tunnel_exit_glow)
+	_decoration_root.set_meta(&"special_readability_coverage", PackedStringArray([
+		"shortcut", "jump", "bridge", "tunnel", "obstacle", "final", "finish",
+	]))
+
+func _append_narrowing_edges(
+	result: Array[Transform3D],
+	approach_segment: int,
+	target_width: float,
+	start_t: float
+) -> void:
+	var a := ROUTE_POINTS[approach_segment]
+	var b := ROUTE_POINTS[approach_segment + 1]
+	var right := _segment_right(approach_segment)
+	var start_center := a.lerp(b, start_t)
+	for side in [-1.0, 1.0]:
+		var from: Vector3 = start_center + right * side * (SEGMENT_WIDTHS[approach_segment] * 0.5 - 0.42) + Vector3.UP * 0.12
+		var to: Vector3 = b + right * side * (target_width * 0.5 - 0.42) + Vector3.UP * 0.12
+		result.append(_flat_beam_transform(from, to, 0.22, 0.045))
+
+func _guide_transform_at(
+	a: Vector3,
+	b: Vector3,
+	t: float,
+	lateral_offset: float,
+	vertical_offset: float,
+	size: Vector3
+) -> Transform3D:
+	return _track_transform_at(a, b, t, lateral_offset, vertical_offset, size)
+
+func _flat_beam_transform(from: Vector3, to: Vector3, width: float, height: float) -> Transform3D:
+	var transform := Transform3D(Basis.IDENTITY, (from + to) * 0.5)
+	transform = transform.looking_at(to, Vector3.UP)
+	transform.basis = transform.basis.scaled(Vector3(width, height, from.distance_to(to)))
+	return transform
 
 func _add_box_multimesh(node_name: String, transforms: Array[Transform3D], material: Material) -> void:
 	if transforms.is_empty():
@@ -915,12 +1117,12 @@ func _build_tunnel() -> void:
 	exit_glow_transforms.append(_track_transform_at(
 		a, b, 0.975, 0.0, 4.08, Vector3(9.6, 0.12, 0.26)
 	))
+	light_transforms.append_array(exit_glow_transforms)
 	_add_box_multimesh("TunnelWallSegments", wall_panel_transforms, _tunnel_material)
 	_add_box_multimesh("TunnelCeilingPanels", ceiling_panel_transforms, _tunnel_material)
 	_add_box_multimesh("TunnelFramesAndCeilingSupports", support_transforms, _materials[&"bridge"])
 	_add_box_multimesh("TunnelGuideLights", light_transforms, _materials[&"tunnel_light"])
 	_add_box_multimesh("TunnelEdgeMarkings", edge_marking_transforms, _materials[&"curb_warning"])
-	_add_box_multimesh("TunnelExitGlow", exit_glow_transforms, _materials[&"tunnel_light"])
 
 func _build_shortcuts() -> void:
 	var a_entry := ROUTE_POINTS[SHORTCUT_A_ENTRY_ROUTE_INDEX]
@@ -1179,6 +1381,9 @@ func _build_environment_pass_2() -> void:
 	_append_box_multimesh("WoodStructuresAndProps", wood_props)
 	_append_mesh_multimesh("CanyonOutcropsAndLooseRock", rocks)
 	_add_box_multimesh("EnvironmentStructuralProps", structural, _bridge_material)
+	var structural_batch := _decoration_root.get_node_or_null("EnvironmentStructuralProps") as MultiMeshInstance3D
+	if structural_batch != null:
+		structural_batch.set_meta(&"finish_gate_position", finish)
 	_add_box_multimesh("EnvironmentWarningDetails", warnings, _materials[&"hazard"])
 	_add_box_multimesh("EnvironmentEventDetails", event_details, _materials[&"event_blue"])
 	var cone_mesh := CylinderMesh.new()
@@ -1279,6 +1484,7 @@ func _configure_environment_lod_and_visibility() -> void:
 	_set_visibility_range("TracksideRoundProps", 0.0, 170.0)
 	_set_visibility_range("RoadDirectionArrows", 0.0, 360.0)
 	_set_visibility_range("TracksideDirectionGuides", 0.0, 420.0)
+	_set_visibility_range("ShortcutWearMarks", 0.0, 280.0)
 	_set_visibility_range("RiverWetRockAccents", 0.0, 260.0)
 	_set_visibility_range("BridgeRiver", 0.0, 760.0)
 	_set_visibility_range("LongRiver", 0.0, 760.0)
