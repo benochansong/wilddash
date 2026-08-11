@@ -1,6 +1,10 @@
 class_name WildDashItemBox
 extends Area3D
 
+const BASE_PICKUP_RADIUS := 4.1
+const PLAYER_PICKUP_BONUS := 0.45
+const PICKUP_SCAN_INTERVAL := 0.05
+
 @export var respawn_seconds := 5.0
 
 var _active := true
@@ -8,6 +12,7 @@ var _visual_root: Node3D
 var _collision: CollisionShape3D
 var _time := 0.0
 var _scan_elapsed := 0.0
+var _previous_probe_positions: Dictionary = {}
 
 func _ready() -> void:
 	add_to_group("wilddash_item_box")
@@ -28,17 +33,25 @@ func _physics_process(delta: float) -> void:
 	if not _active:
 		return
 	_scan_elapsed += delta
-	if _scan_elapsed < 0.10:
+	if _scan_elapsed < PICKUP_SCAN_INTERVAL:
 		return
 	_scan_elapsed = 0.0
 	for racer in RaceManager.racers:
-		if racer == null or not is_instance_valid(racer) or RaceManager.finish_order.has(racer):
+		if racer == null or not is_instance_valid(racer):
 			continue
-		var pickup_radius := 3.3
+		var probe_position := racer.global_position + Vector3.UP * 0.8
+		var racer_id := racer.get_instance_id()
+		var previous_probe: Vector3 = _previous_probe_positions.get(racer_id, probe_position)
+		_previous_probe_positions[racer_id] = probe_position
+		if RaceManager.finish_order.has(racer):
+			continue
+		var pickup_radius := BASE_PICKUP_RADIUS
 		if racer.has_method("get_interaction_radius"):
 			pickup_radius = float(racer.call("get_interaction_radius", pickup_radius))
 		pickup_radius = ItemSystem.get_pickup_radius(racer, pickup_radius)
-		if global_position.distance_to(racer.global_position + Vector3.UP * 0.8) <= pickup_radius:
+		if racer is WildDashCharacterController and (racer as WildDashCharacterController).is_player:
+			pickup_radius += PLAYER_PICKUP_BONUS
+		if _distance_point_to_segment(global_position, previous_probe, probe_position) <= pickup_radius:
 			if _try_pickup(racer):
 				return
 
@@ -71,6 +84,7 @@ func _deactivate() -> void:
 	if not _active:
 		return
 	_active = false
+	_previous_probe_positions.clear()
 	set_deferred("monitoring", false)
 	if _collision != null:
 		_collision.set_deferred("disabled", true)
@@ -83,11 +97,28 @@ func _respawn_later() -> void:
 	if not is_inside_tree():
 		return
 	_active = true
+	_previous_probe_positions.clear()
 	monitoring = true
 	if _collision != null:
 		_collision.disabled = false
 	if _visual_root != null:
 		_visual_root.visible = true
+	call_deferred("_try_overlapping_pickup")
+
+func _try_overlapping_pickup() -> void:
+	if not _active or not monitoring:
+		return
+	for body in get_overlapping_bodies():
+		if _try_pickup(body):
+			return
+
+func _distance_point_to_segment(point: Vector3, a: Vector3, b: Vector3) -> float:
+	var segment := b - a
+	var length_squared := segment.length_squared()
+	if length_squared <= 0.0001:
+		return point.distance_to(b)
+	var t := clampf((point - a).dot(segment) / length_squared, 0.0, 1.0)
+	return point.distance_to(a + segment * t)
 
 func _build_visual() -> void:
 	_visual_root = Node3D.new()
@@ -124,6 +155,6 @@ func _build_visual() -> void:
 
 	_collision = CollisionShape3D.new()
 	var shape := SphereShape3D.new()
-	shape.radius = 1.45
+	shape.radius = 2.1
 	_collision.shape = shape
 	add_child(_collision)
