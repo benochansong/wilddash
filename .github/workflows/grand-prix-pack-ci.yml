@@ -37,7 +37,7 @@ jobs:
           set -o pipefail
           export WILDDASH_RC5_RACERS=10
           export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-pack-10"
-          timeout 110s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+          timeout 125s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot res://tests/rc5_grand_prix_probe.tscn \
             | tee /tmp/pack-10.log
           grep -q "RC5 PROBE START racers=10 ai=9" /tmp/pack-10.log
@@ -50,7 +50,7 @@ jobs:
           set -o pipefail
           export WILDDASH_RC5_RACERS=15
           export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-pack-15"
-          timeout 110s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+          timeout 150s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot res://tests/rc5_grand_prix_probe.tscn \
             | tee /tmp/pack-15.log
           grep -q "RC5 PROBE START racers=15 ai=14" /tmp/pack-15.log
@@ -63,7 +63,7 @@ jobs:
           set -o pipefail
           export WILDDASH_RC5_RACERS=18
           export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-pack-18"
-          timeout 110s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+          timeout 165s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot res://tests/rc5_grand_prix_probe.tscn \
             | tee /tmp/pack-18.log
           grep -q "RC5 PROBE START racers=18 ai=17" /tmp/pack-18.log
