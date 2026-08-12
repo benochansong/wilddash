@@ -24,13 +24,11 @@ var _camera: Camera3D
 var _base_fov := -1.0
 var _slip_speed := 0.0
 var _slip_sign := 0.0
+var _surface_slip_multiplier := 1.0
 var _overlay: WildDashSpeedLinesOverlay
 var _reported_ready := false
 
 func _ready() -> void:
-	# Race modes create the Player and ChaseCamera from their parent _ready().
-	# Run this controller later than gameplay nodes so the tiny arcade slip is
-	# applied after the normal CharacterBody3D race movement for the frame.
 	process_priority = 100
 	if DisplayServer.get_name() != "headless" and speed_lines_enabled:
 		var canvas := CanvasLayer.new()
@@ -88,10 +86,10 @@ func _physics_process(delta: float) -> void:
 		_slip_speed *= 0.42
 	_slip_sign = current_sign
 	var speed_factor := clampf((speed_ratio - slip_start_speed_ratio) / maxf(0.01, 1.08 - slip_start_speed_ratio), 0.0, 1.0)
-	var desired_slip := _racer.current_speed * slip_strength * speed_factor * steer_amount * _get_archetype_slip_multiplier()
+	var desired_slip := _racer.current_speed * slip_strength * speed_factor * steer_amount * _get_archetype_slip_multiplier() * _surface_slip_multiplier
 	if _is_boosted(speed_ratio):
 		desired_slip *= boost_slip_multiplier
-	desired_slip = minf(max_slip_speed, desired_slip)
+	desired_slip = minf(max_slip_speed * maxf(1.0, _surface_slip_multiplier * 0.92), desired_slip)
 	_slip_speed = move_toward(_slip_speed, desired_slip, slip_response * delta)
 
 	var right := _racer.global_transform.basis.x.normalized()
@@ -99,6 +97,12 @@ func _physics_process(delta: float) -> void:
 	var collision := _racer.move_and_collide(outward * _slip_speed * delta)
 	if collision != null:
 		_slip_speed *= 0.28
+
+func set_surface_slip_multiplier(value: float) -> void:
+	_surface_slip_multiplier = clampf(value, 0.75, 1.45)
+
+func get_surface_slip_multiplier() -> float:
+	return _surface_slip_multiplier
 
 func _resolve_runtime_nodes() -> void:
 	if _racer == null or not is_instance_valid(_racer):
