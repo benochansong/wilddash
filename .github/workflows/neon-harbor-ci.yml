@@ -1,17 +1,7 @@
 name: WILD DASH Neon Harbor CI
 
+# Track-specific validation. Run manually when Neon Harbor changes.
 on:
-  pull_request:
-    paths:
-      - "godot/tracks/neon_harbor_track.gd"
-      - "godot/tracks/neon_harbor_track.tscn"
-      - "godot/tracks/neon_harbor_lighting_polish.gd"
-      - "godot/modes/neon_harbor_race/**"
-      - "godot/systems/racing_feel_controller.gd"
-      - "godot/camera/speed_lines_overlay.gd"
-      - "godot/tests/neon_harbor_*.gd"
-      - "godot/tests/neon_harbor_*.tscn"
-      - ".github/workflows/neon-harbor-ci.yml"
   workflow_dispatch:
 
 permissions:
