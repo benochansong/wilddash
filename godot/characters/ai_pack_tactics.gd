@@ -23,18 +23,22 @@ const NORMAL_FRONT_HEADWAY := 4.4
 const HARD_FRONT_HEADWAY := 4.0
 const SIDE_FRONT_CLEARANCE := 5.2
 const SIDE_REAR_CLEARANCE := 4.4
-const ESCAPE_FRONT_CLEARANCE := 4.25
-const ESCAPE_REAR_CLEARANCE := 3.55
+const NORMAL_ESCAPE_FRONT_CLEARANCE := 4.80
+const NORMAL_ESCAPE_REAR_CLEARANCE := 4.20
+const HARD_ESCAPE_FRONT_CLEARANCE := 4.25
+const HARD_ESCAPE_REAR_CLEARANCE := 3.55
 const LARGE_BODY_HEADWAY_BONUS := 0.9
 const LARGE_BODY_ESCAPE_BONUS := 0.35
 const LARGE_BODY_LANE_SCALE := 0.74
 const CROWD_DENSITY_LIMIT := 4
 const CROWD_LANE_SCALE := 0.72
-const NORMAL_BLOCKED_ESCAPE_SECONDS := 1.05
+const NORMAL_BLOCKED_ESCAPE_SECONDS := 0.95
 const HARD_BLOCKED_ESCAPE_SECONDS := 0.78
 const TRAILING_ESCAPE_TIME_SCALE := 0.82
-const BLOCKED_SPEED_RATIO := 0.91
-const ESCAPE_COOLDOWN_SECONDS := 1.25
+const NORMAL_BLOCKED_SPEED_RATIO := 0.96
+const HARD_BLOCKED_SPEED_RATIO := 0.91
+const NORMAL_ESCAPE_COOLDOWN_SECONDS := 1.55
+const HARD_ESCAPE_COOLDOWN_SECONDS := 1.25
 const NORMAL_ESCAPE_COMMIT_SECONDS := 1.05
 const HARD_ESCAPE_COMMIT_SECONDS := 0.86
 const POST_BLOCK_RECOVERY_SECONDS := 1.25
@@ -172,6 +176,7 @@ func _update_pack_decision(decision_elapsed: float) -> void:
 	if _base_speed > 0.0 and _driver.target_speed > _base_speed * 1.75:
 		_base_speed = _driver.target_speed
 
+	var hard_mode := GameManager.difficulty == &"nightmare"
 	var forward := -_racer.global_transform.basis.z.normalized()
 	var right := _racer.global_transform.basis.x.normalized()
 	var front: WildDashCharacterController = null
@@ -225,13 +230,13 @@ func _update_pack_decision(decision_elapsed: float) -> void:
 		var pace_response := 0.28
 		if _post_block_recovery_remaining > 0.0:
 			pace_scale = maxf(pace_scale, 1.0)
-			pace_response = 0.56 if GameManager.difficulty == &"nightmare" else 0.50
+			pace_response = 0.56 if hard_mode else 0.46
 		_driver.target_speed = lerpf(_driver.target_speed, _base_speed * pace_scale, pace_response)
 		_record_action(&"pace", null, 0.0)
 		return
 
 	var large_body := _is_large_body()
-	var safe_front_gap := HARD_FRONT_HEADWAY if GameManager.difficulty == &"nightmare" else NORMAL_FRONT_HEADWAY
+	var safe_front_gap := HARD_FRONT_HEADWAY if hard_mode else NORMAL_FRONT_HEADWAY
 	if large_body:
 		safe_front_gap += LARGE_BODY_HEADWAY_BONUS
 
@@ -255,9 +260,13 @@ func _update_pack_decision(decision_elapsed: float) -> void:
 	var field_size: int = RaceManager.racers.size()
 	var trailing_half: bool = rank > ceili(float(field_size) * 0.5)
 	var front_id: int = int(front.get_instance_id())
-	var slow_in_traffic: bool = _racer.current_speed < _base_speed * BLOCKED_SPEED_RATIO
-	var blocked_range: bool = front_distance < safe_front_gap * 1.55
-	if blocked_range and slow_in_traffic:
+	var blocked_speed_ratio := HARD_BLOCKED_SPEED_RATIO if hard_mode else NORMAL_BLOCKED_SPEED_RATIO
+	var slow_in_traffic := _racer.current_speed < _base_speed * blocked_speed_ratio
+	var blocked_range := front_distance < safe_front_gap * 1.55
+	var trailing_queue_pressure := false
+	if trailing_half and not hard_mode:
+		trailing_queue_pressure = front_distance < safe_front_gap * 1.25 and front.current_speed < _base_speed * 0.995
+	if blocked_range and (slow_in_traffic or trailing_queue_pressure):
 		if _blocked_target_id == front_id:
 			_blocked_elapsed += decision_elapsed
 		else:
@@ -270,11 +279,14 @@ func _update_pack_decision(decision_elapsed: float) -> void:
 			_blocked_target_id = 0
 			_blocked_active = false
 
-	var escape_threshold := HARD_BLOCKED_ESCAPE_SECONDS if GameManager.difficulty == &"nightmare" else NORMAL_BLOCKED_ESCAPE_SECONDS
+	var escape_threshold := HARD_BLOCKED_ESCAPE_SECONDS if hard_mode else NORMAL_BLOCKED_ESCAPE_SECONDS
 	if trailing_half:
 		escape_threshold *= TRAILING_ESCAPE_TIME_SCALE
-	var escape_front_clearance := ESCAPE_FRONT_CLEARANCE + (LARGE_BODY_ESCAPE_BONUS if large_body else 0.0)
-	var escape_rear_clearance := ESCAPE_REAR_CLEARANCE + (LARGE_BODY_ESCAPE_BONUS if large_body else 0.0)
+	var escape_front_clearance := HARD_ESCAPE_FRONT_CLEARANCE if hard_mode else NORMAL_ESCAPE_FRONT_CLEARANCE
+	var escape_rear_clearance := HARD_ESCAPE_REAR_CLEARANCE if hard_mode else NORMAL_ESCAPE_REAR_CLEARANCE
+	if large_body:
+		escape_front_clearance += LARGE_BODY_ESCAPE_BONUS
+		escape_rear_clearance += LARGE_BODY_ESCAPE_BONUS
 	var left_escape_clear := front_left > escape_front_clearance and rear_left > escape_rear_clearance
 	var right_escape_clear := front_right > escape_front_clearance and rear_right > escape_rear_clearance
 	var breakout_ready := _blocked_elapsed >= escape_threshold and _escape_cooldown_remaining <= 0.0 and (left_escape_clear or right_escape_clear)
@@ -295,8 +307,8 @@ func _update_pack_decision(decision_elapsed: float) -> void:
 		preferred_side = escape_side
 		can_change_lane = true
 		_committed_side = escape_side
-		_lane_commit_remaining = HARD_ESCAPE_COMMIT_SECONDS if GameManager.difficulty == &"nightmare" else NORMAL_ESCAPE_COMMIT_SECONDS
-		_escape_cooldown_remaining = ESCAPE_COOLDOWN_SECONDS
+		_lane_commit_remaining = HARD_ESCAPE_COMMIT_SECONDS if hard_mode else NORMAL_ESCAPE_COMMIT_SECONDS
+		_escape_cooldown_remaining = HARD_ESCAPE_COOLDOWN_SECONDS if hard_mode else NORMAL_ESCAPE_COOLDOWN_SECONDS
 		_post_block_recovery_remaining = POST_BLOCK_RECOVERY_SECONDS
 		_blocked_breakout_actions += 1
 		_blocked_elapsed = 0.0
@@ -304,17 +316,18 @@ func _update_pack_decision(decision_elapsed: float) -> void:
 		_blocked_active = false
 	elif can_change_lane and (_committed_side == 0.0 or preferred_side != _committed_side or _lane_commit_remaining <= 0.0):
 		_committed_side = preferred_side
-		_lane_commit_remaining = HARD_LANE_COMMIT_SECONDS if GameManager.difficulty == &"nightmare" else NORMAL_LANE_COMMIT_SECONDS
+		_lane_commit_remaining = HARD_LANE_COMMIT_SECONDS if hard_mode else NORMAL_LANE_COMMIT_SECONDS
 		_lane_commit_actions += 1
 	elif not can_change_lane and _lane_commit_remaining <= 0.0:
 		_committed_side = 0.0
 
-	var lane_cap := HARD_MAX_LANE_SHIFT if GameManager.difficulty == &"nightmare" else MAX_LANE_SHIFT
+	var lane_cap := HARD_MAX_LANE_SHIFT if hard_mode else MAX_LANE_SHIFT
 	var overtake_strength := lerpf(1.20, lane_cap, _overtake)
 	var desired_shift := preferred_side * overtake_strength
 	if large_body:
 		desired_shift *= LARGE_BODY_LANE_SCALE
-	var desired_speed_scale := 0.965
+	var traffic_hold_scale := 0.965 if hard_mode else 0.955
+	var desired_speed_scale := traffic_hold_scale
 	var action: StringName = &"traffic_hold"
 
 	match _personality:
@@ -323,19 +336,19 @@ func _update_pack_decision(decision_elapsed: float) -> void:
 				desired_speed_scale = 1.02
 				action = &"overtake"
 			else:
-				desired_speed_scale = 0.965
+				desired_speed_scale = traffic_hold_scale
 				desired_shift *= 0.30
 		Personality.SAFE:
-			desired_speed_scale = 0.955 if not can_change_lane else 0.98
+			desired_speed_scale = (0.955 if hard_mode else 0.945) if not can_change_lane else 0.98
 			desired_shift *= 0.55
 			action = &"yield" if not can_change_lane or front_distance < safe_front_gap else &"line_change"
 		Personality.SHORTCUT:
-			desired_speed_scale = 0.995 if can_change_lane else 0.965
+			desired_speed_scale = 0.995 if can_change_lane else traffic_hold_scale
 			desired_shift *= 0.72
 			action = &"line_change" if can_change_lane else &"traffic_hold"
 		Personality.ITEM_FIGHTER:
 			if _racer.get_held_item() != &"":
-				desired_speed_scale = 0.98 if can_change_lane else 0.96
+				desired_speed_scale = 0.98 if can_change_lane else (0.96 if hard_mode else 0.95)
 				desired_shift *= 0.64
 				action = &"attack_setup"
 			elif can_change_lane:
@@ -343,66 +356,69 @@ func _update_pack_decision(decision_elapsed: float) -> void:
 				desired_shift *= 0.78
 				action = &"overtake"
 			else:
-				desired_speed_scale = 0.965
+				desired_speed_scale = traffic_hold_scale
 		_:
 			if can_change_lane:
 				desired_speed_scale = 1.005
 				action = &"overtake"
 			else:
-				desired_speed_scale = 0.965
+				desired_speed_scale = traffic_hold_scale
 				desired_shift *= 0.30
 
-	# Follow the pace of the car ahead without stacking an excessive slowdown.
-	# Phase 2 could cap a blocked racer at 0.93x even when the front racer was
-	# moving at nearly the same pace, which widened the tail of dense fields.
+	# Difficulty-specific following: Normal leaves more headway and solves queues
+	# with deliberate lane escapes; Hard tolerates closer pressure and faster calls.
 	if front_distance < safe_front_gap:
 		var pressure := clampf((safe_front_gap - front_distance) / safe_front_gap, 0.0, 1.0)
-		var close_speed_cap := lerpf(0.99, 0.96, pressure)
-		var front_speed_ratio := clampf(front.current_speed / maxf(_base_speed, 0.1), 0.90, 1.02)
-		close_speed_cap = maxf(close_speed_cap, minf(0.995, front_speed_ratio + 0.012))
-		if large_body:
-			close_speed_cap = minf(close_speed_cap, 0.985)
-		if GameManager.difficulty == &"nightmare":
+		var close_speed_cap := 0.97
+		if hard_mode:
+			close_speed_cap = lerpf(0.99, 0.96, pressure)
+			var hard_front_ratio := clampf(front.current_speed / maxf(_base_speed, 0.1), 0.90, 1.02)
+			close_speed_cap = maxf(close_speed_cap, minf(0.995, hard_front_ratio + 0.012))
+			if large_body:
+				close_speed_cap = minf(close_speed_cap, 0.985)
 			close_speed_cap = minf(0.998, close_speed_cap + 0.006)
+		else:
+			close_speed_cap = lerpf(0.975, 0.945, pressure)
+			var normal_front_ratio := clampf(front.current_speed / maxf(_base_speed, 0.1), 0.88, 1.0)
+			close_speed_cap = minf(close_speed_cap, maxf(0.94, normal_front_ratio + 0.006))
+			if large_body:
+				close_speed_cap = minf(close_speed_cap, 0.97)
 		desired_speed_scale = minf(desired_speed_scale, close_speed_cap)
 		if not can_change_lane:
 			desired_shift *= 0.55
-			action = &"yield" if _personality == Personality.SAFE else &"traffic_hold"
+		action = &"yield" if _personality == Personality.SAFE else &"traffic_hold"
 
 	if breakout_ready:
-		desired_speed_scale = maxf(desired_speed_scale, 0.995 if GameManager.difficulty == &"nightmare" else 0.985)
+		desired_speed_scale = maxf(desired_speed_scale, 0.995 if hard_mode else 0.975)
 		action = &"blocked_escape"
 
-	# Do not cut across a racer approaching from behind. During an explicit
-	# blocked escape, use a still-safe but slightly tighter rear gap so the tail
-	# can actually leave a traffic queue instead of waiting indefinitely.
+	# Never cut across an unsafe rear approach. Normal keeps a wider escape gap;
+	# Hard may use the tighter RC6 Phase 3 gap after an explicit blocked decision.
 	var rear_guard := escape_rear_clearance if breakout_ready else SIDE_REAR_CLEARANCE
 	if preferred_side < 0.0 and rear_left < rear_guard:
 		desired_shift = maxf(0.0, desired_shift)
-		desired_speed_scale = minf(desired_speed_scale, 0.97)
+		desired_speed_scale = minf(desired_speed_scale, 0.97 if hard_mode else 0.955)
 		action = &"yield"
 	elif preferred_side > 0.0 and rear_right < rear_guard:
 		desired_shift = minf(0.0, desired_shift)
-		desired_speed_scale = minf(desired_speed_scale, 0.97)
+		desired_speed_scale = minf(desired_speed_scale, 0.97 if hard_mode else 0.955)
 		action = &"yield"
 
-	# Dense groups still prefer stable lines, except when the racer has been
-	# measurably blocked long enough to justify a committed escape.
 	if nearby_count >= CROWD_DENSITY_LIMIT and front_distance < safe_front_gap * 1.35 and not breakout_ready:
 		desired_shift *= CROWD_LANE_SCALE
-		desired_speed_scale = minf(desired_speed_scale, 0.985 if GameManager.difficulty == &"nightmare" else 0.98)
+		desired_speed_scale = minf(desired_speed_scale, 0.985 if hard_mode else 0.97)
 		_crowd_avoid_actions += 1
 		if action == &"overtake":
 			action = &"line_change"
 
-	var response := 0.50 if GameManager.difficulty == &"nightmare" else 0.40
+	var response := 0.50 if hard_mode else 0.40
 	if breakout_ready:
-		response = 0.66 if GameManager.difficulty == &"nightmare" else 0.58
+		response = 0.66 if hard_mode else 0.56
 	_lane_shift = clampf(lerpf(_lane_shift, desired_shift, response), -lane_cap, lane_cap)
 	_driver.preferred_lane = clampf(_base_lane + _lane_shift, -4.0, 4.0)
-	var speed_response := 0.46 if GameManager.difficulty == &"nightmare" else 0.38
+	var speed_response := 0.46 if hard_mode else 0.36
 	if breakout_ready or _post_block_recovery_remaining > 0.0:
-		speed_response = 0.58 if GameManager.difficulty == &"nightmare" else 0.52
+		speed_response = 0.58 if hard_mode else 0.48
 	_driver.target_speed = lerpf(_driver.target_speed, _base_speed * desired_speed_scale, speed_response)
 	_record_action(action, front, front_distance)
 
