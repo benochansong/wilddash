@@ -1,9 +1,11 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://modes/neon_harbor_race/neon_harbor_race_mode.gd" id="1_mode"]
 [ext_resource type="Script" path="res://tracks/neon_harbor_lighting_polish.gd" id="2_lighting"]
 [ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="3_feel"]
 [ext_resource type="Script" path="res://systems/race_environment_collision_controller.gd" id="4_collision"]
+[ext_resource type="Script" path="res://items/item_combat_expansion_controller.gd" id="5_items"]
+[ext_resource type="Script" path="res://tracks/race_obstacle_expansion_controller.gd" id="6_obstacles"]
 
 [node name="NeonHarborRace" type="Node3D"]
 script = ExtResource("1_mode")
@@ -20,3 +22,9 @@ boost_slip_multiplier = 1.2
 
 [node name="RaceEnvironmentCollisionController" type="Node" parent="."]
 script = ExtResource("4_collision")
+
+[node name="ItemCombatExpansionController" type="Node" parent="."]
+script = ExtResource("5_items")
+
+[node name="RaceObstacleExpansionController" type="Node3D" parent="."]
+script = ExtResource("6_obstacles")
