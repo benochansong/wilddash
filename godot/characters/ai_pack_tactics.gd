@@ -9,19 +9,30 @@ enum Personality {
 	BALANCED,
 }
 
-const NORMAL_THINK_INTERVAL := 0.16
-const HARD_THINK_INTERVAL := 0.12
-const DETECTION_FORWARD := 10.5
-const DETECTION_REAR := 6.5
-const DETECTION_SIDE := 3.6
-const FRONT_CORRIDOR := 1.35
-const MAX_LANE_SHIFT := 2.8
-const HARD_MAX_LANE_SHIFT := 3.15
+const NORMAL_THINK_INTERVAL := 0.18
+const HARD_THINK_INTERVAL := 0.14
+const DETECTION_FORWARD := 12.5
+const DETECTION_REAR := 7.5
+const DETECTION_SIDE := 4.4
+const FRONT_CORRIDOR := 1.55
+const MAX_LANE_SHIFT := 2.45
+const HARD_MAX_LANE_SHIFT := 2.85
+const NORMAL_LANE_COMMIT_SECONDS := 0.85
+const HARD_LANE_COMMIT_SECONDS := 0.62
+const NORMAL_FRONT_HEADWAY := 4.4
+const HARD_FRONT_HEADWAY := 4.0
+const SIDE_FRONT_CLEARANCE := 5.2
+const SIDE_REAR_CLEARANCE := 4.4
+const LARGE_BODY_HEADWAY_BONUS := 0.9
+const LARGE_BODY_LANE_SCALE := 0.74
+const CROWD_DENSITY_LIMIT := 4
+const CROWD_LANE_SCALE := 0.72
 const PRODUCTION_PACE_SCALE := 1.35
 const HARD_RISK_BONUS := 0.12
 const HARD_OVERTAKE_BONUS := 0.10
 const HARD_SHORTCUT_BONUS := 0.10
 const HARD_SPEED_SCALE := 1.02
+const LARGE_BODY_ANIMALS := [&"bear", &"elephant", &"panda", &"boar"]
 
 var _racer: WildDashCharacterController
 var _driver: WildDashAIController
@@ -34,11 +45,15 @@ var _shortcut_preference := 0.5
 var _think_elapsed := 0.0
 var _think_interval := NORMAL_THINK_INTERVAL
 var _lane_shift := 0.0
+var _lane_commit_remaining := 0.0
+var _committed_side := 0.0
 var _last_action := &"pace"
 var _overtake_actions := 0
 var _yield_actions := 0
 var _line_change_actions := 0
 var _traffic_holds := 0
+var _lane_commit_actions := 0
+var _crowd_avoid_actions := 0
 
 func _ready() -> void:
 	add_to_group("wilddash_ai_tactics")
@@ -112,11 +127,14 @@ func get_balance_telemetry() -> Dictionary:
 		"yield_actions": _yield_actions,
 		"line_change_actions": _line_change_actions,
 		"traffic_holds": _traffic_holds,
+		"lane_commits": _lane_commit_actions,
+		"crowd_avoids": _crowd_avoid_actions,
 	}
 
 func _process(delta: float) -> void:
 	if _racer == null or _driver == null or not is_instance_valid(_racer) or _racer.finished or not RaceManager.active:
 		return
+	_lane_commit_remaining = maxf(0.0, _lane_commit_remaining - delta)
 	_think_elapsed += delta
 	if _think_elapsed < _think_interval:
 		return
@@ -136,6 +154,7 @@ func _update_pack_decision() -> void:
 	var front_right := INF
 	var rear_left := INF
 	var rear_right := INF
+	var nearby_count := 0
 
 	for candidate in RaceManager.racers:
 		if candidate == _racer or not candidate is WildDashCharacterController or RaceManager.finish_order.has(candidate):
@@ -147,6 +166,8 @@ func _update_pack_decision() -> void:
 		var side := offset.dot(right)
 		if absf(side) > DETECTION_SIDE:
 			continue
+		if absf(ahead) <= DETECTION_FORWARD:
+			nearby_count += 1
 
 		if ahead > 0.3 and ahead <= DETECTION_FORWARD:
 			if absf(side) <= FRONT_CORRIDOR and ahead < front_distance:
@@ -165,77 +186,126 @@ func _update_pack_decision() -> void:
 				rear_right = minf(rear_right, rear_distance)
 
 	if front == null:
-		_lane_shift = move_toward(_lane_shift, 0.0, 0.75)
-		_driver.preferred_lane = lerpf(_driver.preferred_lane, _base_lane + _lane_shift, 0.32)
-		_driver.target_speed = lerpf(_driver.target_speed, _base_speed * (0.98 + _risk * 0.04), 0.32)
+		var decay := 0.28 if _lane_commit_remaining > 0.0 else 0.62
+		_lane_shift = move_toward(_lane_shift, 0.0, decay)
+		if _lane_commit_remaining <= 0.0:
+			_committed_side = 0.0
+		_driver.preferred_lane = lerpf(_driver.preferred_lane, _base_lane + _lane_shift, 0.26)
+		var pace_scale := 0.985 + _risk * 0.025
+		_driver.target_speed = lerpf(_driver.target_speed, _base_speed * pace_scale, 0.28)
 		_record_action(&"pace", null, 0.0)
 		return
 
-	var left_clear := front_left == INF and rear_left == INF
-	var right_clear := front_right == INF and rear_right == INF
+	var large_body := _is_large_body()
+	var safe_front_gap := HARD_FRONT_HEADWAY if GameManager.difficulty == &"nightmare" else NORMAL_FRONT_HEADWAY
+	if large_body:
+		safe_front_gap += LARGE_BODY_HEADWAY_BONUS
+
+	var left_clear := front_left > SIDE_FRONT_CLEARANCE and rear_left > SIDE_REAR_CLEARANCE
+	var right_clear := front_right > SIDE_FRONT_CLEARANCE and rear_right > SIDE_REAR_CLEARANCE
 	var preferred_side := -1.0 if front_side >= 0.0 else 1.0
-	if left_clear and right_clear:
-		preferred_side = -1.0 if int(_racer.get_instance_id()) % 2 == 0 else 1.0
+	var committed_clear := (_committed_side < 0.0 and left_clear) or (_committed_side > 0.0 and right_clear)
+	if _lane_commit_remaining > 0.0 and _committed_side != 0.0 and committed_clear:
+		preferred_side = _committed_side
+	elif left_clear and right_clear:
+		if absf(front_left - front_right) > 0.75:
+			preferred_side = -1.0 if front_left > front_right else 1.0
+		else:
+			preferred_side = -1.0 if int(_racer.get_instance_id()) % 2 == 0 else 1.0
 	elif left_clear:
 		preferred_side = -1.0
 	elif right_clear:
 		preferred_side = 1.0
 
+	var can_change_lane := (preferred_side < 0.0 and left_clear) or (preferred_side > 0.0 and right_clear)
+	if can_change_lane and (_committed_side == 0.0 or preferred_side != _committed_side or _lane_commit_remaining <= 0.0):
+		_committed_side = preferred_side
+		_lane_commit_remaining = HARD_LANE_COMMIT_SECONDS if GameManager.difficulty == &"nightmare" else NORMAL_LANE_COMMIT_SECONDS
+		_lane_commit_actions += 1
+	elif not can_change_lane and _lane_commit_remaining <= 0.0:
+		_committed_side = 0.0
+
 	var lane_cap := HARD_MAX_LANE_SHIFT if GameManager.difficulty == &"nightmare" else MAX_LANE_SHIFT
-	var overtake_strength := lerpf(1.25, lane_cap, _overtake)
+	var overtake_strength := lerpf(1.20, lane_cap, _overtake)
 	var desired_shift := preferred_side * overtake_strength
-	var desired_speed_scale := 0.94
+	if large_body:
+		desired_shift *= LARGE_BODY_LANE_SCALE
+	var desired_speed_scale := 0.955
 	var action: StringName = &"traffic_hold"
-	var can_change_lane := left_clear or right_clear
 
 	match _personality:
 		Personality.AGGRESSIVE:
 			if can_change_lane:
-				desired_speed_scale = 1.035
+				desired_speed_scale = 1.02
 				action = &"overtake"
 			else:
-				desired_speed_scale = 0.94
-				desired_shift *= 0.35
+				desired_speed_scale = 0.955
+				desired_shift *= 0.30
 		Personality.SAFE:
-			desired_speed_scale = 0.91 if not can_change_lane else 0.96
-			desired_shift *= 0.58
-			action = &"yield" if not can_change_lane or front_distance < 4.0 else &"line_change"
+			desired_speed_scale = 0.945 if not can_change_lane else 0.98
+			desired_shift *= 0.55
+			action = &"yield" if not can_change_lane or front_distance < safe_front_gap else &"line_change"
 		Personality.SHORTCUT:
-			desired_speed_scale = 0.985
-			desired_shift *= 0.76
+			desired_speed_scale = 0.995 if can_change_lane else 0.955
+			desired_shift *= 0.72
 			action = &"line_change" if can_change_lane else &"traffic_hold"
 		Personality.ITEM_FIGHTER:
 			if _racer.get_held_item() != &"":
-				desired_speed_scale = 0.96
-				desired_shift *= 0.68
+				desired_speed_scale = 0.975 if can_change_lane else 0.95
+				desired_shift *= 0.64
 				action = &"attack_setup"
 			elif can_change_lane:
 				desired_speed_scale = 1.01
-				desired_shift *= 0.82
-				action = &"overtake"
-		_:
-			if can_change_lane:
-				desired_speed_scale = 0.995
+				desired_shift *= 0.78
 				action = &"overtake"
 			else:
-				desired_speed_scale = 0.93
-				desired_shift *= 0.35
+				desired_speed_scale = 0.955
+		_:
+			if can_change_lane:
+				desired_speed_scale = 1.005
+				action = &"overtake"
+			else:
+				desired_speed_scale = 0.955
+				desired_shift *= 0.30
+
+	# Create headway before contact rather than repeatedly colliding and recovering.
+	if front_distance < safe_front_gap:
+		var pressure := clampf((safe_front_gap - front_distance) / safe_front_gap, 0.0, 1.0)
+		var close_speed_cap := lerpf(0.965, 0.93, pressure)
+		if GameManager.difficulty == &"nightmare":
+			close_speed_cap += 0.01
+		desired_speed_scale = minf(desired_speed_scale, close_speed_cap)
+		if not can_change_lane:
+			desired_shift *= 0.55
+			action = &"yield" if _personality == Personality.SAFE else &"traffic_hold"
 
 	# Do not cut across a racer approaching from behind on the chosen side.
-	if preferred_side < 0.0 and rear_left < 3.2:
+	if preferred_side < 0.0 and rear_left < SIDE_REAR_CLEARANCE:
 		desired_shift = maxf(0.0, desired_shift)
-		desired_speed_scale = minf(desired_speed_scale, 0.94)
+		desired_speed_scale = minf(desired_speed_scale, 0.96)
 		action = &"yield"
-	elif preferred_side > 0.0 and rear_right < 3.2:
+	elif preferred_side > 0.0 and rear_right < SIDE_REAR_CLEARANCE:
 		desired_shift = minf(0.0, desired_shift)
-		desired_speed_scale = minf(desired_speed_scale, 0.94)
+		desired_speed_scale = minf(desired_speed_scale, 0.96)
 		action = &"yield"
 
-	var response := 0.68 if GameManager.difficulty == &"nightmare" else 0.55
+	# In a dense knot, hold the current line instead of oscillating between gaps.
+	if nearby_count >= CROWD_DENSITY_LIMIT and front_distance < safe_front_gap * 1.35:
+		desired_shift *= CROWD_LANE_SCALE
+		desired_speed_scale = minf(desired_speed_scale, 0.975 if GameManager.difficulty == &"nightmare" else 0.97)
+		_crowd_avoid_actions += 1
+		if action == &"overtake":
+			action = &"line_change"
+
+	var response := 0.48 if GameManager.difficulty == &"nightmare" else 0.38
 	_lane_shift = clampf(lerpf(_lane_shift, desired_shift, response), -lane_cap, lane_cap)
-	_driver.preferred_lane = clampf(_base_lane + _lane_shift, -4.2, 4.2)
-	_driver.target_speed = _base_speed * desired_speed_scale
+	_driver.preferred_lane = clampf(_base_lane + _lane_shift, -4.0, 4.0)
+	var speed_response := 0.42 if GameManager.difficulty == &"nightmare" else 0.34
+	_driver.target_speed = lerpf(_driver.target_speed, _base_speed * desired_speed_scale, speed_response)
 	_record_action(action, front, front_distance)
+
+func _is_large_body() -> bool:
+	return _racer != null and _racer.animal_id in LARGE_BODY_ANIMALS
 
 func _record_action(action: StringName, target: WildDashCharacterController, gap: float) -> void:
 	if action == _last_action:
