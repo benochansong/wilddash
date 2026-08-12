@@ -75,7 +75,11 @@ func _physics_process(delta: float) -> void:
 	if _reported or not RaceManager.active:
 		return
 	var elapsed := RaceManager.get_elapsed_seconds()
-	var timeout_seconds := 230.0 if _realtime else 100.0
+	# Dense 15/18-racer fields now include 18 items, themed obstacles and
+	# stronger collision containment. Give the accelerated probe enough time
+	# to verify eventual all-finish behavior instead of failing a healthy late
+	# finisher at the old one-size-fits-all 100-second ceiling.
+	var timeout_seconds := 230.0 if _realtime else (110.0 if _target_racers <= 10 else (135.0 if _target_racers <= 15 else 150.0))
 	if elapsed > timeout_seconds:
 		_fail("Grand Prix probe timeout %.1fs > %.1fs" % [elapsed, timeout_seconds])
 		return
