@@ -5,6 +5,11 @@ const BARRIER_FACTORY: Script = preload("res://tracks/race_barrier_factory.gd")
 
 const GRAND_PRIX_HARD_SEGMENTS: Array[int] = [0, 1, 2, 3, 4, 5, 7, 8, 9, 12, 14, 18, 19, 25, 26, 27, 28]
 const NEON_HARD_SEGMENTS: Array[int] = [6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 21, 22, 23, 24]
+const GRAND_PRIX_TUNNEL_SEGMENT := 25
+const NEON_TUNNEL_SEGMENT := 13
+const TUNNEL_SHELL_LENGTH_EXTENSION := 12.0
+const TUNNEL_FAILSAFE_END_EXTENSION := 6.0
+const TUNNEL_FAILSAFE_EDGE_PADDING := 0.10
 
 const NEON_HARD_BATCHES: PackedStringArray = [
 	"ContainersRed", "ContainersBlue", "ContainersTeal",
@@ -18,9 +23,23 @@ var _installed := false
 var _barrier_count := 0
 var _visual_barrier_count := 0
 var _protected_visuals_skipped := 0
+var _tunnel_shell_barriers := 0
+var _tunnel_profiles: Array[Dictionary] = []
+var _tunnel_failsafe_corrections := 0
 
 func _ready() -> void:
+	# RacingFeelController uses priority 100 for the extra lateral slip move.
+	# Run after it so the tunnel failsafe sees the final physics position for the
+	# frame rather than allowing a second motion to escape after containment.
+	process_priority = 120
 	call_deferred("_install_after_track_ready")
+
+func _physics_process(_delta: float) -> void:
+	if not _installed or _tunnel_profiles.is_empty():
+		return
+	for racer in RaceManager.racers:
+		if racer is CharacterBody3D:
+			_enforce_tunnel_corridor(racer as CharacterBody3D)
 
 func _install_after_track_ready() -> void:
 	for _frame in range(3):
@@ -41,9 +60,11 @@ func _install_after_track_ready() -> void:
 	_configure_racer_collision_safety()
 	if track is WildDashGrandPrixTrack:
 		_barrier_count += _add_segment_containment(track, collision_root, GRAND_PRIX_HARD_SEGMENTS, "GP")
+		_tunnel_shell_barriers += _add_tunnel_hard_shell(track, collision_root, GRAND_PRIX_TUNNEL_SEGMENT, "GP")
 	elif track is WildDashNeonHarborTrack:
 		_barrier_count += _add_segment_containment(track, collision_root, NEON_HARD_SEGMENTS, "NH")
 		_visual_barrier_count += _add_hard_visual_batch_collisions(track, collision_root, NEON_HARD_BATCHES, "NH")
+		_tunnel_shell_barriers += _add_tunnel_hard_shell(track, collision_root, NEON_TUNNEL_SEGMENT, "NH")
 	elif track is WildDashSnowpeakWinterTrack:
 		# Snowpeak already has collision on dangerous winter rails and the Ice
 		# Cave. Only visually solid buildings/infrastructure need to be promoted
@@ -51,9 +72,10 @@ func _install_after_track_ready() -> void:
 		_visual_barrier_count += _add_hard_visual_batch_collisions(track, collision_root, SNOWPEAK_HARD_BATCHES, "SP")
 
 	_installed = true
-	print("RACE COLLISION PASS READY track=%s segment_barriers=%d visual_hard_barriers=%d protected_skipped=%d racers=%d safe_margin=0.06 debug=%s" % [
-		track.name, _barrier_count, _visual_barrier_count, _protected_visuals_skipped,
-		RaceManager.racers.size(), str(OS.has_environment("WILDDASH_DEBUG_COLLISION")),
+	print("RACE COLLISION PASS READY track=%s segment_barriers=%d visual_hard_barriers=%d tunnel_shell=%d tunnel_profiles=%d protected_skipped=%d racers=%d safe_margin=0.06 debug=%s" % [
+		track.name, _barrier_count, _visual_barrier_count, _tunnel_shell_barriers,
+		_tunnel_profiles.size(), _protected_visuals_skipped, RaceManager.racers.size(),
+		str(OS.has_environment("WILDDASH_DEBUG_COLLISION")),
 	])
 
 func _find_track() -> Node3D:
@@ -106,6 +128,148 @@ func _add_segment_containment(track: Node3D, collision_root: Node3D, segments: A
 			)
 			added += 1
 	return added
+
+func _add_tunnel_hard_shell(track: Node3D, collision_root: Node3D, segment_index: int, prefix: String) -> int:
+	var road := _find_road_collision(collision_root, segment_index)
+	if road == null:
+		push_warning("%s TUNNEL COLLISION: missing road collision for segment %d" % [prefix, segment_index])
+		return 0
+
+	var route: Array[Vector3] = track.get_route_points()
+	if segment_index < 0 or segment_index + 1 >= route.size():
+		push_warning("%s TUNNEL COLLISION: route index out of range" % prefix)
+		return 0
+
+	var added := 0
+	var road_center := road.global_position
+	var wall_sources: Array[CSGBox3D] = []
+	var roof_source: CSGBox3D = null
+	for child in collision_root.get_children():
+		if not child is CSGBox3D:
+			continue
+		var csg := child as CSGBox3D
+		var lower_name := String(csg.name).to_lower()
+		if lower_name.contains("tunnelwall") or lower_name.contains("tunnel_wall"):
+			wall_sources.append(csg)
+		elif lower_name.contains("tunnelroof") or lower_name.contains("tunnel_roof"):
+			roof_source = csg
+
+	# Existing CSG walls are kept, but a StaticBody/BoxShape shell is layered on
+	# top because it is more predictable for high-speed CharacterBody sweeps.
+	for wall in wall_sources:
+		var base_transform := Transform3D(wall.global_transform.basis.orthonormalized(), wall.global_position)
+		var shell_size := Vector3(
+			maxf(1.25, wall.size.x + 0.70),
+			maxf(5.8, wall.size.y + 0.80),
+			wall.size.z + TUNNEL_SHELL_LENGTH_EXTENSION
+		)
+		BARRIER_FACTORY.add_transformed_box_barrier(
+			collision_root,
+			"%s_TunnelShell_%s" % [prefix, String(wall.name)],
+			base_transform,
+			shell_size,
+			Color(1.0, 0.12, 0.08, 0.26)
+		)
+		added += 1
+
+		# A second outer backstop overlaps the primary shell. It never narrows the
+		# road, but prevents a racer that somehow crosses the first contact plane
+		# during a boost/slip frame from escaping into scenery.
+		var outward := wall.global_position - road_center
+		outward.y = 0.0
+		if outward.length_squared() > 0.001:
+			outward = outward.normalized()
+			var backstop_transform := base_transform
+			backstop_transform.origin += outward * 0.72
+			BARRIER_FACTORY.add_transformed_box_barrier(
+				collision_root,
+				"%s_TunnelBackstop_%s" % [prefix, String(wall.name)],
+				backstop_transform,
+				Vector3(maxf(1.10, wall.size.x + 0.55), shell_size.y + 0.35, shell_size.z + 2.0),
+				Color(0.95, 0.04, 0.04, 0.18)
+			)
+			added += 1
+
+	if roof_source != null:
+		var roof_transform := Transform3D(roof_source.global_transform.basis.orthonormalized(), roof_source.global_position)
+		BARRIER_FACTORY.add_transformed_box_barrier(
+			collision_root,
+			"%s_TunnelShell_%s" % [prefix, String(roof_source.name)],
+			roof_transform,
+			Vector3(roof_source.size.x + 0.8, maxf(1.15, roof_source.size.y + 0.55), roof_source.size.z + TUNNEL_SHELL_LENGTH_EXTENSION),
+			Color(1.0, 0.22, 0.05, 0.18)
+		)
+		added += 1
+
+	# Register a final corridor safety net. Physical walls remain the primary
+	# solution; this correction only fires if the character center is already
+	# beyond the legal tunnel width after all CharacterBody motions in a frame.
+	_tunnel_profiles.append({
+		"prefix": prefix,
+		"a": route[segment_index],
+		"b": route[segment_index + 1],
+		"width": road.size.x,
+	})
+	print("%s TUNNEL HARD SHELL READY walls=%d shell_barriers=%d width=%.2f length=%.2f" % [
+		prefix, wall_sources.size(), added, road.size.x, road.size.z,
+	])
+	return added
+
+func _enforce_tunnel_corridor(racer: CharacterBody3D) -> void:
+	for profile in _tunnel_profiles:
+		var a: Vector3 = profile.get("a", Vector3.ZERO)
+		var b: Vector3 = profile.get("b", Vector3.ZERO)
+		var width := float(profile.get("width", 0.0))
+		if width <= 0.1:
+			continue
+		var ab := b - a
+		var ab_length_squared := ab.length_squared()
+		if ab_length_squared <= 0.001:
+			continue
+		var raw_t := (racer.global_position - a).dot(ab) / ab_length_squared
+		var extension_t := TUNNEL_FAILSAFE_END_EXTENSION / sqrt(ab_length_squared)
+		if raw_t < -extension_t or raw_t > 1.0 + extension_t:
+			continue
+		var t := clampf(raw_t, 0.0, 1.0)
+		var centerline := a.lerp(b, t)
+		# Ignore racers far above/below the drivable tunnel shell. This keeps the
+		# safeguard from affecting unrelated scenery or respawn positions.
+		if absf(racer.global_position.y - centerline.y) > 6.5:
+			continue
+		var planar := b - a
+		planar.y = 0.0
+		if planar.length_squared() <= 0.001:
+			continue
+		planar = planar.normalized()
+		var right := Vector3(-planar.z, 0.0, planar.x)
+		var lateral := (racer.global_position - centerline).dot(right)
+		var radius := _get_racer_collision_radius(racer)
+		var allowed_center_lateral := maxf(1.0, width * 0.5 - radius - TUNNEL_FAILSAFE_EDGE_PADDING)
+		if absf(lateral) <= allowed_center_lateral:
+			continue
+
+		var side := signf(lateral)
+		var excess := lateral - side * allowed_center_lateral
+		racer.global_position -= right * excess
+		var outward := right * side
+		var outward_velocity := racer.velocity.dot(outward)
+		if outward_velocity > 0.0:
+			racer.velocity -= outward * outward_velocity
+		if racer is WildDashCharacterController:
+			var controller := racer as WildDashCharacterController
+			controller.current_speed *= 0.90
+		_tunnel_failsafe_corrections += 1
+		if _tunnel_failsafe_corrections <= 8 or OS.has_environment("WILDDASH_DEBUG_COLLISION"):
+			print("%s TUNNEL FAILSAFE BLOCK racer=%s lateral=%.2f allowed=%.2f correction=%.2f" % [
+				String(profile.get("prefix", "RACE")), racer.name, lateral, allowed_center_lateral, absf(excess),
+			])
+		return
+
+func _get_racer_collision_radius(racer: CharacterBody3D) -> float:
+	var collision_shape := racer.get_node_or_null("CollisionShape3D") as CollisionShape3D
+	if collision_shape != null and collision_shape.shape is CapsuleShape3D:
+		return (collision_shape.shape as CapsuleShape3D).radius
+	return 0.62
 
 func _find_road_collision(collision_root: Node3D, segment_index: int) -> CSGBox3D:
 	var prefix := "Road_%02d" % segment_index
