@@ -33,6 +33,10 @@ func _ready() -> void:
 	GameManager.current_round_index = 0
 	GameManager.campaign_running = true
 	GameManager.chimera_enabled = false
+	# Fix both global random helpers and the base 12-item weighted picker. The
+	# expanded six-item controller reads the same WILDDASH_BALANCE_SEED env var.
+	seed(_seed)
+	ItemSystem._rng.seed = _seed + 17
 
 	ItemSystem.item_granted.connect(_on_item_granted)
 	ItemSystem.item_used.connect(_on_item_used)
@@ -112,8 +116,6 @@ func _on_racer_finished(racer: Node3D, rank: int) -> void:
 	if racer == null or not racer is WildDashCharacterController:
 		return
 	var controller := racer as WildDashCharacterController
-	# The headless Player is always Dog and is AI-driven only as a control proxy.
-	# Exclude it from species balance so Dog does not receive a synthetic extra start.
 	if controller.is_player:
 		return
 	var animal := String(controller.animal_id)
