@@ -26,7 +26,7 @@ func _install_when_ready() -> void:
 	_build_tunnel_fill_lights()
 	_build_finish_floodlight()
 	_installed = true
-	print("NEON HARBOR LIGHTING POLISH PASS ambient=1.22 route_lights=%d tunnel_lights=3 shadows=false" % ROUTE_LIGHT_INDICES.size())
+	print("NEON HARBOR LIGHTING POLISH PASS ambient=1.22 route_lights=%d tunnel_lights=3 streetlight_meshes=true shadows=false" % ROUTE_LIGHT_INDICES.size())
 
 func is_installed() -> bool:
 	return _installed
@@ -66,19 +66,34 @@ func _brighten_key_materials() -> void:
 
 func _build_practical_route_lights() -> void:
 	var route := _track.get_route_points()
+	var pole_transforms: Array[Transform3D] = []
+	var lamp_transforms: Array[Transform3D] = []
 	for list_index in range(ROUTE_LIGHT_INDICES.size()):
 		var route_index: int = ROUTE_LIGHT_INDICES[list_index]
 		if route_index < 0 or route_index >= route.size():
 			continue
+		var side := -1.0 if list_index % 2 == 0 else 1.0
+		var right := _route_right(route, route_index)
+		var lateral_offset := 9.4
+		var pole_base := route[route_index] + right * side * lateral_offset
+		var pole := Transform3D(Basis.IDENTITY, pole_base + Vector3.UP * 2.6)
+		pole.basis = pole.basis.scaled(Vector3(0.18, 5.2, 0.18))
+		pole_transforms.append(pole)
+		var lamp := Transform3D(Basis.IDENTITY, pole_base - right * side * 0.55 + Vector3.UP * 5.15)
+		lamp.basis = lamp.basis.scaled(Vector3(1.0, 0.18, 0.46))
+		lamp_transforms.append(lamp)
+
 		var light := OmniLight3D.new()
 		light.name = "PracticalRouteLight_%02d" % route_index
-		light.position = route[route_index] + Vector3.UP * 6.2
+		light.position = pole_base - right * side * 0.65 + Vector3.UP * 5.35
 		light.light_color = WARM_LIGHT if list_index % 3 != 1 else COOL_LIGHT
 		light.light_energy = 1.45 if list_index % 3 != 1 else 1.28
 		light.omni_range = 29.0
 		light.omni_attenuation = 1.35
 		light.shadow_enabled = false
 		add_child(light)
+	_add_box_batch("PracticalStreetLightPoles", pole_transforms, Color(0.30, 0.37, 0.46), false)
+	_add_box_batch("PracticalStreetLampHeads", lamp_transforms, Color(1.0, 0.78, 0.40), true)
 
 func _build_tunnel_fill_lights() -> void:
 	var route := _track.get_route_points()
@@ -107,6 +122,41 @@ func _build_finish_floodlight() -> void:
 	light.omni_attenuation = 1.25
 	light.shadow_enabled = false
 	add_child(light)
+
+func _route_right(route: Array[Vector3], index: int) -> Vector3:
+	var previous_index := maxi(0, index - 1)
+	var next_index := mini(route.size() - 1, index + 1)
+	var direction := route[next_index] - route[previous_index]
+	direction.y = 0.0
+	if direction.length_squared() <= 0.001:
+		return Vector3.RIGHT
+	direction = direction.normalized()
+	return Vector3(-direction.z, 0.0, direction.x)
+
+func _add_box_batch(node_name: String, transforms: Array[Transform3D], color: Color, emissive: bool) -> void:
+	if transforms.is_empty():
+		return
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3.ONE
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.mesh = mesh
+	multimesh.instance_count = transforms.size()
+	for index in range(transforms.size()):
+		multimesh.set_instance_transform(index, transforms[index])
+	var material := StandardMaterial3D.new()
+	material.albedo_color = color
+	material.roughness = 0.42
+	material.metallic = 0.50 if not emissive else 0.10
+	if emissive:
+		material.emission_enabled = true
+		material.emission = color
+		material.emission_energy_multiplier = 1.4
+	var instance := MultiMeshInstance3D.new()
+	instance.name = node_name
+	instance.multimesh = multimesh
+	instance.material_override = material
+	add_child(instance)
 
 func _set_material_albedo(node: Node, color: Color) -> void:
 	if not node is MultiMeshInstance3D:
