@@ -5,7 +5,10 @@ on:
     paths:
       - "godot/tracks/neon_harbor_track.gd"
       - "godot/tracks/neon_harbor_track.tscn"
+      - "godot/tracks/neon_harbor_lighting_polish.gd"
       - "godot/modes/neon_harbor_race/**"
+      - "godot/systems/racing_feel_controller.gd"
+      - "godot/camera/speed_lines_overlay.gd"
       - "godot/tests/neon_harbor_*.gd"
       - "godot/tests/neon_harbor_*.tscn"
       - ".github/workflows/neon-harbor-ci.yml"
@@ -53,6 +56,8 @@ jobs:
           timeout 120s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot res://tests/neon_harbor_race_probe.tscn \
             | tee /tmp/neon-15.log
+          grep -q "NEON HARBOR LIGHTING POLISH PASS" /tmp/neon-15.log
+          grep -q "RACING FEEL READY" /tmp/neon-15.log
           grep -q "NEON HARBOR ALL FINISH PASS racers=15 finishers=15" /tmp/neon-15.log
           grep -q "NEON HARBOR NPC VARIETY PASS species=12 roster=12" /tmp/neon-15.log
           grep -q "NEON HARBOR PROBE PASS racers=15 checkpoints=9" /tmp/neon-15.log
@@ -65,6 +70,8 @@ jobs:
           timeout 120s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot res://tests/neon_harbor_race_probe.tscn \
             | tee /tmp/neon-18.log
+          grep -q "NEON HARBOR LIGHTING POLISH PASS" /tmp/neon-18.log
+          grep -q "RACING FEEL READY" /tmp/neon-18.log
           grep -q "NEON HARBOR ALL FINISH PASS racers=18 finishers=18" /tmp/neon-18.log
           grep -q "NEON HARBOR NPC VARIETY PASS species=12 roster=12" /tmp/neon-18.log
           grep -q "NEON HARBOR PROBE PASS racers=18 checkpoints=9" /tmp/neon-18.log
