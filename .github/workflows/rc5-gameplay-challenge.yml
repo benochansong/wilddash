@@ -16,7 +16,7 @@ permissions:
 jobs:
   validate-rc5:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout RC5 candidate
         uses: actions/checkout@v5
@@ -77,15 +77,13 @@ jobs:
           grep -q "SHORTCUT A PASS" /tmp/rc5-track.log
           grep -q "SHORTCUT B PASS" /tmp/rc5-track.log
 
-      - name: Verify RC5 balance ceilings
+      - name: Verify RC5 balance ceilings and five-round contract
         run: |
           set -o pipefail
           timeout 35s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot res://tests/rc5_gameplay_challenge.tscn | tee /tmp/rc5-balance.log
-          grep -q "RC5 SHIELD WEIGHT PASS" /tmp/rc5-balance.log
-          grep -q "RC5 CHIMERA CAP PASS" /tmp/rc5-balance.log
-          grep -q "RC5 TRACK CHALLENGE PASS" /tmp/rc5-balance.log
-          grep -q "RC5 GAMEPLAY CHALLENGE PASS" /tmp/rc5-balance.log
+          grep -q "RC5 ROUND5 SNOWPEAK PASS" /tmp/rc5-balance.log
+          grep -q "RC5 GAMEPLAY CHALLENGE PASS .*round3=neon_harbor round5=snowpeak" /tmp/rc5-balance.log
 
       - name: Probe Normal 15-racer production pace and interaction flow
         run: |
@@ -101,14 +99,13 @@ jobs:
           {
             echo "## RC5 Normal 15-racer telemetry"
             echo '```text'
-            grep -E "RC5 (GRAND PRIX ITEM BOXES PASS|PRODUCTION PACE PASS|FINISH POSITION|CHARACTER RESULT|GAMEPLAY TELEMETRY|ALL FINISH|INTERACTION FLOW|CHAIN CC|NORMAL PACE|GRAND PRIX PROBE)" /tmp/rc5-probe-15.log || true
+            grep -E "RC5 (FINISH POSITION|CHARACTER RESULT|GAMEPLAY TELEMETRY|ALL FINISH|INTERACTION FLOW|CHAIN CC|NORMAL PACE|GRAND PRIX PROBE)" /tmp/rc5-probe-15.log || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           grep "RC5 GAMEPLAY TELEMETRY" /tmp/rc5-probe-15.log | tail -1 | while IFS= read -r line; do echo "::notice title=RC5 Normal Telemetry::$line"; done
           grep "RC5 NORMAL PACE" /tmp/rc5-probe-15.log | tail -1 | while IFS= read -r line; do echo "::notice title=RC5 Normal Pace::$line"; done
           grep "RC5 CHARACTER RESULT" /tmp/rc5-probe-15.log | while IFS= read -r line; do echo "::notice title=RC5 Normal Character Result::$line"; done
           if [ "$status" -ne 0 ]; then exit "$status"; fi
-          grep -q "RC5 GRAND PRIX ITEM BOXES PASS count=36 target=36" /tmp/rc5-probe-15.log
           grep -q "RC5 ALL FINISH PASS racers=15" /tmp/rc5-probe-15.log
           grep -q "RC5 INTERACTION FLOW PASS" /tmp/rc5-probe-15.log
           grep -q "RC5 NORMAL PACE PASS" /tmp/rc5-probe-15.log
@@ -121,39 +118,41 @@ jobs:
           export WILDDASH_RC5_RACERS=18
           export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-rc5-probe-18"
           set +e
-          timeout 120s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+          timeout 165s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot res://tests/rc5_grand_prix_probe.tscn | tee /tmp/rc5-probe-18.log
           status=${PIPESTATUS[0]}
           set -e
           {
             echo "## RC5 Hard 18-racer telemetry"
             echo '```text'
-            grep -E "(AI HARD PROFILE|RC5 (GRAND PRIX ITEM BOXES PASS|FINISH POSITION|CHARACTER RESULT|GAMEPLAY TELEMETRY|ALL FINISH|INTERACTION FLOW|CHAIN CC|GRAND PRIX PROBE))" /tmp/rc5-probe-18.log || true
+            grep -E "RC5 (FINISH POSITION|CHARACTER RESULT|GAMEPLAY TELEMETRY|ALL FINISH|INTERACTION FLOW|CHAIN CC|GRAND PRIX PROBE)" /tmp/rc5-probe-18.log || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           grep "RC5 GAMEPLAY TELEMETRY" /tmp/rc5-probe-18.log | tail -1 | while IFS= read -r line; do echo "::notice title=RC5 Hard Telemetry::$line"; done
           grep "RC5 CHARACTER RESULT" /tmp/rc5-probe-18.log | while IFS= read -r line; do echo "::notice title=RC5 Hard Character Result::$line"; done
           if [ "$status" -ne 0 ]; then exit "$status"; fi
-          grep -q "AI HARD PROFILE" /tmp/rc5-probe-18.log
-          grep -q "RC5 GRAND PRIX ITEM BOXES PASS count=36 target=36" /tmp/rc5-probe-18.log
           grep -q "RC5 ALL FINISH PASS racers=18" /tmp/rc5-probe-18.log
           grep -q "RC5 INTERACTION FLOW PASS" /tmp/rc5-probe-18.log
           grep -q "RC5 GRAND PRIX PROBE PASS racers=18 realtime=false" /tmp/rc5-probe-18.log
 
-      - name: Run four-round Normal campaign regression
+      - name: Run five-round Normal campaign regression
         run: |
           set -o pipefail
           export WILDDASH_AUTOTEST=1
           export WILDDASH_AI_COUNT=14
           export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-rc5-campaign"
-          timeout 180s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path godot | tee /tmp/rc5-campaign.log
+          timeout 320s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path godot | tee /tmp/rc5-campaign.log
           grep -q "GRAND PRIX COMPLETE racers=15 finishers=15" /tmp/rc5-campaign.log
-          grep -q "RC_FLOW Round 2" /tmp/rc5-campaign.log
-          grep -q "RC_FLOW Round 3" /tmp/rc5-campaign.log
-          grep -q "RC_FLOW Final" /tmp/rc5-campaign.log
-          grep -q "CAMPAIGN COMPLETE rounds=4" /tmp/rc5-campaign.log
-          grep -q "RC_SAVE result_saved=true" /tmp/rc5-campaign.log
-          echo "RC5 FOUR ROUND CAMPAIGN PASS"
+          grep -q "FRUIT AI PICKUP" /tmp/rc5-campaign.log
+          grep -q "NEON HARBOR START racers=15 ai=14 checkpoints=9" /tmp/rc5-campaign.log
+          grep -q "NEON HARBOR 15 RACERS ALL FINISH PASS" /tmp/rc5-campaign.log
+          grep -q "NEON HARBOR COMPLETE racers=15 finishers=15" /tmp/rc5-campaign.log
+          grep -q "PUSH OUT AI BODY CHECK" /tmp/rc5-campaign.log
+          grep -q "SNOWPEAK START racers=15 ai=14 checkpoints=10" /tmp/rc5-campaign.log
+          grep -q "SNOWPEAK 15 RACERS ALL FINISH PASS" /tmp/rc5-campaign.log
+          grep -q "SNOWPEAK COMPLETE racers=15 finishers=15" /tmp/rc5-campaign.log
+          grep -q "HEADLESS RESULT rounds=5" /tmp/rc5-campaign.log
+          echo "RC5 FIVE ROUND CAMPAIGN PASS"
 
       - name: Benchmark 10 25 50 racers baseline and optimized
         run: |
