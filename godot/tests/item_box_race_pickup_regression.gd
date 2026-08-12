@@ -50,10 +50,10 @@ func _test_high_speed_player_sweep() -> bool:
 	return true
 
 func _test_player_refreshes_held_item() -> bool:
-	# The previous test intentionally leaves one item in the player's one-slot
-	# inventory. A new box should refresh/replace it instead of silently doing
-	# nothing. Adjacent boxes are protected by the short pickup cooldown.
-	var first_box := _spawn_box("ReplacementBox", _player.global_position + Vector3.UP * 0.6)
+	# Keep the replacement box far away so the physics scanner cannot consume
+	# it by proximity. force_pickup then isolates the row cooldown/replacement
+	# contract from the swept pickup test above.
+	var first_box := _spawn_box("ReplacementBox", Vector3(30, 0.8, 30))
 	if first_box.force_pickup(_player):
 		return _fail("Pickup row cooldown did not block immediate adjacent box")
 	for _frame in range(24):
@@ -72,7 +72,7 @@ func _test_ai_keeps_one_slot_rule() -> bool:
 	_ai.set_held_item(&"")
 	if not ItemSystem.grant_item(_ai, ItemSystem.DASH_BERRY):
 		return _fail("Could not seed AI held item")
-	var box := _spawn_box("AIInventoryBox", _ai.global_position + Vector3.UP * 0.6)
+	var box := _spawn_box("AIInventoryBox", Vector3(36, 0.8, 30))
 	if box.force_pickup(_ai):
 		return _fail("AI replaced an occupied one-slot inventory")
 	if _ai.get_held_item() != ItemSystem.DASH_BERRY:
