@@ -1,6 +1,18 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://modes/neon_harbor_race/neon_harbor_race_mode.gd" id="1_mode"]
+[ext_resource type="Script" path="res://tracks/neon_harbor_lighting_polish.gd" id="2_lighting"]
+[ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="3_feel"]
 
 [node name="NeonHarborRace" type="Node3D"]
 script = ExtResource("1_mode")
+
+[node name="NeonHarborLightingPolish" type="Node3D" parent="."]
+script = ExtResource("2_lighting")
+
+[node name="RacingFeelController" type="Node" parent="."]
+script = ExtResource("3_feel")
+fov_gain = 7.5
+boost_fov_bonus = 2.8
+slip_strength = 0.09
+boost_slip_multiplier = 1.2
