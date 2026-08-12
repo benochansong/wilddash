@@ -18,7 +18,7 @@ static func has_required_materials() -> bool:
 		&"concrete", &"water", &"hazard", &"finish", &"wet_rock",
 		&"dirt_road", &"bridge_road", &"tunnel_road", &"road_edge",
 		&"guide_backing", &"guide_arrow",
-		&"shortcut_wear",
+		&"shortcut_wear", &"guardrail",
 	]:
 		if not palette.has(key) or palette[key] == null:
 			return false
@@ -26,6 +26,11 @@ static func has_required_materials() -> bool:
 
 static func _build_palette() -> Dictionary:
 	var metal := _standard(Color("7f969b"), 0.38, Color.BLACK, 0.68)
+	# Route containment must remain readable at speed against the dark asphalt,
+	# canyon rock and muted sky. Keep bridge machinery darker, but give the
+	# gameplay-facing guardrails a brighter galvanized finish with a tiny warm
+	# response so the rail silhouette is obvious without becoming neon.
+	var guardrail := _standard(Color("c9d4d6"), 0.44, Color("f6bf45") * 0.025, 0.58)
 	var concrete := _surface(Color("4a545b"), Color("303940"), 0.94, 0.36, 0.10, 0.01, 0.0, 0.10)
 	var finish := _standard(Color("20a8c8"), 0.48, Color("20a8c8") * 0.10, 0.12)
 	return {
@@ -53,7 +58,7 @@ static func _build_palette() -> Dictionary:
 		&"guide_backing": _standard(Color("20282d"), 0.82),
 		&"guide_arrow": _standard(Color("f6bf45"), 0.60, Color("f6bf45") * 0.08),
 		&"shortcut_wear": _surface(Color("76503b"), Color("52382e"), 1.0, 0.30, 0.16, 0.10, 0.0, 0.10),
-		&"guardrail": metal,
+		&"guardrail": guardrail,
 		&"foliage": _surface(Color("407b42"), Color("27543a"), 0.98, 0.55, 0.14, 0.02),
 		&"foliage_light": _surface(Color("709747"), Color("41713d"), 0.98, 0.60, 0.12, 0.02),
 		&"tunnel_light": _standard(Color("ffd47a"), 0.32, Color("ffd47a") * 1.45),
