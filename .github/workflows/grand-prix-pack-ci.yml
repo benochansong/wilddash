@@ -33,6 +33,32 @@ jobs:
       - name: Import RC6 project
         run: /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --editor --path godot --quit
 
+      - name: Preflight RC6 balance scene
+        run: |
+          set -o pipefail
+          export WILDDASH_BALANCE_RACERS=15
+          export WILDDASH_BALANCE_RUNS=1
+          export WILDDASH_BALANCE_RUN_INDEX=1
+          export WILDDASH_BALANCE_SEED=7601
+          export WILDDASH_BALANCE_RUN=1
+          export WILDDASH_REALTIME_BALANCE=1
+          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-rc6-preflight"
+          rm -rf "$XDG_DATA_HOME"
+          set +e
+          timeout 12s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot res://tests/ai_race_balance_probe.tscn \
+            | tee /tmp/rc6-preflight.log
+          preflight_status=${PIPESTATUS[0]}
+          set -e
+          if grep -Eq "SCRIPT ERROR|Compile Error|Parse Error|ERROR: Failed to load script" /tmp/rc6-preflight.log; then
+            echo "RC6 preflight detected a script compile/load error."
+            exit 1
+          fi
+          if [ "$preflight_status" -ne 0 ] && [ "$preflight_status" -ne 124 ]; then
+            exit "$preflight_status"
+          fi
+          echo "RC6 preflight passed script loading."
+
       - name: Validate Normal 15 racers
         run: |
           set -o pipefail
@@ -69,7 +95,7 @@ jobs:
 
       - name: Upload RC6 AI balance telemetry
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: WILD-DASH-RC6-AI-Balance-Smoke
           path: /tmp/rc6-balance-*.log
