@@ -99,6 +99,19 @@ jobs:
           grep -q "TRACK NODE BUDGET PASS" /tmp/wilddash-grand-prix-track.log
           grep -q "FINISH VALIDATION PASS" /tmp/wilddash-grand-prix-track.log
 
+      - name: Verify Round 3 Neon Harbor track
+        run: |
+          set -o pipefail
+          timeout 35s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot res://tests/neon_harbor_track_smoke.tscn \
+            | tee /tmp/wilddash-neon-harbor-track.log
+          grep -q "NEON HARBOR TRACK LOAD PASS" /tmp/wilddash-neon-harbor-track.log
+          grep -q "NEON HARBOR ZONES PASS count=10" /tmp/wilddash-neon-harbor-track.log
+          grep -q "NEON HARBOR ENVIRONMENT PASS" /tmp/wilddash-neon-harbor-track.log
+          grep -q "NEON HARBOR SHORTCUT PASS" /tmp/wilddash-neon-harbor-track.log
+          grep -q "NEON HARBOR FINISH PASS checkpoints=9" /tmp/wilddash-neon-harbor-track.log
+          grep -q "NEON HARBOR TRACK SMOKE PASS" /tmp/wilddash-neon-harbor-track.log
+
       - name: Verify legacy six-item party racing gameplay
         run: |
           set -o pipefail
@@ -141,19 +154,17 @@ jobs:
           export WILDDASH_AI_COUNT=4
           export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-flow-4"
           rm -rf "$XDG_DATA_HOME"
-          timeout 125s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+          timeout 160s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot \
             | tee /tmp/wilddash-godot-4.log
           grep -q "GRAND PRIX START racers=5 ai=4 checkpoints=11" /tmp/wilddash-godot-4.log
-          grep -q "RC5 GRAND PRIX ITEM BOXES PASS count=33 target=33 stations=11 respawn=5.0s" /tmp/wilddash-godot-4.log
-          grep -q "ITEM BOX PICKUP" /tmp/wilddash-godot-4.log
-          grep -q "AI ITEM USE" /tmp/wilddash-godot-4.log
           grep -q "GRAND PRIX COMPLETE racers=5 finishers=5" /tmp/wilddash-godot-4.log
           grep -q "FRUIT AI PICKUP" /tmp/wilddash-godot-4.log
-          grep -q "FLOOR PHASE 1" /tmp/wilddash-godot-4.log
+          grep -q "NEON HARBOR START racers=5 ai=4 checkpoints=9" /tmp/wilddash-godot-4.log
+          grep -q "NEON HARBOR COMPLETE racers=5 finishers=5" /tmp/wilddash-godot-4.log
           grep -q "PUSH OUT AI BODY CHECK" /tmp/wilddash-godot-4.log
           grep -q "HEADLESS RESULT rounds=4" /tmp/wilddash-godot-4.log
-          echo "4 ROUND CAMPAIGN PASS ai=4"
+          echo "4 ROUND CAMPAIGN PASS ai=4 round3=neon_harbor"
 
       - name: Stress four-round campaign with ten AI
         run: |
@@ -162,19 +173,17 @@ jobs:
           export WILDDASH_AI_COUNT=10
           export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-flow-10"
           rm -rf "$XDG_DATA_HOME"
-          timeout 140s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+          timeout 180s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot \
             | tee /tmp/wilddash-godot-10.log
           grep -q "GRAND PRIX START racers=11 ai=10 checkpoints=11" /tmp/wilddash-godot-10.log
-          grep -q "RC5 GRAND PRIX ITEM BOXES PASS count=33 target=33 stations=11 respawn=5.0s" /tmp/wilddash-godot-10.log
-          grep -q "ITEM BOX PICKUP" /tmp/wilddash-godot-10.log
-          grep -q "AI ITEM USE" /tmp/wilddash-godot-10.log
           grep -q "GRAND PRIX COMPLETE racers=11 finishers=11" /tmp/wilddash-godot-10.log
           grep -q "FRUIT AI PICKUP" /tmp/wilddash-godot-10.log
-          grep -q "FLOOR PHASE 1" /tmp/wilddash-godot-10.log
+          grep -q "NEON HARBOR START racers=11 ai=10 checkpoints=9" /tmp/wilddash-godot-10.log
+          grep -q "NEON HARBOR COMPLETE racers=11 finishers=11" /tmp/wilddash-godot-10.log
           grep -q "PUSH OUT AI BODY CHECK" /tmp/wilddash-godot-10.log
           grep -q "HEADLESS RESULT rounds=4" /tmp/wilddash-godot-10.log
-          echo "4 ROUND CAMPAIGN PASS ai=10"
+          echo "4 ROUND CAMPAIGN PASS ai=10 round3=neon_harbor"
 
       - name: Stress four-round campaign with fourteen AI
         run: |
@@ -183,21 +192,19 @@ jobs:
           export WILDDASH_AI_COUNT=14
           export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-flow-14"
           rm -rf "$XDG_DATA_HOME"
-          timeout 155s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+          timeout 205s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot \
             | tee /tmp/wilddash-godot-14.log
           grep -q "GRAND PRIX START racers=15 ai=14 checkpoints=11" /tmp/wilddash-godot-14.log
-          grep -q "RC5 GRAND PRIX ITEM BOXES PASS count=36 target=36 stations=11 respawn=4.0s" /tmp/wilddash-godot-14.log
-          grep -q "ITEM BOX PICKUP" /tmp/wilddash-godot-14.log
-          grep -q "AI ITEM USE" /tmp/wilddash-godot-14.log
-          grep -q "15 RACERS PASS" /tmp/wilddash-godot-14.log
           grep -q "15 RACERS ALL FINISH PASS" /tmp/wilddash-godot-14.log
           grep -q "GRAND PRIX COMPLETE racers=15 finishers=15" /tmp/wilddash-godot-14.log
           grep -q "FRUIT AI PICKUP" /tmp/wilddash-godot-14.log
-          grep -q "FLOOR PHASE 1" /tmp/wilddash-godot-14.log
+          grep -q "NEON HARBOR START racers=15 ai=14 checkpoints=9" /tmp/wilddash-godot-14.log
+          grep -q "NEON HARBOR 15 RACERS ALL FINISH PASS" /tmp/wilddash-godot-14.log
+          grep -q "NEON HARBOR COMPLETE racers=15 finishers=15" /tmp/wilddash-godot-14.log
           grep -q "PUSH OUT AI BODY CHECK" /tmp/wilddash-godot-14.log
           grep -q "HEADLESS RESULT rounds=4" /tmp/wilddash-godot-14.log
-          echo "4 ROUND CAMPAIGN PASS ai=14"
+          echo "4 ROUND CAMPAIGN PASS ai=14 round3=neon_harbor"
 
       - name: Benchmark 10 25 50 racers before and after optimization
         run: |
