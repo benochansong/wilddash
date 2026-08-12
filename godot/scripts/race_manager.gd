@@ -254,9 +254,20 @@ func get_respawn_position(racer: Node3D) -> Vector3:
 	if _route_points.is_empty():
 		return Vector3.ZERO
 	var passed := get_checkpoint_progress(racer)
-	if passed <= 0 or _checkpoint_positions.is_empty():
+	if passed <= 0 or _checkpoint_positions.is_empty() or _checkpoint_route_distances.is_empty():
 		return _route_points[0] + Vector3.UP * 1.6
 	var checkpoint_index := mini(passed - 1, _checkpoint_positions.size() - 1)
+	var checkpoint_distance := _checkpoint_route_distances[checkpoint_index]
+	# Respawn on an actual route center point slightly beyond the last cleared
+	# checkpoint instead of on the checkpoint Area3D itself. On folded tracks a
+	# checkpoint can be spatially close to another route segment; the AI then
+	# used a global nearest-point search and could repeatedly target the wrong
+	# branch after falling off the course. An exact center-route respawn makes
+	# the nearest route index deterministic while preserving ordered checkpoints.
+	var desired_distance := checkpoint_distance + 6.0
+	for i in range(_route_distances.size()):
+		if _route_distances[i] >= desired_distance:
+			return _route_points[i] + Vector3.UP * 1.6
 	return _checkpoint_positions[checkpoint_index] + Vector3.UP * 1.6
 
 func get_elapsed_seconds() -> float:
