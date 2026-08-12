@@ -1,13 +1,8 @@
 name: WILD DASH RC5 Gameplay Challenge
 
+# Full RC5 validation is intentionally manual. It is expensive and should be
+# run for release-candidate checkpoints, not for every pull request.
 on:
-  push:
-    branches:
-      - feature/rc5-gameplay-challenge
-  pull_request:
-    paths:
-      - "godot/**"
-      - ".github/workflows/rc5-gameplay-challenge.yml"
   workflow_dispatch:
 
 permissions:
