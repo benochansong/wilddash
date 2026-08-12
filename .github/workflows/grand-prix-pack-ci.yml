@@ -1,10 +1,8 @@
 name: WILD DASH Grand Prix Pack CI
 
+# Heavy/specialized validation. Run manually from the Actions tab when needed
+# instead of on every pull request.
 on:
-  pull_request:
-    paths:
-      - "godot/**"
-      - ".github/workflows/grand-prix-pack-ci.yml"
   workflow_dispatch:
 
 permissions:
