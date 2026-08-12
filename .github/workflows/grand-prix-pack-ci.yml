@@ -1,16 +1,22 @@
 name: WILD DASH Grand Prix Pack CI
 
-# Heavy/specialized validation. Run manually from the Actions tab when needed
-# instead of on every pull request.
+# Heavy/specialized validation. This branch temporarily uses the existing
+# default-branch manual workflow entry point to validate RC6 AI balance before
+# merge. It remains workflow_dispatch only and is restored after validation.
 on:
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: wild-dash-rc6-balance-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  grand-prix-pack:
+  rc6-ai-balance:
     runs-on: ubuntu-latest
+    timeout-minutes: 18
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -24,66 +30,48 @@ jobs:
           chmod +x /tmp/godot/Godot_v4.7.1-stable_linux.x86_64
           /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --version
 
-      - name: Import project
+      - name: Import RC6 project
         run: /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --editor --path godot --quit
 
-      # This workflow validates Round 1 only. It deliberately runs the isolated
-      # Grand Prix probe instead of booting the full campaign, so adding later
-      # rounds cannot create unrelated timeouts here.
-      - name: Verify Casual 10-racer field
+      - name: Validate Normal 15 racers
         run: |
           set -o pipefail
-          export WILDDASH_RC5_RACERS=10
-          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-pack-10"
-          timeout 110s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
-            --headless --path godot res://tests/rc5_grand_prix_probe.tscn \
-            | tee /tmp/pack-10.log
-          grep -q "RC5 PROBE START racers=10 ai=9" /tmp/pack-10.log
-          grep -q "RC5 ALL FINISH PASS racers=10" /tmp/pack-10.log
-          grep -q "RC5 INTERACTION FLOW PASS" /tmp/pack-10.log
-          grep -q "RC5 GRAND PRIX PROBE PASS racers=10 realtime=false" /tmp/pack-10.log
+          export WILDDASH_BALANCE_RACERS=15
+          export WILDDASH_BALANCE_RUNS=1
+          export WILDDASH_BALANCE_RUN_INDEX=1
+          export WILDDASH_BALANCE_SEED=7601
+          export WILDDASH_BALANCE_RUN=1
+          export WILDDASH_REALTIME_BALANCE=1
+          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-rc6-balance-15"
+          rm -rf "$XDG_DATA_HOME"
+          timeout 320s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot res://tests/ai_race_balance_probe.tscn \
+            | tee /tmp/rc6-balance-15.log
+          grep -q "AI_BALANCE_PASS racers=15 run=1 seed=7601" /tmp/rc6-balance-15.log
+          grep "AI_BALANCE_RESULT" /tmp/rc6-balance-15.log >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Verify Normal 15-racer gameplay target
+      - name: Validate Hard 18 racers
         run: |
           set -o pipefail
-          export WILDDASH_RC5_RACERS=15
-          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-pack-15"
-          timeout 110s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
-            --headless --path godot res://tests/rc5_grand_prix_probe.tscn \
-            | tee /tmp/pack-15.log
-          grep -q "RC5 PROBE START racers=15 ai=14" /tmp/pack-15.log
-          grep -q "RC5 ALL FINISH PASS racers=15" /tmp/pack-15.log
-          grep -q "RC5 INTERACTION FLOW PASS" /tmp/pack-15.log
-          grep -q "RC5 GRAND PRIX PROBE PASS racers=15 realtime=false" /tmp/pack-15.log
+          export WILDDASH_BALANCE_RACERS=18
+          export WILDDASH_BALANCE_RUNS=1
+          export WILDDASH_BALANCE_RUN_INDEX=1
+          export WILDDASH_BALANCE_SEED=7901
+          export WILDDASH_BALANCE_RUN=1
+          export WILDDASH_REALTIME_BALANCE=1
+          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-rc6-balance-18"
+          rm -rf "$XDG_DATA_HOME"
+          timeout 320s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot res://tests/ai_race_balance_probe.tscn \
+            | tee /tmp/rc6-balance-18.log
+          grep -q "AI_BALANCE_PASS racers=18 run=1 seed=7901" /tmp/rc6-balance-18.log
+          grep "AI_BALANCE_RESULT" /tmp/rc6-balance-18.log >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Verify Hard 18-racer field
-        run: |
-          set -o pipefail
-          export WILDDASH_RC5_RACERS=18
-          export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-pack-18"
-          timeout 110s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
-            --headless --path godot res://tests/rc5_grand_prix_probe.tscn \
-            | tee /tmp/pack-18.log
-          grep -q "RC5 PROBE START racers=18 ai=17" /tmp/pack-18.log
-          grep -q "RC5 ALL FINISH PASS racers=18" /tmp/pack-18.log
-          grep -q "RC5 INTERACTION FLOW PASS" /tmp/pack-18.log
-          grep -q "RC5 GRAND PRIX PROBE PASS racers=18 realtime=false" /tmp/pack-18.log
-
-      - name: Re-run 10 25 50 racer performance benchmark
-        run: |
-          set -o pipefail
-          for profile in baseline optimized; do
-            if [ "$profile" = "optimized" ]; then
-              export WILDDASH_OPTIMIZED=1
-            else
-              export WILDDASH_OPTIMIZED=0
-            fi
-            for racers in 10 25 50; do
-              export WILDDASH_RACER_COUNT=$racers
-              log="/tmp/wilddash-pack-perf-${profile}-${racers}.log"
-              timeout 18s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
-                --headless --path godot res://benchmark/race_benchmark.tscn | tee "$log"
-              grep -q "PERF_RESULT profile=${profile} racers=${racers}" "$log"
-              grep -q "BENCHMARK RACE COMPLETE profile=${profile} racers=${racers}" "$log"
-            done
-          done
+      - name: Upload RC6 AI balance telemetry
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: WILD-DASH-RC6-AI-Balance-Smoke
+          path: /tmp/rc6-balance-*.log
+          if-no-files-found: warn
+          retention-days: 14
