@@ -1,0 +1,119 @@
+name: WILD DASH AI Race Balance
+
+on:
+  workflow_dispatch:
+    inputs:
+      field:
+        description: "Race field to validate"
+        required: true
+        default: "both"
+        type: choice
+        options:
+          - both
+          - "15"
+          - "18"
+      runs:
+        description: "Deterministic runs per field"
+        required: true
+        default: "3"
+        type: choice
+        options:
+          - "1"
+          - "3"
+          - "5"
+      base_seed:
+        description: "Base deterministic seed"
+        required: true
+        default: "6100"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wild-dash-ai-balance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  balance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Download Godot 4.7.1 stable
+        run: |
+          curl -L --fail --retry 3 \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip \
+            -o /tmp/godot.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x /tmp/godot/Godot_v4.7.1-stable_linux.x86_64
+          /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --version
+
+      - name: Import project
+        run: /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --editor --path godot --quit
+
+      - name: Run Normal 15 and Hard 18 balance probes
+        env:
+          FIELD: ${{ inputs.field }}
+          RUNS: ${{ inputs.runs }}
+          BASE_SEED: ${{ inputs.base_seed }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/wilddash-ai-balance
+          : > /tmp/wilddash-ai-balance/results.txt
+          : > /tmp/wilddash-ai-balance/characters.txt
+
+          fields=""
+          if [ "$FIELD" = "both" ]; then
+            fields="15 18"
+          else
+            fields="$FIELD"
+          fi
+
+          for racers in $fields; do
+            for run_index in $(seq 1 "$RUNS"); do
+              seed=$((BASE_SEED + racers * 100 + run_index))
+              log="/tmp/wilddash-ai-balance/racers-${racers}-run-${run_index}-seed-${seed}.log"
+              export WILDDASH_BALANCE_RACERS="$racers"
+              export WILDDASH_BALANCE_RUNS="$RUNS"
+              export WILDDASH_BALANCE_RUN_INDEX="$run_index"
+              export WILDDASH_BALANCE_SEED="$seed"
+              export WILDDASH_BALANCE_RUN=1
+              export WILDDASH_REALTIME_BALANCE=1
+              export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-ai-balance-${racers}-${run_index}"
+              rm -rf "$XDG_DATA_HOME"
+
+              echo "=== AI BALANCE racers=${racers} run=${run_index}/${RUNS} seed=${seed} ==="
+              timeout 320s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+                --headless --path godot res://tests/ai_race_balance_probe.tscn \
+                | tee "$log"
+              grep -q "AI_BALANCE_PASS racers=${racers} run=${run_index} seed=${seed}" "$log"
+              grep "AI_BALANCE_RESULT" "$log" >> /tmp/wilddash-ai-balance/results.txt
+              grep "AI_BALANCE_CHARACTER" "$log" >> /tmp/wilddash-ai-balance/characters.txt || true
+            done
+          done
+
+          {
+            echo "## WILD DASH RC6 AI Race Balance"
+            echo
+            echo "### Race results"
+            echo '```text'
+            cat /tmp/wilddash-ai-balance/results.txt
+            echo '```'
+            echo
+            echo "### Character distribution"
+            echo '```text'
+            cat /tmp/wilddash-ai-balance/characters.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload AI balance telemetry
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: WILD-DASH-RC6-AI-Balance-Logs
+          path: /tmp/wilddash-ai-balance/
+          if-no-files-found: warn
+          retention-days: 14
