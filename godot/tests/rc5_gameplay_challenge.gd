@@ -13,13 +13,19 @@ func _ready() -> void:
 	await get_tree().process_frame
 	var failures: Array[String] = []
 
-	# Difficulty / campaign integration.
+	# Difficulty / campaign integration. Check each StringName explicitly instead
+	# of comparing a typed Array[StringName] against an untyped literal array.
 	_check(GameManager.CASUAL_AI_COUNT == 9, "Casual should be Player + 9 AI", failures)
 	_check(GameManager.NORMAL_AI_COUNT == 14, "Normal should be Player + 14 AI", failures)
 	_check(GameManager.HARD_AI_COUNT == 17, "Hard should be Player + 17 AI", failures)
 	_check(GameManager.DEFAULT_AI_COUNT == GameManager.NORMAL_AI_COUNT, "Normal should be production default", failures)
 	_check(GameManager.MAX_AI_COUNT >= GameManager.HARD_AI_COUNT, "Hard racer count supported", failures)
-	_check(GameManager.ROUND_IDS == [&"grand_prix", &"fruit_collection", &"neon_harbor_race", &"push_out"], "four-round campaign order with Neon Harbor round 3", failures)
+	_check(GameManager.ROUND_IDS.size() == 4, "four-round campaign size", failures)
+	if GameManager.ROUND_IDS.size() == 4:
+		_check(GameManager.ROUND_IDS[0] == &"grand_prix", "Round 1 Grand Prix", failures)
+		_check(GameManager.ROUND_IDS[1] == &"fruit_collection", "Round 2 Fruit Collection", failures)
+		_check(GameManager.ROUND_IDS[2] == &"neon_harbor_race", "Round 3 Neon Harbor", failures)
+		_check(GameManager.ROUND_IDS[3] == &"push_out", "Round 4 Push Out", failures)
 	_check(ResourceLoader.exists("res://modes/floor_collapse/floor_collapse.tscn"), "Floor Collapse preserved outside campaign", failures)
 
 	# Item challenge: 12 distinct definitions, rank weighting, shield frequency,
