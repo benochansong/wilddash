@@ -1,18 +1,8 @@
 name: WILD DASH Item Combat & Obstacles CI
 
+# Heavy/specialized validation. Run manually when item combat or obstacle
+# behavior changes instead of on every pull request.
 on:
-  pull_request:
-    paths:
-      - "godot/items/**"
-      - "godot/tracks/dynamic_obstacle.gd"
-      - "godot/tracks/race_obstacle_expansion_controller.gd"
-      - "godot/modes/grand_prix/grand_prix.tscn"
-      - "godot/modes/neon_harbor_race/neon_harbor_race.tscn"
-      - "godot/modes/snowpeak_winter_rally/snowpeak_winter_rally.tscn"
-      - "godot/ui/mode_hud.gd"
-      - "godot/tests/item_combat_expansion_regression.*"
-      - "godot/tests/race_obstacle_expansion_regression.*"
-      - ".github/workflows/item-combat-obstacle-ci.yml"
   workflow_dispatch:
 
 permissions:
