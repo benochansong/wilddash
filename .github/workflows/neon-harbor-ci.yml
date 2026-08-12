@@ -1,0 +1,70 @@
+name: WILD DASH Neon Harbor CI
+
+on:
+  pull_request:
+    paths:
+      - "godot/tracks/neon_harbor_track.gd"
+      - "godot/tracks/neon_harbor_track.tscn"
+      - "godot/modes/neon_harbor_race/**"
+      - "godot/tests/neon_harbor_*.gd"
+      - "godot/tests/neon_harbor_*.tscn"
+      - ".github/workflows/neon-harbor-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-neon-harbor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Download Godot 4.7.1 stable
+        run: |
+          curl -L --fail --retry 3 \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip \
+            -o /tmp/godot.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x /tmp/godot/Godot_v4.7.1-stable_linux.x86_64
+          /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --version
+
+      - name: Import project
+        run: /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --editor --path godot --quit
+
+      - name: Verify Neon Harbor track contract
+        run: |
+          set -o pipefail
+          timeout 35s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot res://tests/neon_harbor_track_smoke.tscn \
+            | tee /tmp/neon-track.log
+          grep -q "NEON HARBOR TRACK LOAD PASS" /tmp/neon-track.log
+          grep -q "NEON HARBOR ENVIRONMENT PASS" /tmp/neon-track.log
+          grep -q "NEON HARBOR FINISH PASS checkpoints=9" /tmp/neon-track.log
+          grep -q "NEON HARBOR TRACK SMOKE PASS" /tmp/neon-track.log
+
+      - name: Probe Neon Harbor Normal 15 racers
+        run: |
+          set -o pipefail
+          export WILDDASH_NEON_RACERS=15
+          export XDG_DATA_HOME="$RUNNER_TEMP/neon-15"
+          timeout 120s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot res://tests/neon_harbor_race_probe.tscn \
+            | tee /tmp/neon-15.log
+          grep -q "NEON HARBOR ALL FINISH PASS racers=15 finishers=15" /tmp/neon-15.log
+          grep -q "NEON HARBOR NPC VARIETY PASS species=12 roster=12" /tmp/neon-15.log
+          grep -q "NEON HARBOR PROBE PASS racers=15 checkpoints=9" /tmp/neon-15.log
+
+      - name: Probe Neon Harbor Hard 18 racers
+        run: |
+          set -o pipefail
+          export WILDDASH_NEON_RACERS=18
+          export XDG_DATA_HOME="$RUNNER_TEMP/neon-18"
+          timeout 120s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot res://tests/neon_harbor_race_probe.tscn \
+            | tee /tmp/neon-18.log
+          grep -q "NEON HARBOR ALL FINISH PASS racers=18 finishers=18" /tmp/neon-18.log
+          grep -q "NEON HARBOR NPC VARIETY PASS species=12 roster=12" /tmp/neon-18.log
+          grep -q "NEON HARBOR PROBE PASS racers=18 checkpoints=9" /tmp/neon-18.log
