@@ -249,7 +249,7 @@ func _record_action(action: StringName, target: WildDashCharacterController, gap
 			_line_change_actions += 1
 		&"traffic_hold":
 			_traffic_holds += 1
-	var target_name := "none" if target == null else target.name
+	var target_name: String = "none" if target == null else String(target.name)
 	print("AI PACK TACTIC racer=%s personality=%s action=%s target=%s gap=%.1f lane=%.1f" % [
 		_racer.name, get_personality_name(), String(action), target_name, gap, _driver.preferred_lane,
 	])
