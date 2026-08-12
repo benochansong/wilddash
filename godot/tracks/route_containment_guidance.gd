@@ -63,9 +63,8 @@ func _build_route_containment() -> void:
 			OPEN_AREA_SEGMENTS.has(segment_index)
 		)
 
-	# Straight segment rails used to stop abruptly at every route point. Connect
-	# neighboring boundaries through bends so the eye reads one continuous racing
-	# corridor instead of unrelated strips of road scattered across the scene.
+	# Connect neighboring boundaries through bends so the route reads as one
+	# continuous corridor instead of unrelated road strips scattered in view.
 	for route_index in range(1, route_points.size() - 1):
 		if SKIP_CORNER_CONNECTOR_ROUTES.has(route_index):
 			continue
@@ -107,21 +106,20 @@ func _append_wood_fence_segment(
 	var width := SEGMENT_WIDTHS[segment_index]
 	var length := a.distance_to(b)
 	for side in [-1.0, 1.0]:
-		# Two rails make the Forest read as Road -> shoulder -> fence -> vegetation.
 		result.append(_track_transform_at(
-			a, b, 0.5, side * (width * 0.5 + 0.72), 0.58,
-			Vector3(0.18, 0.18, length)
+			a, b, 0.5, side * (width * 0.5 + 0.72), 0.62,
+			Vector3(0.24, 0.22, length)
 		))
 		result.append(_track_transform_at(
-			a, b, 0.5, side * (width * 0.5 + 0.72), 1.03,
-			Vector3(0.16, 0.16, length)
+			a, b, 0.5, side * (width * 0.5 + 0.72), 1.16,
+			Vector3(0.20, 0.18, length)
 		))
-		var post_count := maxi(5, int(ceil(length / 11.0)))
+		var post_count := maxi(6, int(ceil(length / 8.5)))
 		for post_index in range(post_count + 1):
 			var t := float(post_index) / float(post_count)
 			result.append(_track_transform_at(
-				a, b, t, side * (width * 0.5 + 0.72), 0.64,
-				Vector3(0.27, 1.30, 0.27)
+				a, b, t, side * (width * 0.5 + 0.72), 0.72,
+				Vector3(0.32, 1.50, 0.32)
 			))
 
 func _append_guardrail_segment(
@@ -138,32 +136,31 @@ func _append_guardrail_segment(
 	var length := a.distance_to(b)
 	var lateral_extra := _guardrail_extra(segment_index)
 	for side in [-1.0, 1.0]:
-		# The lower beam is intentionally thicker than the first pass. It needs to
-		# remain readable from a third-person camera while other road segments are
-		# visible in the distance.
+		# Make the actual route boundary unmistakable from the third-person camera.
+		# The lower beam is deliberately thicker/taller than decorative background rails.
 		result.append(_track_transform_at(
-			a, b, 0.5, side * (width * 0.5 + lateral_extra), 0.73,
-			Vector3(0.30 if strong else 0.25, 0.38 if strong else 0.32, length)
+			a, b, 0.5, side * (width * 0.5 + lateral_extra), 0.78,
+			Vector3(0.38 if strong else 0.32, 0.48 if strong else 0.40, length)
 		))
 		if strong:
 			result.append(_track_transform_at(
-				a, b, 0.5, side * (width * 0.5 + lateral_extra), 1.14,
-				Vector3(0.20, 0.16, length)
+				a, b, 0.5, side * (width * 0.5 + lateral_extra), 1.34,
+				Vector3(0.26, 0.22, length)
 			))
 
-		var spacing := 9.5 if open_area else (11.5 if strong else 14.0)
-		var post_count := maxi(5, int(ceil(length / spacing)))
+		var spacing := 7.0 if open_area else (8.5 if strong else 11.0)
+		var post_count := maxi(6, int(ceil(length / spacing)))
 		for post_index in range(post_count + 1):
 			var t := float(post_index) / float(post_count)
 			result.append(_track_transform_at(
-				a, b, t, side * (width * 0.5 + lateral_extra), 0.60,
-				Vector3(0.28 if strong else 0.24, 1.20 if strong else 1.10, 0.28 if strong else 0.24)
+				a, b, t, side * (width * 0.5 + lateral_extra), 0.72,
+				Vector3(0.34 if strong else 0.30, 1.52 if strong else 1.34, 0.34 if strong else 0.30)
 			))
-			# Sparse warm reflectors create a directional rhythm without becoming arrows.
+			# Strong warm reflectors form a readable rhythm along the current corridor.
 			if strong and post_index % 2 == 0:
 				accents.append(_track_transform_at(
-					a, b, t, side * (width * 0.5 + lateral_extra - 0.03), 1.16,
-					Vector3(0.30, 0.18, 0.18)
+					a, b, t, side * (width * 0.5 + lateral_extra - 0.05), 1.32,
+					Vector3(0.42, 0.24, 0.22)
 				))
 
 func _append_corner_connectors(
@@ -182,21 +179,21 @@ func _append_corner_connectors(
 			continue
 		if wood:
 			result.append(_beam_transform_between(
-				from + Vector3.UP * 0.58, to + Vector3.UP * 0.58, 0.18, 0.18
+				from + Vector3.UP * 0.62, to + Vector3.UP * 0.62, 0.24, 0.22
 			))
 			result.append(_beam_transform_between(
-				from + Vector3.UP * 1.03, to + Vector3.UP * 1.03, 0.16, 0.16
+				from + Vector3.UP * 1.16, to + Vector3.UP * 1.16, 0.20, 0.18
 			))
 			added += 2
 		else:
 			result.append(_beam_transform_between(
-				from + Vector3.UP * 0.73, to + Vector3.UP * 0.73,
-				0.30 if strong else 0.25, 0.38 if strong else 0.32
+				from + Vector3.UP * 0.78, to + Vector3.UP * 0.78,
+				0.38 if strong else 0.32, 0.48 if strong else 0.40
 			))
 			added += 1
 			if strong:
 				result.append(_beam_transform_between(
-					from + Vector3.UP * 1.14, to + Vector3.UP * 1.14, 0.20, 0.16
+					from + Vector3.UP * 1.34, to + Vector3.UP * 1.34, 0.26, 0.22
 				))
 				added += 1
 	return added
