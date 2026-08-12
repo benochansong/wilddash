@@ -34,7 +34,22 @@ func _physics_process(delta: float) -> void:
 		if desired.length_squared() > 0.001:
 			desired = desired.normalized()
 			_direction = _direction.lerp(desired, clampf(homing_strength * delta, 0.0, 0.18)).normalized()
-	global_position += _direction * speed * delta
+	var from := global_position
+	var to := from + _direction * speed * delta
+	var query := PhysicsRayQueryParameters3D.create(from, to, 3)
+	if owner_racer != null and is_instance_valid(owner_racer):
+		query.exclude = [owner_racer.get_rid()]
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if not hit.is_empty():
+		var collider = hit.get("collider")
+		if collider is WildDashCharacterController and collider != owner_racer:
+			_resolve_hit(collider)
+		else:
+			# World layer 1 wins over visual tunnelling: projectiles disappear on
+			# tunnel/warehouse/guardrail contact rather than spawning outside.
+			queue_free()
+		return
+	global_position = to
 	if _direction.length_squared() > 0.001:
 		look_at(global_position + _direction, Vector3.UP)
 
