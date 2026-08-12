@@ -17,6 +17,7 @@ const START_GRID_X_SPACING := 2.45
 const START_GRID_Z_SPACING := 3.15
 const FINISH_RUNOUT_DISTANCE := 12.0
 const SHORTCUT_SKIP_ROUTE_INDEX := 4
+const HEAVY_SHORTCUT_BLOCK_IDS: Array[StringName] = [&"elephant", &"bear", &"panda"]
 const PLAYER_MAX_SPEED_SCALE := 1.18
 const PLAYER_CRUISE_SPEED_SCALE := 1.10
 const PLAYER_ACCELERATION_SCALE := 1.10
@@ -79,12 +80,15 @@ func _ready() -> void:
 		tactics.configure(racer, driver, personality as WildDashAIPackTactics.Personality, risk, overtake, shortcut_pref)
 		add_child(tactics)
 
-		if personality == WildDashAIPackTactics.Personality.SHORTCUT:
+		var heavy_shortcut_blocked: bool = HEAVY_SHORTCUT_BLOCK_IDS.has(racer.animal_id)
+		if personality == WildDashAIPackTactics.Personality.SHORTCUT and not heavy_shortcut_blocked:
 			driver.preferred_lane = clampf(lane * 0.25, -0.9, 0.9)
 			driver.set_race_route(_build_shortcut_route(SHORTCUT_SKIP_ROUTE_INDEX))
 			_shortcut_users += 1
 		else:
 			driver.set_race_route(_build_race_route_with_runout())
+			if personality == WildDashAIPackTactics.Personality.SHORTCUT and heavy_shortcut_blocked:
+				print("NEON HARBOR HEAVY AI MAIN ROUTE racer=%s animal=%s shortcut_blocked=true" % [racer.name, racer.animal_id])
 
 		var item_brain := AI_ITEM_BRAIN_SCRIPT.new() as WildDashAIItemBrain
 		item_brain.name = "%sItemBrain" % racer.name
