@@ -19,13 +19,13 @@ enum GameState {
 const ROUND_IDS: Array[StringName] = [
 	&"grand_prix",
 	&"fruit_collection",
-	&"floor_collapse",
+	&"neon_harbor_race",
 	&"push_out",
 ]
 const ROUND_SCENES: Array[String] = [
 	"res://modes/grand_prix/grand_prix.tscn",
 	"res://modes/fruit_collection/fruit_collection.tscn",
-	"res://modes/floor_collapse/floor_collapse.tscn",
+	"res://modes/neon_harbor_race/neon_harbor_race.tscn",
 	"res://modes/push_out/push_out.tscn",
 ]
 const LOBBY_SCENE := "res://scenes/lobby.tscn"
@@ -137,9 +137,12 @@ func begin_round(mode_id: StringName) -> void:
 		&"fruit_collection":
 			set_state(GameState.ARENA)
 			print("RC_FLOW Round 2")
+		&"neon_harbor_race":
+			set_state(GameState.RACE)
+			print("RC_FLOW Round 3 Neon Harbor Race")
 		&"floor_collapse":
 			set_state(GameState.ARENA)
-			print("RC_FLOW Round 3")
+			print("RC_FLOW Floor Collapse Free Play")
 		&"push_out":
 			set_state(GameState.FINAL)
 			print("RC_FLOW Final")
