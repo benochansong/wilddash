@@ -13,7 +13,6 @@ extends Camera3D
 @export var obstructed_smoothing := 16.0
 @export var recovery_smoothing := 6.5
 @export var target_anchor_height := 1.15
-@export var minimum_camera_distance := 2.6
 
 var _target: Node3D
 var _camera_obstructed := false
@@ -80,6 +79,10 @@ func _get_camera_anchor() -> Vector3:
 func _resolve_obstructed_position(anchor: Vector3, desired_position: Vector3) -> Vector3:
 	if not obstruction_enabled or _target == null or get_world_3d() == null:
 		return desired_position
+	var ray := desired_position - anchor
+	if ray.length_squared() <= 0.001:
+		return desired_position
+	var ray_direction := ray.normalized()
 	var query := PhysicsRayQueryParameters3D.new()
 	query.from = anchor
 	query.to = desired_position
@@ -92,18 +95,11 @@ func _resolve_obstructed_position(anchor: Vector3, desired_position: Vector3) ->
 	if hit.is_empty():
 		return desired_position
 
+	# Stay on the racer side of the blocking roof/wall. Pulling backward along the
+	# ray is more reliable than pushing along the surface normal at tunnel corners.
 	var hit_position: Vector3 = hit.get("position", desired_position)
-	var hit_normal: Vector3 = hit.get("normal", Vector3.ZERO)
-	var candidate := hit_position + hit_normal * obstruction_clearance
-
-	# Keep enough separation from the racer for a readable third-person view even
-	# when the tunnel roof or side wall forces the normal outdoor camera inward.
-	var from_anchor := candidate - anchor
-	if from_anchor.length() < minimum_camera_distance:
-		var desired_direction := desired_position - anchor
-		if desired_direction.length_squared() > 0.001:
-			candidate = anchor + desired_direction.normalized() * minimum_camera_distance
-	return candidate
+	var safe_distance := maxf(0.35, anchor.distance_to(hit_position) - obstruction_clearance)
+	return anchor + ray_direction * safe_distance
 
 func _apply_target_profile() -> void:
 	if not _target is WildDashCharacterController:
