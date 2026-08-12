@@ -1,6 +1,8 @@
 class_name WildDashModeHUD
 extends CanvasLayer
 
+const EXPANDED_ITEM_CATALOG: Script = preload("res://items/expanded_item_catalog.gd")
+
 var _title_label: Label
 var _metrics_label: Label
 var _message_label: Label
@@ -76,11 +78,18 @@ func _process(_delta: float) -> void:
 	if _bound_character == null or not is_instance_valid(_bound_character):
 		return
 	var held_item := _bound_character.get_held_item()
-	set_item_state(
-		ItemSystem.get_display_name(held_item),
-		ItemSystem.get_status_text(_bound_character),
-		ItemSystem.get_icon_text(held_item),
-	)
+	if EXPANDED_ITEM_CATALOG.is_expanded(held_item):
+		set_item_state(
+			EXPANDED_ITEM_CATALOG.get_display_name(held_item),
+			"%s READY · Q / B" % EXPANDED_ITEM_CATALOG.get_status_label(held_item),
+			EXPANDED_ITEM_CATALOG.get_icon_text(held_item),
+		)
+	else:
+		set_item_state(
+			ItemSystem.get_display_name(held_item),
+			ItemSystem.get_status_text(_bound_character),
+			ItemSystem.get_icon_text(held_item),
+		)
 	var cooldown := _bound_character.skill_cooldown_remaining
 	var status := "READY · E / X" if cooldown <= 0.01 else "%.1f sec" % cooldown
 	set_skill_state(_bound_character.get_skill_icon_text(), _bound_character.get_skill_name(), status)
