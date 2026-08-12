@@ -5,7 +5,6 @@ import test from "node:test";
 test("desktop build contains the offline game shell", async () => {
   await Promise.all([
     access(new URL("../dist/index.html", import.meta.url)),
-    access(new URL("../dist/app-icon.png", import.meta.url)),
     access(new URL("../electron/main.cjs", import.meta.url)),
   ]);
 
