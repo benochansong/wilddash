@@ -1,17 +1,8 @@
 name: WILD DASH Race Collision CI
 
+# Collision-specific regression suite. Run manually when collision/barrier
+# behavior changes instead of on every pull request.
 on:
-  pull_request:
-    paths:
-      - "godot/tracks/race_barrier_factory.gd"
-      - "godot/systems/race_environment_collision_controller.gd"
-      - "godot/systems/racing_feel_controller.gd"
-      - "godot/modes/grand_prix/grand_prix.tscn"
-      - "godot/modes/neon_harbor_race/neon_harbor_race.tscn"
-      - "godot/modes/snowpeak_winter_rally/snowpeak_winter_rally.tscn"
-      - "godot/items/item_box.gd"
-      - "godot/tests/race_environment_collision_regression.*"
-      - ".github/workflows/race-collision-ci.yml"
   workflow_dispatch:
 
 permissions:
