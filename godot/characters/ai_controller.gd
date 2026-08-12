@@ -6,6 +6,16 @@ enum AIMode {
 	ARENA,
 }
 
+const SOFT_RECOVERY_SECONDS := 1.75
+const HARD_RECOVERY_SECONDS := 4.0
+const HARD_MODE_SOFT_RECOVERY_SECONDS := 1.45
+const HARD_MODE_HARD_RECOVERY_SECONDS := 3.35
+const EMERGENCY_REPEAT_LIMIT := 2
+const SOFT_RECOVERY_COOLDOWN := 1.20
+const COLLISION_COUNT_DEBOUNCE := 0.35
+const RUBBER_BAND_TRAILING_MAX := 0.06
+const RUBBER_BAND_LEADING_MAX := 0.04
+
 @export var racer_path: NodePath
 @export var ai_mode: AIMode = AIMode.RACE
 @export var target_speed := 10.4
@@ -35,11 +45,23 @@ var _route_index := 1
 var _recovery_sample_elapsed := 0.0
 var _recovery_sample_progress := 0.0
 var _recovery_stagnant_seconds := 0.0
+var _soft_recovery_cooldown := 0.0
+var _collision_debounce_remaining := 0.0
+var _last_recovery_checkpoint := -1
+var _same_checkpoint_recoveries := 0
+var _soft_recovery_count := 0
+var _hard_recovery_count := 0
+var _emergency_recovery_count := 0
+var _collision_count := 0
+var _overtake_count := 0
+var _low_speed_seconds := 0.0
+var _last_rank := 0
 
 func _ready() -> void:
 	_racer = get_node_or_null(racer_path) as WildDashCharacterController
 	if _racer == null:
 		return
+	add_to_group("wilddash_ai_driver")
 	if not preserve_player_identity:
 		_racer.is_player = false
 	_configure_deterministic_personality(_racer.animal_id)
@@ -52,6 +74,8 @@ func _physics_process(delta: float) -> void:
 	var started_usec := Time.get_ticks_usec()
 	_last_brain_updated = false
 	_last_raycast_used = false
+	_soft_recovery_cooldown = maxf(0.0, _soft_recovery_cooldown - delta)
+	_collision_debounce_remaining = maxf(0.0, _collision_debounce_remaining - delta)
 	if _racer == null or _racer.finished:
 		_record_perf(started_usec)
 		return
@@ -67,6 +91,7 @@ func _physics_process(delta: float) -> void:
 	else:
 		_lod_level = 0
 		_process_race_ai_baseline(delta)
+	_update_balance_telemetry(delta)
 	_record_perf(started_usec)
 
 func set_race_route(points: Array[Vector3]) -> void:
@@ -99,6 +124,20 @@ func get_racer() -> WildDashCharacterController:
 func get_route_index() -> int:
 	return _route_index
 
+func get_balance_telemetry() -> Dictionary:
+	return {
+		"animal": String(_racer.animal_id) if _racer != null else "unknown",
+		"difficulty": String(GameManager.difficulty),
+		"rank": RaceManager.get_rank(_racer) if _racer != null else 0,
+		"checkpoint": RaceManager.get_checkpoint_progress(_racer) if _racer != null else 0,
+		"soft_recoveries": _soft_recovery_count,
+		"hard_recoveries": _hard_recovery_count,
+		"emergency_recoveries": _emergency_recovery_count,
+		"collisions": _collision_count,
+		"overtakes": _overtake_count,
+		"low_speed_seconds": _low_speed_seconds,
+	}
+
 func _process_race_ai_baseline(delta: float) -> void:
 	if not RaceManager.active:
 		return
@@ -121,9 +160,9 @@ func _process_race_ai_baseline(delta: float) -> void:
 
 	var progress := RaceManager.get_track_progress(_racer)
 	_update_stuck_state(delta, progress)
-	if _stuck_seconds > 1.0:
-		_avoidance_sign *= -1.0
-		desired_x += _avoidance_sign * 4.8
+	if _stuck_seconds > _soft_recovery_threshold() and _soft_recovery_cooldown <= 0.0:
+		var soft_target := _racer.global_position + (-_racer.global_transform.basis.z.normalized() * 7.0)
+		_apply_soft_recovery(soft_target)
 		_stuck_seconds = 0.0
 
 	desired_x = clampf(desired_x, -8.0, 8.0)
@@ -171,9 +210,9 @@ func _update_straight_race_brain(elapsed: float, allow_raycast: bool) -> void:
 
 	var progress := RaceManager.get_track_progress(_racer)
 	_update_stuck_state(elapsed, progress)
-	if _stuck_seconds > 1.0:
-		_avoidance_sign *= -1.0
-		desired_x += _avoidance_sign * 4.8
+	if _stuck_seconds > _soft_recovery_threshold() and _soft_recovery_cooldown <= 0.0:
+		var forward_target := _racer.global_position + (-_racer.global_transform.basis.z.normalized() * 7.0)
+		_apply_soft_recovery(forward_target)
 		_stuck_seconds = 0.0
 
 	desired_x = clampf(desired_x, -8.0, 8.0)
@@ -219,20 +258,13 @@ func _update_route_brain(elapsed: float, allow_raycast: bool) -> void:
 
 	var progress := RaceManager.get_track_progress(_racer)
 	_update_stuck_state(elapsed, progress)
-	if _stuck_seconds > 1.35:
-		_avoidance_sign *= -1.0
-		_racer.current_speed = maxf(_racer.current_speed, target_speed * 0.7)
-		if _racer.is_on_floor():
-			_racer.velocity.y = _racer.jump_velocity * 0.9
+	if _stuck_seconds > _soft_recovery_threshold() and _soft_recovery_cooldown <= 0.0:
+		_apply_soft_recovery(current_target)
 		_stuck_seconds = 0.0
 
 func _advance_route_index() -> void:
 	if _race_route.size() < 2 or _racer == null:
 		return
-	# A fixed 3.5m capture radius is fine around 10-15m/s but can make racers
-	# orbit a waypoint after a boost, jump landing, or headless stress speed.
-	# Scale the capture radius conservatively and also accept a waypoint that
-	# has just been crossed while the racer remains inside the local corridor.
 	var reach_radius := clampf(3.5 + maxf(0.0, _racer.current_speed - 18.0) * 0.12, 3.5, 7.5)
 	while _route_index < _race_route.size() - 1:
 		var target := _race_route[_route_index]
@@ -262,32 +294,61 @@ func _update_hard_stuck_recovery(delta: float) -> void:
 	if _racer == null or _race_route.size() < 2 or not RaceManager.active:
 		return
 	_recovery_sample_elapsed += delta
-	if _recovery_sample_elapsed < 1.0:
+	if _recovery_sample_elapsed < 0.75:
 		return
 	var progress := RaceManager.get_track_progress(_racer)
 	var advanced := progress - _recovery_sample_progress
-	if advanced < 1.5:
+	if advanced < 1.2:
 		_recovery_stagnant_seconds += _recovery_sample_elapsed
 	else:
-		_recovery_stagnant_seconds = 0.0
+		_recovery_stagnant_seconds = maxf(0.0, _recovery_stagnant_seconds - _recovery_sample_elapsed * 1.5)
 	_recovery_sample_progress = progress
 	_recovery_sample_elapsed = 0.0
-	if _recovery_stagnant_seconds < 4.0:
+	if _recovery_stagnant_seconds < _hard_recovery_threshold():
 		return
-	print("AI HARD STUCK RECOVERY racer=%s checkpoint=%d progress=%.1f" % [
-		RaceManager.get_racer_label(_racer),
-		RaceManager.get_checkpoint_progress(_racer),
-		progress,
-	])
-	_recover_stalled_to_route()
+
+	var checkpoint := RaceManager.get_checkpoint_progress(_racer)
+	if checkpoint == _last_recovery_checkpoint:
+		_same_checkpoint_recoveries += 1
+	else:
+		_last_recovery_checkpoint = checkpoint
+		_same_checkpoint_recoveries = 1
+
+	if _same_checkpoint_recoveries >= EMERGENCY_REPEAT_LIMIT:
+		_emergency_recovery_count += 1
+		print("AI EMERGENCY RECOVERY racer=%s checkpoint=%d progress=%.1f repeat=%d" % [
+			RaceManager.get_racer_label(_racer), checkpoint, progress, _same_checkpoint_recoveries,
+		])
+		_recover_emergency_to_checkpoint_route()
+		_same_checkpoint_recoveries = 0
+	else:
+		_hard_recovery_count += 1
+		print("AI HARD STUCK RECOVERY racer=%s checkpoint=%d progress=%.1f" % [
+			RaceManager.get_racer_label(_racer), checkpoint, progress,
+		])
+		_recover_stalled_to_route()
+
 	_recovery_stagnant_seconds = 0.0
 	_recovery_sample_progress = RaceManager.get_track_progress(_racer)
 
-# Falling below the course is a real checkpoint respawn. A racer that is still
-# near the course but has been stuck for four seconds gets a lighter recovery.
-# Keep recovery local to the current route target so a folded hairpin cannot
-# snap the racer onto a spatially-near future branch and accidentally bypass
-# an ordered checkpoint.
+func _apply_soft_recovery(target: Vector3) -> void:
+	if _racer == null:
+		return
+	var direction := target - _racer.global_position
+	direction.y = 0.0
+	if direction.length_squared() > 0.01:
+		direction = direction.normalized()
+		_cached_target_yaw = atan2(-direction.x, -direction.z)
+	_avoidance_sign *= -1.0
+	_racer.current_speed = maxf(_racer.current_speed, _soft_recovery_speed_floor())
+	if _racer.is_on_floor() and _racer.has_blocking_collision():
+		_racer.velocity.y = _racer.jump_velocity * 0.58
+	_soft_recovery_count += 1
+	_soft_recovery_cooldown = SOFT_RECOVERY_COOLDOWN
+	print("AI SOFT RECOVERY racer=%s checkpoint=%d route=%d speed=%.1f" % [
+		RaceManager.get_racer_label(_racer), RaceManager.get_checkpoint_progress(_racer), _route_index, _racer.current_speed,
+	])
+
 func _recover_stalled_to_route() -> void:
 	if _racer == null or _race_route.is_empty():
 		return
@@ -298,6 +359,7 @@ func _recover_stalled_to_route() -> void:
 	var safe_index := previous_index if previous_distance <= current_distance else current_index
 	var safe_position := _race_route[safe_index] + Vector3.UP * 0.35
 	_racer.reset_motion(safe_position)
+	_racer.current_speed = maxf(_racer.current_speed, _hard_recovery_speed_floor())
 	_route_index = mini(safe_index + 1, _race_route.size() - 1)
 	_orient_from_position(safe_position)
 	_reset_recovery_sampling()
@@ -305,11 +367,26 @@ func _recover_stalled_to_route() -> void:
 		RaceManager.get_racer_label(_racer), safe_index, RaceManager.get_checkpoint_progress(_racer),
 	])
 
+func _recover_emergency_to_checkpoint_route() -> void:
+	if _racer == null:
+		return
+	var safe_position := RaceManager.get_respawn_position(_racer)
+	_racer.reset_motion(safe_position)
+	_racer.current_speed = maxf(_racer.current_speed, _hard_recovery_speed_floor())
+	if not _race_route.is_empty():
+		_route_index = mini(_find_nearest_route_index(safe_position) + 1, _race_route.size() - 1)
+		_orient_from_position(safe_position)
+	_reset_recovery_sampling()
+	print("AI CHECKPOINT LOOP BREAK racer=%s checkpoint=%d route=%d" % [
+		RaceManager.get_racer_label(_racer), RaceManager.get_checkpoint_progress(_racer), _route_index,
+	])
+
 func _recover_to_track() -> void:
 	if _racer == null:
 		return
 	var respawn := RaceManager.get_respawn_position(_racer)
 	_racer.reset_motion(respawn)
+	_racer.current_speed = maxf(_racer.current_speed, _hard_recovery_speed_floor())
 	if not _race_route.is_empty():
 		_route_index = mini(_find_nearest_route_index(respawn) + 1, _race_route.size() - 1)
 		_orient_from_position(respawn)
@@ -331,6 +408,7 @@ func _reset_recovery_sampling() -> void:
 	_recovery_stagnant_seconds = 0.0
 	_recovery_sample_progress = RaceManager.get_track_progress(_racer)
 	_last_progress = _recovery_sample_progress
+	_stuck_seconds = 0.0
 
 func _find_nearest_route_index(position: Vector3) -> int:
 	if _race_route.is_empty():
@@ -345,7 +423,8 @@ func _find_nearest_route_index(position: Vector3) -> int:
 	return best_index
 
 func _move_racer(delta: float, inspect_blocking_collision: bool) -> void:
-	var skill_target_speed := target_speed * _racer.get_active_speed_scale()
+	var rubber_band_scale := _get_rubber_band_scale()
+	var skill_target_speed := target_speed * _racer.get_active_speed_scale() * rubber_band_scale
 	var skill_acceleration := acceleration * _racer.get_active_acceleration_scale()
 	_racer.current_speed = move_toward(_racer.current_speed, skill_target_speed, skill_acceleration * delta)
 	var forward := -_racer.global_transform.basis.z.normalized()
@@ -356,7 +435,11 @@ func _move_racer(delta: float, inspect_blocking_collision: bool) -> void:
 	_racer.move_and_slide()
 	_racer.resolve_skill_contacts()
 	if inspect_blocking_collision and _racer.has_blocking_collision():
-		_racer.current_speed *= _racer.get_collision_speed_retention()
+		var retained_speed := _racer.current_speed * _racer.get_collision_speed_retention()
+		_racer.current_speed = maxf(_collision_speed_floor(skill_target_speed), retained_speed)
+		if _collision_debounce_remaining <= 0.0:
+			_collision_count += 1
+			_collision_debounce_remaining = COLLISION_COUNT_DEBOUNCE
 	_racer.decay_knockback(delta)
 
 func _process_arena_ai(delta: float) -> void:
@@ -376,6 +459,56 @@ func _process_arena_ai(delta: float) -> void:
 	_racer.resolve_skill_contacts()
 	_racer.current_speed = Vector2(_racer.velocity.x, _racer.velocity.z).length()
 	_racer.decay_knockback(delta)
+
+func _update_balance_telemetry(delta: float) -> void:
+	if _racer == null or not RaceManager.active:
+		return
+	var reference_speed := minf(target_speed, maxf(_racer.cruise_speed * 1.45, 8.0))
+	if _racer.current_speed < reference_speed * 0.48:
+		_low_speed_seconds += delta
+	var rank := RaceManager.get_rank(_racer)
+	if _last_rank > 0 and rank > 0 and rank < _last_rank:
+		_overtake_count += _last_rank - rank
+	_last_rank = rank
+
+func _get_rubber_band_scale() -> float:
+	if _racer == null or RaceManager.racers.size() < 10:
+		return 1.0
+	if DisplayServer.get_name() == "headless" and not OS.has_environment("WILDDASH_REALTIME_BALANCE") and not OS.has_environment("WILDDASH_BALANCE_RUN"):
+		return 1.0
+	var player: WildDashCharacterController = null
+	for candidate in RaceManager.racers:
+		if candidate is WildDashCharacterController and (candidate as WildDashCharacterController).is_player:
+			player = candidate as WildDashCharacterController
+			break
+	if player == null or player == _racer or RaceManager.get_track_length() <= 1.0:
+		return 1.0
+	var gap_ratio := (RaceManager.get_track_progress(player) - RaceManager.get_track_progress(_racer)) / RaceManager.get_track_length()
+	if gap_ratio > 0.10:
+		var trailing_strength := clampf((gap_ratio - 0.10) / 0.24, 0.0, 1.0)
+		return 1.0 + trailing_strength * RUBBER_BAND_TRAILING_MAX
+	if gap_ratio < -0.10:
+		var leading_strength := clampf((-gap_ratio - 0.10) / 0.24, 0.0, 1.0)
+		return 1.0 - leading_strength * RUBBER_BAND_LEADING_MAX
+	return 1.0
+
+func _soft_recovery_threshold() -> float:
+	return HARD_MODE_SOFT_RECOVERY_SECONDS if GameManager.difficulty == &"nightmare" else SOFT_RECOVERY_SECONDS
+
+func _hard_recovery_threshold() -> float:
+	return HARD_MODE_HARD_RECOVERY_SECONDS if GameManager.difficulty == &"nightmare" else HARD_RECOVERY_SECONDS
+
+func _soft_recovery_speed_floor() -> float:
+	var ratio := 0.72 if GameManager.difficulty == &"nightmare" else 0.68
+	return maxf(5.8, minf(target_speed * ratio, _racer.cruise_speed * 1.12))
+
+func _hard_recovery_speed_floor() -> float:
+	var ratio := 0.76 if GameManager.difficulty == &"nightmare" else 0.72
+	return maxf(6.2, minf(target_speed * ratio, _racer.cruise_speed * 1.18))
+
+func _collision_speed_floor(skill_target_speed: float) -> float:
+	var ratio := 0.60 if GameManager.difficulty == &"nightmare" else 0.55
+	return maxf(5.5, minf(skill_target_speed * ratio, _racer.cruise_speed * 1.05))
 
 func _resolve_lod_level() -> int:
 	if _lod_anchor == null or _racer == null:
