@@ -9,7 +9,7 @@ func _ready() -> void:
 	call_deferred("_install_service_lane_safety")
 
 func _install_service_lane_safety() -> void:
-	var track := get_parent()
+	var track: Node = get_parent()
 	if track == null:
 		return
 	var decoration := track.get_node_or_null("DecorationGeometry") as Node3D
@@ -18,11 +18,11 @@ func _install_service_lane_safety() -> void:
 		push_error("NEON SHORTCUT SAFETY could not resolve track roots")
 		return
 
-	var direction := SHORTCUT_B - SHORTCUT_A
-	var planar := Vector3(direction.x, 0.0, direction.z).normalized()
-	var right := Vector3(-planar.z, 0.0, planar.x)
-	var midpoint := (SHORTCUT_A + SHORTCUT_B) * 0.5
-	var length := SHORTCUT_A.distance_to(SHORTCUT_B)
+	var direction: Vector3 = SHORTCUT_B - SHORTCUT_A
+	var planar: Vector3 = Vector3(direction.x, 0.0, direction.z).normalized()
+	var right: Vector3 = Vector3(-planar.z, 0.0, planar.x)
+	var midpoint: Vector3 = (SHORTCUT_A + SHORTCUT_B) * 0.5
+	var length: float = SHORTCUT_A.distance_to(SHORTCUT_B)
 
 	# Overlay a wider visual service lane so the playable path matches the safe
 	# collision footprint. This is intentionally industrial concrete, not the
@@ -52,9 +52,9 @@ func _install_service_lane_safety() -> void:
 	rail_material.albedo_color = Color(0.42, 0.52, 0.62)
 	rail_material.metallic = 0.72
 	rail_material.roughness = 0.34
-	for side in [-1.0, 1.0]:
-		var rail_position := midpoint + right * RAIL_OFFSET * side + Vector3.UP * 0.72
-		var rail_target := SHORTCUT_B + right * RAIL_OFFSET * side + Vector3.UP * 0.72
+	for side: float in [-1.0, 1.0]:
+		var rail_position: Vector3 = midpoint + right * RAIL_OFFSET * side + Vector3.UP * 0.72
+		var rail_target: Vector3 = SHORTCUT_B + right * RAIL_OFFSET * side + Vector3.UP * 0.72
 
 		var rail_visual := CSGBox3D.new()
 		rail_visual.name = "ShortcutAServiceRail_%s_Visual" % ("L" if side < 0.0 else "R")
