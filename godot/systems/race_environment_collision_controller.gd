@@ -37,6 +37,7 @@ func _install_after_track_ready() -> void:
 		track.add_child(collision_root)
 
 	_tag_existing_world_collision(collision_root)
+	_configure_racer_collision_safety()
 	if track is WildDashGrandPrixTrack:
 		_barrier_count += _add_segment_containment(track, collision_root, GRAND_PRIX_HARD_SEGMENTS, "GP")
 	elif track is WildDashNeonHarborTrack:
@@ -49,8 +50,8 @@ func _install_after_track_ready() -> void:
 		_visual_barrier_count += _add_hard_visual_batch_collisions(track, collision_root, SNOWPEAK_HARD_BATCHES, "SP")
 
 	_installed = true
-	print("RACE COLLISION PASS READY track=%s segment_barriers=%d visual_hard_barriers=%d debug=%s" % [
-		track.name, _barrier_count, _visual_barrier_count, str(OS.has_environment("WILDDASH_DEBUG_COLLISION")),
+	print("RACE COLLISION PASS READY track=%s segment_barriers=%d visual_hard_barriers=%d racers=%d safe_margin=0.06 debug=%s" % [
+		track.name, _barrier_count, _visual_barrier_count, RaceManager.racers.size(), str(OS.has_environment("WILDDASH_DEBUG_COLLISION")),
 	])
 
 func _find_track() -> Node3D:
@@ -61,6 +62,16 @@ func _find_track() -> Node3D:
 		if child is WildDashGrandPrixTrack or child is WildDashNeonHarborTrack or child is WildDashSnowpeakWinterTrack:
 			return child as Node3D
 	return null
+
+func _configure_racer_collision_safety() -> void:
+	for racer in RaceManager.racers:
+		if racer is CharacterBody3D:
+			var body := racer as CharacterBody3D
+			# A small but deliberate recovery margin keeps the gameplay capsule from
+			# visually sinking halfway into thin walls before slide resolution. This
+			# is world-contact tolerance only; character stats and route widths stay
+			# unchanged.
+			body.safe_margin = maxf(body.safe_margin, 0.06)
 
 func _add_segment_containment(track: Node3D, collision_root: Node3D, segments: Array[int], prefix: String) -> int:
 	var added := 0
