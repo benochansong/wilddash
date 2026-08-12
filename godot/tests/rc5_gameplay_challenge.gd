@@ -2,6 +2,7 @@ extends Node
 
 const TRACK_SCENE: PackedScene = preload("res://tracks/grand_prix_track.tscn")
 const NEON_TRACK_SCENE: PackedScene = preload("res://tracks/neon_harbor_track.tscn")
+const SNOW_TRACK_SCENE: PackedScene = preload("res://tracks/snowpeak_winter_track.tscn")
 const MIN_TRACK_LENGTH := 2200.0
 const MAX_TRACK_LENGTH := 2600.0
 const MIN_CHECKPOINTS := 10
@@ -13,23 +14,20 @@ func _ready() -> void:
 	await get_tree().process_frame
 	var failures: Array[String] = []
 
-	# Difficulty / campaign integration. Check each StringName explicitly instead
-	# of comparing a typed Array[StringName] against an untyped literal array.
 	_check(GameManager.CASUAL_AI_COUNT == 9, "Casual should be Player + 9 AI", failures)
 	_check(GameManager.NORMAL_AI_COUNT == 14, "Normal should be Player + 14 AI", failures)
 	_check(GameManager.HARD_AI_COUNT == 17, "Hard should be Player + 17 AI", failures)
 	_check(GameManager.DEFAULT_AI_COUNT == GameManager.NORMAL_AI_COUNT, "Normal should be production default", failures)
 	_check(GameManager.MAX_AI_COUNT >= GameManager.HARD_AI_COUNT, "Hard racer count supported", failures)
-	_check(GameManager.ROUND_IDS.size() == 4, "four-round campaign size", failures)
-	if GameManager.ROUND_IDS.size() == 4:
+	_check(GameManager.ROUND_IDS.size() == 5, "five-round campaign size", failures)
+	if GameManager.ROUND_IDS.size() == 5:
 		_check(GameManager.ROUND_IDS[0] == &"grand_prix", "Round 1 Grand Prix", failures)
 		_check(GameManager.ROUND_IDS[1] == &"fruit_collection", "Round 2 Fruit Collection", failures)
 		_check(GameManager.ROUND_IDS[2] == &"neon_harbor_race", "Round 3 Neon Harbor", failures)
 		_check(GameManager.ROUND_IDS[3] == &"push_out", "Round 4 Push Out", failures)
+		_check(GameManager.ROUND_IDS[4] == &"snowpeak_winter_rally", "Round 5 Snowpeak Winter Rally", failures)
 	_check(ResourceLoader.exists("res://modes/floor_collapse/floor_collapse.tscn"), "Floor Collapse preserved outside campaign", failures)
 
-	# Item challenge: 12 distinct definitions, rank weighting, shield frequency,
-	# dash ceiling, and chain-CC protection.
 	_check(ItemSystem.get_item_count() >= MIN_ITEMS, "minimum 12 items", failures)
 	var front_total := 0.0
 	var mid_total := 0.0
@@ -57,14 +55,7 @@ func _ready() -> void:
 		_check(shield_front / front_total <= MAX_SHIELD_SHARE, "front shield share", failures)
 		_check(shield_mid / mid_total <= MAX_SHIELD_SHARE, "mid shield share", failures)
 		_check(shield_back / back_total <= MAX_SHIELD_SHARE, "back shield share", failures)
-		print("RC5 SHIELD WEIGHT PASS front=%.1f%% mid=%.1f%% back=%.1f%% cap=%.0f%%" % [
-			shield_front / front_total * 100.0,
-			shield_mid / mid_total * 100.0,
-			shield_back / back_total * 100.0,
-			MAX_SHIELD_SHARE * 100.0,
-		])
 
-	# Character identity and known exploit caps.
 	var dog := WildDashAnimalCatalog.get_definition(&"dog")
 	var rabbit := WildDashAnimalCatalog.get_definition(&"rabbit")
 	var elephant := WildDashAnimalCatalog.get_definition(&"elephant")
@@ -82,7 +73,6 @@ func _ready() -> void:
 		_check(max_speed / min_speed <= 1.12, "base character speed spread", failures)
 		_check(ItemSystem.DASH_SPEED_MULTIPLIER * dog.skill_speed_multiplier <= 1.75, "Dog + Dash theoretical ceiling", failures)
 
-	# Chimera remains bounded and based on the original four playable animals.
 	var max_chimera_accel := 1.0
 	var max_chimera_turn := 1.0
 	for animal_id: StringName in WildDashAnimalCatalog.all_ids():
@@ -99,9 +89,7 @@ func _ready() -> void:
 		max_chimera_accel = maxf(max_chimera_accel, float(body.get("acceleration_multiplier", 1.0)) * float(tail.get("acceleration_multiplier", 1.0)))
 		max_chimera_turn = maxf(max_chimera_turn, float(body.get("turn_multiplier", 1.0)) * float(tail.get("turn_multiplier", 1.0)))
 	_check(max_chimera_accel <= 1.18 and max_chimera_turn <= 1.18, "Chimera combined passive ceiling", failures)
-	print("RC5 CHIMERA CAP PASS accel=%.3f turn=%.3f" % [max_chimera_accel, max_chimera_turn])
 
-	# Round 1 extended production track remains unchanged.
 	RaceManager.clear_racers()
 	RaceManager.clear_track()
 	var track := TRACK_SCENE.instantiate() as WildDashGrandPrixTrack
@@ -117,11 +105,9 @@ func _ready() -> void:
 		_check(checkpoints >= MIN_CHECKPOINTS and checkpoints <= MAX_CHECKPOINTS, "10-12 checkpoints", failures)
 		_check(shortcut_a >= 45.0 and shortcut_a <= 95.0, "Shortcut A risk/reward", failures)
 		_check(shortcut_b >= 45.0 and shortcut_b <= 95.0, "Shortcut B risk/reward", failures)
-		print("RC5 TRACK CHALLENGE PASS length=%.1fm checkpoints=%d shortcuts=2 save_a=%.1fm save_b=%.1fm" % [length, checkpoints, shortcut_a, shortcut_b])
 		track.queue_free()
 		await get_tree().process_frame
 
-	# Round 3 must be a distinct shorter night race, not another copy of Round 1.
 	RaceManager.clear_racers()
 	RaceManager.clear_track()
 	var neon := NEON_TRACK_SCENE.instantiate() as WildDashNeonHarborTrack
@@ -134,8 +120,26 @@ func _ready() -> void:
 		_check(neon.get_checkpoint_positions().size() >= 8 and neon.get_checkpoint_positions().size() <= 10, "8-10 Neon Harbor checkpoints", failures)
 		_check(neon.get_zone_names().has("Industrial Tunnel") and neon.get_zone_names().has("Neon Downtown"), "Neon Harbor distinct zones", failures)
 		_check(neon.get_shortcut_a_saving() > 8.0, "Neon Harbor shortcut risk/reward", failures)
-		print("RC5 ROUND3 NEON HARBOR PASS length=%.1fm points=%d checkpoints=%d zones=%d npc_species=%d" % [
-			neon.get_track_length(), neon.get_route_points().size(), neon.get_checkpoint_positions().size(), neon.get_zone_names().size(), WildDashAnimalCatalog.race_roster_ids().size(),
+		neon.queue_free()
+		await get_tree().process_frame
+
+	RaceManager.clear_racers()
+	RaceManager.clear_track()
+	var snow := SNOW_TRACK_SCENE.instantiate() as WildDashSnowpeakWinterTrack
+	_check(snow != null, "Snowpeak track instantiate", failures)
+	if snow != null:
+		add_child(snow)
+		await get_tree().physics_frame
+		_check(snow.get_track_length() >= 1800.0 and snow.get_track_length() <= 2200.0, "1.8-2.2km Snowpeak", failures)
+		_check(snow.get_route_points().size() >= 26 and snow.get_route_points().size() <= 32, "26-32 Snowpeak route points", failures)
+		_check(snow.get_checkpoint_positions().size() >= 9 and snow.get_checkpoint_positions().size() <= 11, "9-11 Snowpeak checkpoints", failures)
+		_check(snow.get_zone_names().has("Ice Cave Tunnel") and snow.get_zone_names().has("Frozen Lake Sprint"), "Snowpeak distinct winter zones", failures)
+		var normal_profile := snow.get_surface_profile_at(snow.get_route_points()[2])
+		var ice_profile := snow.get_surface_profile_at(snow.get_route_points()[7])
+		_check(StringName(normal_profile.get("surface", &"")) in [&"normal_snow", &"packed_snow"], "Snowpeak normal/packed surface", failures)
+		_check(StringName(ice_profile.get("surface", &"")) == &"ice", "Snowpeak ice surface", failures)
+		print("RC5 ROUND5 SNOWPEAK PASS length=%.1fm points=%d checkpoints=%d zones=%d surfaces=4" % [
+			snow.get_track_length(), snow.get_route_points().size(), snow.get_checkpoint_positions().size(), snow.get_zone_names().size(),
 		])
 
 	if not failures.is_empty():
@@ -143,7 +147,7 @@ func _ready() -> void:
 			push_error("RC5 GAMEPLAY CHALLENGE FAIL " + failure)
 		get_tree().quit(1)
 		return
-	print("RC5 GAMEPLAY CHALLENGE PASS items=%d skills=4 racers=15 hard=18 round3=neon_harbor" % ItemSystem.get_item_count())
+	print("RC5 GAMEPLAY CHALLENGE PASS items=%d skills=4 racers=15 hard=18 round3=neon_harbor round5=snowpeak" % ItemSystem.get_item_count())
 	get_tree().quit(0)
 
 func _bounded(value: Variant, minimum: float, maximum: float) -> bool:
