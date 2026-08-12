@@ -21,12 +21,14 @@ const ROUND_IDS: Array[StringName] = [
 	&"fruit_collection",
 	&"neon_harbor_race",
 	&"push_out",
+	&"snowpeak_winter_rally",
 ]
 const ROUND_SCENES: Array[String] = [
 	"res://modes/grand_prix/grand_prix.tscn",
 	"res://modes/fruit_collection/fruit_collection.tscn",
 	"res://modes/neon_harbor_race/neon_harbor_race.tscn",
 	"res://modes/push_out/push_out.tscn",
+	"res://modes/snowpeak_winter_rally/snowpeak_winter_rally.tscn",
 ]
 const LOBBY_SCENE := "res://scenes/lobby.tscn"
 const CHARACTER_SELECT_SCENE := "res://scenes/character_select.tscn"
@@ -145,7 +147,10 @@ func begin_round(mode_id: StringName) -> void:
 			print("RC_FLOW Floor Collapse Free Play")
 		&"push_out":
 			set_state(GameState.FINAL)
-			print("RC_FLOW Final")
+			print("RC_FLOW Round 4 Push Out")
+		&"snowpeak_winter_rally":
+			set_state(GameState.RACE)
+			print("RC_FLOW Round 5 Snowpeak Winter Rally")
 		_:
 			set_state(GameState.ARENA)
 	round_changed.emit(current_round_index, mode_id)
