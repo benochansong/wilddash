@@ -134,8 +134,11 @@ func _add_tunnel_hard_shell(track: Node3D, collision_root: Node3D, segment_index
 	if road == null:
 		push_warning("%s TUNNEL COLLISION: missing road collision for segment %d" % [prefix, segment_index])
 		return 0
-
-	var route: Array[Vector3] = track.get_route_points()
+	if not track.has_method("get_route_points"):
+		push_warning("%s TUNNEL COLLISION: track has no route accessor" % prefix)
+		return 0
+	var route: Array[Vector3] = []
+	route.assign(track.call("get_route_points"))
 	if segment_index < 0 or segment_index + 1 >= route.size():
 		push_warning("%s TUNNEL COLLISION: route index out of range" % prefix)
 		return 0
