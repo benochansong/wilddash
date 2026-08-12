@@ -11,14 +11,23 @@ static func add_box_barrier(
 	rotation_y: float = 0.0,
 	debug_color: Color = Color(1.0, 0.18, 0.12, 0.22)
 ) -> StaticBody3D:
+	var basis := Basis(Vector3.UP, rotation_y)
+	return add_transformed_box_barrier(parent, node_name, Transform3D(basis, center), size, debug_color)
+
+static func add_transformed_box_barrier(
+	parent: Node3D,
+	node_name: String,
+	world_transform: Transform3D,
+	size: Vector3,
+	debug_color: Color = Color(1.0, 0.18, 0.12, 0.22)
+) -> StaticBody3D:
 	var body := StaticBody3D.new()
 	body.name = node_name
 	body.collision_layer = WORLD_LAYER
 	body.collision_mask = 0
-	body.position = center
-	body.rotation.y = rotation_y
 	body.add_to_group("wilddash_hard_barrier")
 	parent.add_child(body)
+	body.global_transform = world_transform
 
 	var collision := CollisionShape3D.new()
 	collision.name = "CollisionShape3D"
