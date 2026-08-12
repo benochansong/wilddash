@@ -1,19 +1,8 @@
 name: WILD DASH Godot CI
 
+# Full Godot campaign/stress/benchmark validation is intentionally manual.
+# Run it from the Actions tab for integration checkpoints and release candidates.
 on:
-  pull_request:
-    paths:
-      - "godot/**"
-      - "scripts/benchmark-windows.ps1"
-      - ".github/workflows/godot-ci.yml"
-  push:
-    branches:
-      - main
-      - godot/wilddash-next
-    paths:
-      - "godot/**"
-      - "scripts/benchmark-windows.ps1"
-      - ".github/workflows/godot-ci.yml"
   workflow_dispatch:
 
 permissions:
