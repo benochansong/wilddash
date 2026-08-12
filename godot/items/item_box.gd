@@ -2,10 +2,13 @@ class_name WildDashItemBox
 extends Area3D
 
 const AI_PICKUP_RADIUS := 3.3
-const PLAYER_PICKUP_RADIUS := 4.1
-const PLAYER_PICKUP_BONUS := 0.45
-const PLAYER_SCAN_INTERVAL := 0.04
+const PLAYER_PICKUP_RADIUS := 4.4
+const PLAYER_PICKUP_BONUS := 0.75
+const PLAYER_VERTICAL_TOLERANCE := 3.4
+const PLAYER_SCAN_INTERVAL := 0.025
 const AI_SCAN_INTERVAL := 0.10
+const PLAYER_REPICKUP_COOLDOWN_MSEC := 320
+const PICKUP_LOCK_META: StringName = &"wilddash_item_box_pickup_until_msec"
 
 @export var respawn_seconds := 5.0
 
@@ -49,7 +52,7 @@ func _physics_process(delta: float) -> void:
 	for racer in RaceManager.racers:
 		if racer == null or not is_instance_valid(racer) or RaceManager.finish_order.has(racer):
 			continue
-		var is_human_player := racer is WildDashCharacterController and (racer as WildDashCharacterController).is_player
+		var is_human_player := _is_human_player(racer)
 		if is_human_player and not scan_player:
 			continue
 		if not is_human_player and not scan_ai:
@@ -66,13 +69,16 @@ func _physics_process(delta: float) -> void:
 			var racer_id := racer.get_instance_id()
 			var previous_probe: Vector3 = _previous_probe_positions.get(racer_id, probe_position)
 			_previous_probe_positions[racer_id] = probe_position
-			if _distance_point_to_segment(global_position, previous_probe, probe_position) <= pickup_radius:
+			# Use horizontal swept pickup plus a separate vertical tolerance. This
+			# catches fast crossings on slopes/ice without allowing a box on an
+			# overpass several metres above/below the racer to be collected.
+			if _player_swept_pickup_hit(global_position, previous_probe, probe_position, pickup_radius):
 				if _try_pickup(racer):
 					return
 		elif global_position.distance_to(probe_position) <= pickup_radius:
-			# Preserve RC5's original AI item cadence and radius. The swept/high-
-			# frequency forgiveness is intentionally player-only so fixing a missed
-			# human pickup does not inflate AI combat density or alter balance.
+			# Preserve the original AI cadence/radius and one-slot behaviour. The
+			# high-frequency swept forgiveness and replacement behaviour are kept
+			# player-only so AI combat density and balance do not inflate.
 			if _try_pickup(racer):
 				return
 
@@ -86,20 +92,48 @@ func _on_body_entered(body: Node) -> void:
 	_try_pickup(body)
 
 func _try_pickup(body: Node) -> bool:
-	if not _active or body == null or not body.has_method("get_held_item"):
+	if not _active or body == null or not body.has_method("get_held_item") or not body.has_method("set_held_item"):
 		return false
-	if StringName(body.call("get_held_item")) != &"":
+
+	var is_human_player := _is_human_player(body)
+	if is_human_player and _player_pickup_locked(body):
 		return false
+
+	var previous_item := StringName(body.call("get_held_item"))
+	var replaced_existing := false
+	if previous_item != &"":
+		# Human racing should always get a clear response from driving through a
+		# box. Refresh the one-slot inventory instead of silently ignoring the
+		# pickup. AI retains the original no-replacement rule.
+		if not is_human_player:
+			return false
+		body.call("set_held_item", &"")
+		replaced_existing = true
+
 	if not ItemSystem.grant_weighted_item(body):
+		if replaced_existing:
+			body.call("set_held_item", previous_item)
 		return false
+
+	if is_human_player:
+		body.set_meta(PICKUP_LOCK_META, Time.get_ticks_msec() + PLAYER_REPICKUP_COOLDOWN_MSEC)
+
 	var item_id := StringName(body.call("get_held_item"))
-	print("ITEM BOX PICKUP racer=%s item=%s rank=%d" % [
+	print("ITEM BOX PICKUP racer=%s item=%s rank=%d replaced=%s" % [
 		RaceManager.get_racer_label(body) if body is Node3D else body.name,
 		ItemSystem.get_display_name(item_id),
 		RaceManager.get_rank(body) if body is Node3D else 0,
+		str(replaced_existing),
 	])
 	_deactivate()
 	return true
+
+func _player_pickup_locked(body: Node) -> bool:
+	var until_msec := int(body.get_meta(PICKUP_LOCK_META, 0))
+	return Time.get_ticks_msec() < until_msec
+
+func _is_human_player(body: Node) -> bool:
+	return body is WildDashCharacterController and (body as WildDashCharacterController).is_player
 
 func _deactivate() -> void:
 	if not _active:
@@ -133,13 +167,20 @@ func _try_overlapping_pickup() -> void:
 		if _try_pickup(body):
 			return
 
-func _distance_point_to_segment(point: Vector3, a: Vector3, b: Vector3) -> float:
-	var segment := b - a
+func _player_swept_pickup_hit(point: Vector3, a: Vector3, b: Vector3, radius: float) -> bool:
+	var point_xz := Vector2(point.x, point.z)
+	var a_xz := Vector2(a.x, a.z)
+	var b_xz := Vector2(b.x, b.z)
+	var segment := b_xz - a_xz
 	var length_squared := segment.length_squared()
-	if length_squared <= 0.0001:
-		return point.distance_to(b)
-	var t := clampf((point - a).dot(segment) / length_squared, 0.0, 1.0)
-	return point.distance_to(a + segment * t)
+	var t := 1.0
+	if length_squared > 0.0001:
+		t = clampf((point_xz - a_xz).dot(segment) / length_squared, 0.0, 1.0)
+	var closest_xz := a_xz.lerp(b_xz, t)
+	if point_xz.distance_to(closest_xz) > radius:
+		return false
+	var closest_y := lerpf(a.y, b.y, t)
+	return absf(point.y - closest_y) <= PLAYER_VERTICAL_TOLERANCE
 
 func _build_visual() -> void:
 	_visual_root = Node3D.new()
@@ -176,6 +217,6 @@ func _build_visual() -> void:
 
 	_collision = CollisionShape3D.new()
 	var shape := SphereShape3D.new()
-	shape.radius = 1.65
+	shape.radius = 2.0
 	_collision.shape = shape
 	add_child(_collision)
