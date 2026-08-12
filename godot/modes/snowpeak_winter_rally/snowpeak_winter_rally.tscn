@@ -1,10 +1,12 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://modes/snowpeak_winter_rally/snowpeak_winter_rally_mode.gd" id="1_mode"]
 [ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="2_feel"]
 [ext_resource type="Script" path="res://systems/winter_surface_controller.gd" id="3_surface"]
 [ext_resource type="Script" path="res://effects/snowfall_controller.gd" id="4_snow"]
 [ext_resource type="Script" path="res://systems/race_environment_collision_controller.gd" id="5_collision"]
+[ext_resource type="Script" path="res://items/item_combat_expansion_controller.gd" id="6_items"]
+[ext_resource type="Script" path="res://tracks/race_obstacle_expansion_controller.gd" id="7_obstacles"]
 
 [node name="SnowpeakWinterRally" type="Node3D"]
 script = ExtResource("1_mode")
@@ -24,3 +26,9 @@ script = ExtResource("4_snow")
 
 [node name="RaceEnvironmentCollisionController" type="Node" parent="."]
 script = ExtResource("5_collision")
+
+[node name="ItemCombatExpansionController" type="Node" parent="."]
+script = ExtResource("6_items")
+
+[node name="RaceObstacleExpansionController" type="Node3D" parent="."]
+script = ExtResource("7_obstacles")
