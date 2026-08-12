@@ -17,6 +17,7 @@ const SNOWPEAK_HARD_BATCHES: PackedStringArray = [
 var _installed := false
 var _barrier_count := 0
 var _visual_barrier_count := 0
+var _protected_visuals_skipped := 0
 
 func _ready() -> void:
 	call_deferred("_install_after_track_ready")
@@ -50,8 +51,9 @@ func _install_after_track_ready() -> void:
 		_visual_barrier_count += _add_hard_visual_batch_collisions(track, collision_root, SNOWPEAK_HARD_BATCHES, "SP")
 
 	_installed = true
-	print("RACE COLLISION PASS READY track=%s segment_barriers=%d visual_hard_barriers=%d racers=%d safe_margin=0.06 debug=%s" % [
-		track.name, _barrier_count, _visual_barrier_count, RaceManager.racers.size(), str(OS.has_environment("WILDDASH_DEBUG_COLLISION")),
+	print("RACE COLLISION PASS READY track=%s segment_barriers=%d visual_hard_barriers=%d protected_skipped=%d racers=%d safe_margin=0.06 debug=%s" % [
+		track.name, _barrier_count, _visual_barrier_count, _protected_visuals_skipped,
+		RaceManager.racers.size(), str(OS.has_environment("WILDDASH_DEBUG_COLLISION")),
 	])
 
 func _find_track() -> Node3D:
@@ -140,6 +142,9 @@ func _add_hard_visual_batch_collisions(
 				absf(scale.y * primitive_size.y),
 				absf(scale.z * primitive_size.z)
 			)
+			if _should_preserve_open_corridor(track, batch_name, world_transform.origin, size):
+				_protected_visuals_skipped += 1
+				continue
 			# Strip the visual scale from the body transform; BoxShape owns size.
 			var rotation_basis := world_transform.basis.orthonormalized()
 			var barrier_transform := Transform3D(rotation_basis, world_transform.origin)
@@ -151,6 +156,29 @@ func _add_hard_visual_batch_collisions(
 			)
 			added += 1
 	return added
+
+func _should_preserve_open_corridor(track: Node3D, batch_name: String, origin: Vector3, size: Vector3) -> bool:
+	if not track is WildDashNeonHarborTrack or not batch_name.begins_with("Containers"):
+		return false
+	# Neon Harbor's service-lane shortcut connects route points 3 -> 5 while
+	# skipping point 4. Solidify real container stacks, but never generate a new
+	# collision volume inside the established shortcut corridor.
+	var route := (track as WildDashNeonHarborTrack).get_route_points()
+	if route.size() <= 5:
+		return false
+	var clearance := 4.6 + maxf(size.x, size.z) * 0.5
+	return _distance_xz_to_segment(origin, route[3], route[5]) < clearance
+
+func _distance_xz_to_segment(point: Vector3, a: Vector3, b: Vector3) -> float:
+	var p := Vector2(point.x, point.z)
+	var av := Vector2(a.x, a.z)
+	var bv := Vector2(b.x, b.z)
+	var segment := bv - av
+	var length_squared := segment.length_squared()
+	if length_squared <= 0.001:
+		return p.distance_to(av)
+	var t := clampf((p - av).dot(segment) / length_squared, 0.0, 1.0)
+	return p.distance_to(av.lerp(bv, t))
 
 func _tag_existing_world_collision(collision_root: Node3D) -> void:
 	for child in collision_root.get_children():
