@@ -43,7 +43,7 @@ func _verify_track(
 		await get_tree().process_frame
 		return
 	root.add_child(track)
-	var controller := COLLISION_CONTROLLER.new()
+	var controller: Node = COLLISION_CONTROLLER.new()
 	controller.name = "RaceEnvironmentCollisionController"
 	root.add_child(controller)
 	for _frame in range(7):
