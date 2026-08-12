@@ -63,7 +63,14 @@ func _ready() -> void:
 	var normal := track.get_surface_profile_at(route[2])
 	var packed := track.get_surface_profile_at(route[10])
 	var ice := track.get_surface_profile_at(route[7])
-	var shoulder_point := route[2] + Vector3.RIGHT * 12.0
+	# Sample deep snow from the middle of the straight opening segment and move
+	# perpendicular to the road. The previous world-X offset at route[2] could
+	# land inside the following curved segment and falsely report normal snow.
+	var opening_direction := route[1] - route[0]
+	opening_direction.y = 0.0
+	opening_direction = opening_direction.normalized()
+	var opening_right := Vector3(-opening_direction.z, 0.0, opening_direction.x)
+	var shoulder_point := route[0].lerp(route[1], 0.5) + opening_right * 14.0
 	var deep := track.get_surface_profile_at(shoulder_point)
 	if StringName(ice.get("surface", &"")) != &"ice":
 		_fail("Ice surface profile missing")
@@ -71,7 +78,7 @@ func _ready() -> void:
 	if float(ice.get("slip_multiplier", 1.0)) <= float(packed.get("slip_multiplier", 1.0)):
 		_fail("Ice should be slipperier than packed snow")
 		return
-	if float(deep.get("speed_multiplier", 1.0)) >= 1.0:
+	if StringName(deep.get("surface", &"")) != &"deep_snow" or float(deep.get("speed_multiplier", 1.0)) >= 1.0:
 		_fail("Deep snow shoulder should slow player")
 		return
 	print("SNOWPEAK SURFACE PASS normal=%s packed=%s ice=%s deep=%s" % [normal.get("surface"), packed.get("surface"), ice.get("surface"), deep.get("surface")])
