@@ -147,14 +147,14 @@ jobs:
           grep -q "AI NEW ITEM USE PASS items=6" /tmp/wilddash-item-expansion.log
           grep -q "ITEM EXPANSION SMOKE PASS items=12 roles=5 history=2" /tmp/wilddash-item-expansion.log
 
-      - name: Run four-round campaign with four AI
+      - name: Run five-round campaign with four AI
         run: |
           set -o pipefail
           export WILDDASH_AUTOTEST=1
           export WILDDASH_AI_COUNT=4
           export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-flow-4"
           rm -rf "$XDG_DATA_HOME"
-          timeout 160s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+          timeout 220s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot \
             | tee /tmp/wilddash-godot-4.log
           grep -q "GRAND PRIX START racers=5 ai=4 checkpoints=11" /tmp/wilddash-godot-4.log
@@ -163,17 +163,19 @@ jobs:
           grep -q "NEON HARBOR START racers=5 ai=4 checkpoints=9" /tmp/wilddash-godot-4.log
           grep -q "NEON HARBOR COMPLETE racers=5 finishers=5" /tmp/wilddash-godot-4.log
           grep -q "PUSH OUT AI BODY CHECK" /tmp/wilddash-godot-4.log
-          grep -q "HEADLESS RESULT rounds=4" /tmp/wilddash-godot-4.log
-          echo "4 ROUND CAMPAIGN PASS ai=4 round3=neon_harbor"
+          grep -q "SNOWPEAK START racers=5 ai=4 checkpoints=10" /tmp/wilddash-godot-4.log
+          grep -q "SNOWPEAK COMPLETE racers=5 finishers=5" /tmp/wilddash-godot-4.log
+          grep -q "HEADLESS RESULT rounds=5" /tmp/wilddash-godot-4.log
+          echo "5 ROUND CAMPAIGN PASS ai=4 round3=neon_harbor round5=snowpeak"
 
-      - name: Stress four-round campaign with ten AI
+      - name: Stress five-round campaign with ten AI
         run: |
           set -o pipefail
           export WILDDASH_AUTOTEST=1
           export WILDDASH_AI_COUNT=10
           export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-flow-10"
           rm -rf "$XDG_DATA_HOME"
-          timeout 180s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+          timeout 260s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot \
             | tee /tmp/wilddash-godot-10.log
           grep -q "GRAND PRIX START racers=11 ai=10 checkpoints=11" /tmp/wilddash-godot-10.log
@@ -182,17 +184,19 @@ jobs:
           grep -q "NEON HARBOR START racers=11 ai=10 checkpoints=9" /tmp/wilddash-godot-10.log
           grep -q "NEON HARBOR COMPLETE racers=11 finishers=11" /tmp/wilddash-godot-10.log
           grep -q "PUSH OUT AI BODY CHECK" /tmp/wilddash-godot-10.log
-          grep -q "HEADLESS RESULT rounds=4" /tmp/wilddash-godot-10.log
-          echo "4 ROUND CAMPAIGN PASS ai=10 round3=neon_harbor"
+          grep -q "SNOWPEAK START racers=11 ai=10 checkpoints=10" /tmp/wilddash-godot-10.log
+          grep -q "SNOWPEAK COMPLETE racers=11 finishers=11" /tmp/wilddash-godot-10.log
+          grep -q "HEADLESS RESULT rounds=5" /tmp/wilddash-godot-10.log
+          echo "5 ROUND CAMPAIGN PASS ai=10 round3=neon_harbor round5=snowpeak"
 
-      - name: Stress four-round campaign with fourteen AI
+      - name: Stress five-round campaign with fourteen AI
         run: |
           set -o pipefail
           export WILDDASH_AUTOTEST=1
           export WILDDASH_AI_COUNT=14
           export XDG_DATA_HOME="$RUNNER_TEMP/wilddash-flow-14"
           rm -rf "$XDG_DATA_HOME"
-          timeout 205s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+          timeout 320s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path godot \
             | tee /tmp/wilddash-godot-14.log
           grep -q "GRAND PRIX START racers=15 ai=14 checkpoints=11" /tmp/wilddash-godot-14.log
@@ -203,8 +207,11 @@ jobs:
           grep -q "NEON HARBOR 15 RACERS ALL FINISH PASS" /tmp/wilddash-godot-14.log
           grep -q "NEON HARBOR COMPLETE racers=15 finishers=15" /tmp/wilddash-godot-14.log
           grep -q "PUSH OUT AI BODY CHECK" /tmp/wilddash-godot-14.log
-          grep -q "HEADLESS RESULT rounds=4" /tmp/wilddash-godot-14.log
-          echo "4 ROUND CAMPAIGN PASS ai=14 round3=neon_harbor"
+          grep -q "SNOWPEAK START racers=15 ai=14 checkpoints=10" /tmp/wilddash-godot-14.log
+          grep -q "SNOWPEAK 15 RACERS ALL FINISH PASS" /tmp/wilddash-godot-14.log
+          grep -q "SNOWPEAK COMPLETE racers=15 finishers=15" /tmp/wilddash-godot-14.log
+          grep -q "HEADLESS RESULT rounds=5" /tmp/wilddash-godot-14.log
+          echo "5 ROUND CAMPAIGN PASS ai=14 round3=neon_harbor round5=snowpeak"
 
       - name: Benchmark 10 25 50 racers before and after optimization
         run: |
