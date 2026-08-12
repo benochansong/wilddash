@@ -111,7 +111,12 @@ func _on_racer_finished(racer: Node3D, rank: int) -> void:
 	_finish_times.append(elapsed)
 	if racer == null or not racer is WildDashCharacterController:
 		return
-	var animal := String((racer as WildDashCharacterController).animal_id)
+	var controller := racer as WildDashCharacterController
+	# The headless Player is always Dog and is AI-driven only as a control proxy.
+	# Exclude it from species balance so Dog does not receive a synthetic extra start.
+	if controller.is_player:
+		return
+	var animal := String(controller.animal_id)
 	if not _animal_results.has(animal):
 		_animal_results[animal] = {"starts": 0, "rank_sum": 0.0, "wins": 0}
 	var result: Dictionary = _animal_results[animal]
