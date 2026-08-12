@@ -48,10 +48,15 @@ func spawn_racer(
 		push_error("Failed to instantiate shared racer scene")
 		return null
 	var resolved_animal := animal
-	if is_player_character and WildDashAnimalCatalog.is_valid(GameManager.selected_animal):
+	# Player/Chimera selection stays limited to the original four animals.
+	if is_player_character and WildDashAnimalCatalog.is_playable(GameManager.selected_animal):
 		resolved_animal = GameManager.selected_animal
 	if is_player_character and GameManager.chimera_enabled:
 		resolved_animal = GameManager.get_chimera_loadout().body_id
+	# Race-only AI draws from the expanded twelve-species visual roster. The
+	# definitions intentionally reuse the four proven gameplay archetypes.
+	if not is_player_character and movement == WildDashCharacterController.MovementMode.RACE:
+		resolved_animal = WildDashAnimalCatalog.get_race_npc_id(ai_racers.size())
 	racer.name = node_name
 	racer.animal_id = resolved_animal
 	racer.is_player = is_player_character
@@ -67,6 +72,8 @@ func spawn_racer(
 			hud.bind_character(racer)
 	else:
 		ai_racers.append(racer)
+		if movement == WildDashCharacterController.MovementMode.RACE:
+			print("NPC ROSTER SPAWN racer=%s animal=%s slot=%d" % [racer.name, resolved_animal, ai_racers.size()])
 	return racer
 
 func spawn_ai_driver(

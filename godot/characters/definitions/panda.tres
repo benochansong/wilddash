@@ -1,0 +1,47 @@
+[gd_resource type="Resource" script_class="WildDashAnimalDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://characters/animal_definition.gd" id="1_def"]
+[ext_resource type="PackedScene" path="res://characters/visuals/panda_visual.tscn" id="2_visual"]
+
+[resource]
+script = ExtResource("1_def")
+animal_id = &"panda"
+display_name = "Panda"
+nickname = "판다"
+role = "NPC · Power Brawler"
+accent_color = Color(0.31, 0.72, 0.80, 1)
+visual_scene = ExtResource("2_visual")
+max_speed = 13.1
+cruise_speed = 8.3
+acceleration = 19.0
+turn_speed = 1.65
+jump_velocity = 6.1
+gravity = 24.0
+ai_race_speed = 9.9
+arena_move_speed = 8.2
+arena_acceleration = 21.0
+knockback_decay = 19.0
+ai_arena_speed = 5.9
+collision_radius = 0.80
+collision_height = 2.20
+collision_center_y = 1.10
+camera_follow_distance = 10.5
+camera_follow_height = 5.8
+camera_look_ahead = 4.0
+camera_smoothing = 6.2
+camera_fov = 68.0
+skill_id = &"stampede"
+skill_name = "STAMPEDE"
+skill_description = "Elephant archetype gameplay reused for race-roster balance."
+skill_cooldown = 11.0
+skill_duration = 1.35
+skill_speed_multiplier = 1.18
+skill_acceleration_multiplier = 1.35
+skill_turn_multiplier = 0.96
+skill_jump_multiplier = 1.0
+skill_knockback_multiplier = 0.45
+skill_collision_retention_multiplier = 1.10
+skill_evade_duration = 0.0
+skill_forward_impulse = 4.0
+skill_lateral_impulse = 0.0
+skill_push_strength = 4.2
