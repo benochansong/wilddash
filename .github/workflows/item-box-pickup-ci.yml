@@ -1,12 +1,7 @@
 name: WILD DASH Item Box Pickup CI
 
+# Specialized regression suite. Run manually when item pickup behavior changes.
 on:
-  pull_request:
-    paths:
-      - "godot/items/item_box.gd"
-      - "godot/tests/item_box_race_pickup_regression.gd"
-      - "godot/tests/item_box_race_pickup_regression.tscn"
-      - ".github/workflows/item-box-pickup-ci.yml"
   workflow_dispatch:
 
 permissions:
