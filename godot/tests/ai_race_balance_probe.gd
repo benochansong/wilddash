@@ -33,8 +33,6 @@ func _ready() -> void:
 	GameManager.current_round_index = 0
 	GameManager.campaign_running = true
 	GameManager.chimera_enabled = false
-	# Fix both global random helpers and the base 12-item weighted picker. The
-	# expanded six-item controller reads the same WILDDASH_BALANCE_SEED env var.
 	seed(_seed)
 	ItemSystem._rng.seed = _seed + 17
 
@@ -120,12 +118,14 @@ func _on_racer_finished(racer: Node3D, rank: int) -> void:
 		return
 	var animal := String(controller.animal_id)
 	if not _animal_results.has(animal):
-		_animal_results[animal] = {"starts": 0, "rank_sum": 0.0, "wins": 0}
+		_animal_results[animal] = {"starts": 0, "rank_sum": 0.0, "wins": 0, "top3": 0}
 	var result: Dictionary = _animal_results[animal]
 	result["starts"] = int(result.get("starts", 0)) + 1
 	result["rank_sum"] = float(result.get("rank_sum", 0.0)) + float(rank)
 	if rank == 1:
 		result["wins"] = int(result.get("wins", 0)) + 1
+	if rank <= 3:
+		result["top3"] = int(result.get("top3", 0)) + 1
 	_animal_results[animal] = result
 
 func _on_race_completed() -> void:
@@ -147,6 +147,10 @@ func _report_and_exit() -> void:
 	var low_speed_seconds := 0.0
 	var permanent_stalls := 0
 	var max_stall := 0.0
+	var tactical_overtakes := 0
+	var traffic_holds := 0
+	var lane_commits := 0
+	var crowd_avoids := 0
 
 	for driver_node in get_tree().get_nodes_in_group("wilddash_ai_driver"):
 		if not driver_node is WildDashAIController:
@@ -173,12 +177,22 @@ func _report_and_exit() -> void:
 			int(telemetry.get("overtakes", 0)), float(telemetry.get("low_speed_seconds", 0.0)), racer_stall,
 		])
 
+	for tactics_node in get_tree().get_nodes_in_group("wilddash_ai_tactics"):
+		if not tactics_node is WildDashAIPackTactics:
+			continue
+		var tactics := tactics_node as WildDashAIPackTactics
+		var pack_telemetry := tactics.get_balance_telemetry()
+		tactical_overtakes += int(pack_telemetry.get("overtake_actions", 0))
+		traffic_holds += int(pack_telemetry.get("traffic_holds", 0))
+		lane_commits += int(pack_telemetry.get("lane_commits", 0))
+		crowd_avoids += int(pack_telemetry.get("crowd_avoids", 0))
+
 	for animal in _animal_results.keys():
 		var result: Dictionary = _animal_results[animal]
 		var starts := maxi(1, int(result.get("starts", 0)))
 		var average_rank := float(result.get("rank_sum", 0.0)) / float(starts)
-		print("AI_BALANCE_CHARACTER animal=%s starts=%d wins=%d average_rank=%.2f" % [
-			String(animal), starts, int(result.get("wins", 0)), average_rank,
+		print("AI_BALANCE_CHARACTER animal=%s starts=%d wins=%d top3=%d average_rank=%.2f" % [
+			String(animal), starts, int(result.get("wins", 0)), int(result.get("top3", 0)), average_rank,
 		])
 
 	var all_finish := finishers == _target_racers
@@ -187,12 +201,20 @@ func _report_and_exit() -> void:
 	var recovery_loop_ok := permanent_stalls == 0
 	var target_spread := 65.0 if _target_racers >= 18 else 50.0
 	var spread_review := spread <= target_spread
+	var ai_count := maxi(1, _target_racers - 1)
+	var soft_per_ai := float(soft_recoveries) / float(ai_count)
+	var collisions_per_ai := float(collisions) / float(ai_count)
+	var overtakes_per_ai := float(overtakes) / float(ai_count)
 
-	print("AI_BALANCE_RESULT racers=%d difficulty=%s run=%d/%d seed=%d finishers=%d first=%.2f last=%.2f spread=%.2f target_spread=%.1f rank_changes=%d item_pickups=%d item_uses=%d skill_uses=%d soft=%d hard=%d emergency=%d collisions=%d overtakes=%d low_speed=%.2f permanent_stalls=%d max_stall=%.2f" % [
+	print("AI_BALANCE_PACK racers=%d tactical_overtakes=%d traffic_holds=%d lane_commits=%d crowd_avoids=%d" % [
+		_target_racers, tactical_overtakes, traffic_holds, lane_commits, crowd_avoids,
+	])
+	print("AI_BALANCE_RESULT racers=%d difficulty=%s run=%d/%d seed=%d finishers=%d first=%.2f last=%.2f spread=%.2f target_spread=%.1f rank_changes=%d item_pickups=%d item_uses=%d skill_uses=%d soft=%d soft_per_ai=%.2f hard=%d emergency=%d collisions=%d collisions_per_ai=%.2f overtakes=%d overtakes_per_ai=%.2f low_speed=%.2f permanent_stalls=%d max_stall=%.2f" % [
 		_target_racers, String(GameManager.difficulty), _run_index, _run_total, _seed,
 		finishers, first_finish, last_finish, spread, target_spread, _rank_changes,
-		_item_pickups, _item_uses, _skill_uses, soft_recoveries, hard_recoveries,
-		emergency_recoveries, collisions, overtakes, low_speed_seconds, permanent_stalls, max_stall,
+		_item_pickups, _item_uses, _skill_uses, soft_recoveries, soft_per_ai, hard_recoveries,
+		emergency_recoveries, collisions, collisions_per_ai, overtakes, overtakes_per_ai,
+		low_speed_seconds, permanent_stalls, max_stall,
 	])
 
 	if not spread_review:
