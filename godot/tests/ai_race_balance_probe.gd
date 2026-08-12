@@ -151,6 +151,9 @@ func _report_and_exit() -> void:
 	var traffic_holds := 0
 	var lane_commits := 0
 	var crowd_avoids := 0
+	var blocked_breakouts := 0
+	var commit_breaks := 0
+	var blocked_seconds := 0.0
 
 	for driver_node in get_tree().get_nodes_in_group("wilddash_ai_driver"):
 		if not driver_node is WildDashAIController:
@@ -186,6 +189,9 @@ func _report_and_exit() -> void:
 		traffic_holds += int(pack_telemetry.get("traffic_holds", 0))
 		lane_commits += int(pack_telemetry.get("lane_commits", 0))
 		crowd_avoids += int(pack_telemetry.get("crowd_avoids", 0))
+		blocked_breakouts += int(pack_telemetry.get("blocked_breakouts", 0))
+		commit_breaks += int(pack_telemetry.get("commit_breaks", 0))
+		blocked_seconds += float(pack_telemetry.get("blocked_seconds", 0.0))
 
 	for animal in _animal_results.keys():
 		var result: Dictionary = _animal_results[animal]
@@ -205,15 +211,18 @@ func _report_and_exit() -> void:
 	var soft_per_ai := float(soft_recoveries) / float(ai_count)
 	var collisions_per_ai := float(collisions) / float(ai_count)
 	var overtakes_per_ai := float(overtakes) / float(ai_count)
+	var blocked_seconds_per_ai := blocked_seconds / float(ai_count)
 
-	print("AI_BALANCE_PACK racers=%d tactical_overtakes=%d traffic_holds=%d lane_commits=%d crowd_avoids=%d" % [
+	print("AI_BALANCE_PACK racers=%d tactical_overtakes=%d traffic_holds=%d lane_commits=%d crowd_avoids=%d blocked_breakouts=%d commit_breaks=%d blocked_seconds=%.2f blocked_seconds_per_ai=%.2f" % [
 		_target_racers, tactical_overtakes, traffic_holds, lane_commits, crowd_avoids,
+		blocked_breakouts, commit_breaks, blocked_seconds, blocked_seconds_per_ai,
 	])
-	print("AI_BALANCE_RESULT racers=%d difficulty=%s run=%d/%d seed=%d finishers=%d first=%.2f last=%.2f spread=%.2f target_spread=%.1f rank_changes=%d item_pickups=%d item_uses=%d skill_uses=%d soft=%d soft_per_ai=%.2f hard=%d emergency=%d collisions=%d collisions_per_ai=%.2f overtakes=%d overtakes_per_ai=%.2f low_speed=%.2f permanent_stalls=%d max_stall=%.2f" % [
+	print("AI_BALANCE_RESULT racers=%d difficulty=%s run=%d/%d seed=%d finishers=%d first=%.2f last=%.2f spread=%.2f target_spread=%.1f rank_changes=%d item_pickups=%d item_uses=%d skill_uses=%d soft=%d soft_per_ai=%.2f hard=%d emergency=%d collisions=%d collisions_per_ai=%.2f overtakes=%d overtakes_per_ai=%.2f blocked_breakouts=%d commit_breaks=%d blocked_seconds=%.2f blocked_seconds_per_ai=%.2f low_speed=%.2f permanent_stalls=%d max_stall=%.2f" % [
 		_target_racers, String(GameManager.difficulty), _run_index, _run_total, _seed,
 		finishers, first_finish, last_finish, spread, target_spread, _rank_changes,
 		_item_pickups, _item_uses, _skill_uses, soft_recoveries, soft_per_ai, hard_recoveries,
 		emergency_recoveries, collisions, collisions_per_ai, overtakes, overtakes_per_ai,
+		blocked_breakouts, commit_breaks, blocked_seconds, blocked_seconds_per_ai,
 		low_speed_seconds, permanent_stalls, max_stall,
 	])
 
