@@ -104,10 +104,6 @@ func record_checkpoint(racer: Node3D, checkpoint_index: int) -> bool:
 	return true
 
 func sync_checkpoint_from_position(racer: Node3D) -> bool:
-	# Area3D is the primary trigger. This proximity seam makes high-speed racers
-	# and low-FPS machines robust against tunneling through a thin checkpoint.
-	# Only the next ordered checkpoint can be granted, so shortcuts cannot skip
-	# gates or jump straight to the finish.
 	if racer == null or _checkpoint_positions.is_empty():
 		return false
 	var expected := get_checkpoint_progress(racer)
@@ -124,10 +120,6 @@ func sync_checkpoint_from_position(racer: Node3D) -> bool:
 	return record_checkpoint(racer, expected)
 
 func sync_finish_from_position(racer: Node3D) -> bool:
-	# Finish fallback is crossing-based, not radius-based. The old 18 m radius
-	# could mark a racer finished before the visible stripe and immediately put
-	# the controller into its finish coast. We now require the racer centre to
-	# move beyond the finish plane while still being inside the final lane.
 	if racer == null or finish_order.has(racer) or not can_finish(racer) or _route_points.size() < 2:
 		return false
 	var finish := _route_points[_route_points.size() - 1]
@@ -235,8 +227,6 @@ func get_track_progress(racer: Node3D) -> float:
 	return clampf(raw, minimum, maximum)
 
 func get_test_track_progress(racer: Node3D) -> float:
-	# Compatibility name retained for benchmark/legacy callers. Grand Prix now
-	# uses ordered checkpoints plus projected route distance.
 	return get_track_progress(racer)
 
 func get_progress_percent(racer: Node3D) -> float:
@@ -254,9 +244,14 @@ func get_respawn_position(racer: Node3D) -> Vector3:
 	if _route_points.is_empty():
 		return Vector3.ZERO
 	var passed := get_checkpoint_progress(racer)
-	if passed <= 0 or _checkpoint_positions.is_empty():
+	if passed <= 0 or _checkpoint_positions.is_empty() or _checkpoint_route_distances.is_empty():
 		return _route_points[0] + Vector3.UP * 1.6
 	var checkpoint_index := mini(passed - 1, _checkpoint_positions.size() - 1)
+	var checkpoint_distance := _checkpoint_route_distances[checkpoint_index]
+	var desired_distance := checkpoint_distance + 6.0
+	for i in range(_route_distances.size()):
+		if _route_distances[i] >= desired_distance:
+			return _route_points[i] + Vector3.UP * 1.6
 	return _checkpoint_positions[checkpoint_index] + Vector3.UP * 1.6
 
 func get_elapsed_seconds() -> float:
