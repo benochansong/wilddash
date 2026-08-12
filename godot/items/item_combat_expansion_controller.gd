@@ -16,6 +16,7 @@ const SWAP_BOOST_DURATION := 1.75
 
 var _rng := RandomNumberGenerator.new()
 var _buffer_until_msec := 0
+var _buffer_item_at_press: StringName = &""
 var _buffer_reported_empty := false
 var _ai_elapsed := 0.0
 var _boost_effects: Dictionary = {}
@@ -37,6 +38,8 @@ func _input(event: InputEvent) -> void:
 		return
 	if event is InputEventKey and (event as InputEventKey).echo:
 		return
+	var player := _resolve_player()
+	_buffer_item_at_press = player.get_held_item() if player != null else &""
 	_buffer_until_msec = Time.get_ticks_msec() + ITEM_INPUT_BUFFER_MSEC
 	_buffer_reported_empty = false
 
@@ -90,29 +93,39 @@ func use_expanded_item(character: WildDashCharacterController, item_id: StringNa
 func _resolve_player_input_buffer() -> void:
 	if _buffer_until_msec <= 0:
 		return
+	var player := _resolve_player()
+	if player != null and _buffer_item_at_press != &"":
+		var current := player.get_held_item()
+		# The legacy CharacterController also consumes Q/B. If it already used the
+		# item successfully, stop here so this 170ms buffer cannot auto-fire a new
+		# Item Box pickup that happens immediately afterwards.
+		if current == &"" or current != _buffer_item_at_press:
+			_clear_input_buffer()
+			return
 	var now := Time.get_ticks_msec()
 	if now > _buffer_until_msec:
-		var expired_player := _resolve_player()
-		var held := expired_player.get_held_item() if expired_player != null else &""
+		var held := player.get_held_item() if player != null else &""
 		if held == &"" and not _buffer_reported_empty:
 			print("ITEM USE DENIED reason=NO_HELD_ITEM buffer_expired=true")
 		elif held != &"":
 			print("ITEM USE DENIED racer=%s item=%s reason=CONDITION_NOT_READY buffer_expired=true" % [
-				RaceManager.get_racer_label(expired_player), _display_name(held),
+				RaceManager.get_racer_label(player), _display_name(held),
 			])
-		_buffer_until_msec = 0
+		_clear_input_buffer()
 		return
-	if not RaceManager.active:
-		return
-	var player := _resolve_player()
-	if player == null or player.finished:
+	if not RaceManager.active or player == null or player.finished:
 		return
 	var item_id := player.get_held_item()
 	if item_id == &"":
 		_buffer_reported_empty = true
 		return
 	if _try_use_any_item(player, item_id):
-		_buffer_until_msec = 0
+		_clear_input_buffer()
+
+func _clear_input_buffer() -> void:
+	_buffer_until_msec = 0
+	_buffer_item_at_press = &""
+	_buffer_reported_empty = false
 
 func _try_use_any_item(character: WildDashCharacterController, item_id: StringName) -> bool:
 	if CATALOG.is_expanded(item_id):
@@ -135,7 +148,6 @@ func _fire_rocket_forward_fallback(character: WildDashCharacterController) -> bo
 	rocket.name = "RocketNutStraight_%d" % Time.get_ticks_msec()
 	world.add_child(rocket)
 	rocket.configure(character, null)
-	var forward := -character.global_transform.basis.z.normalized()
 	rocket.global_position = _safe_forward_spawn(character, 1.75, 0.82)
 	character.set_held_item(&"")
 	ItemSystem.item_used.emit(character, ItemSystem.ROCKET_NUT)
