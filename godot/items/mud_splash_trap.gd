@@ -1,0 +1,42 @@
+class_name WildDashMudSplashTrap
+extends Area3D
+
+const LIFE_SECONDS := 10.0
+
+var owner_racer: WildDashCharacterController
+var _life := LIFE_SECONDS
+
+func _ready() -> void:
+	collision_layer = 8
+	collision_mask = 2
+	monitoring = true
+	body_entered.connect(_on_body_entered)
+	var collision := CollisionShape3D.new()
+	var shape := CylinderShape3D.new()
+	shape.radius = 1.25
+	shape.height = 0.35
+	collision.shape = shape
+	add_child(collision)
+	var visual := MeshInstance3D.new()
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = 1.18
+	mesh.bottom_radius = 1.32
+	mesh.height = 0.12
+	mesh.radial_segments = 12
+	visual.mesh = mesh
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.24, 0.12, 0.045)
+	material.roughness = 0.95
+	visual.material_override = material
+	add_child(visual)
+
+func _process(delta: float) -> void:
+	_life -= delta
+	if _life <= 0.0:
+		queue_free()
+
+func _on_body_entered(body: Node) -> void:
+	if body == owner_racer or not body is WildDashCharacterController:
+		return
+	if ItemSystem.apply_attack(body, owner_racer, &"mud_splash", 1.05, 0.72, 0.0):
+		queue_free()
