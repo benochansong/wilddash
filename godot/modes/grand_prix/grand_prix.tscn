@@ -1,8 +1,10 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://modes/grand_prix/grand_prix_rc5_mode.gd" id="1_mode"]
 [ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="2_feel"]
 [ext_resource type="Script" path="res://systems/race_environment_collision_controller.gd" id="3_collision"]
+[ext_resource type="Script" path="res://items/item_combat_expansion_controller.gd" id="4_items"]
+[ext_resource type="Script" path="res://tracks/race_obstacle_expansion_controller.gd" id="5_obstacles"]
 
 [node name="GrandPrix" type="Node3D"]
 script = ExtResource("1_mode")
@@ -16,3 +18,9 @@ boost_slip_multiplier = 1.16
 
 [node name="RaceEnvironmentCollisionController" type="Node" parent="."]
 script = ExtResource("3_collision")
+
+[node name="ItemCombatExpansionController" type="Node" parent="."]
+script = ExtResource("4_items")
+
+[node name="RaceObstacleExpansionController" type="Node3D" parent="."]
+script = ExtResource("5_obstacles")
