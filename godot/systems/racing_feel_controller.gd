@@ -94,15 +94,39 @@ func _physics_process(delta: float) -> void:
 
 	var right := _racer.global_transform.basis.x.normalized()
 	var outward := -right * current_sign
+	# CharacterBody3D move_and_collide performs a swept world test for this
+	# extra lateral arcade motion. If a hard barrier is hit, kill the inward
+	# slip immediately instead of allowing repeated lateral pushes to make the
+	# visual body appear embedded in the wall.
 	var collision := _racer.move_and_collide(outward * _slip_speed * delta)
 	if collision != null:
-		_slip_speed *= 0.28
+		_apply_wall_contact_response(collision)
 
 func set_surface_slip_multiplier(value: float) -> void:
 	_surface_slip_multiplier = clampf(value, 0.75, 1.45)
 
 func get_surface_slip_multiplier() -> float:
 	return _surface_slip_multiplier
+
+func cancel_corner_slip() -> void:
+	_slip_speed = 0.0
+	_slip_sign = 0.0
+
+func _apply_wall_contact_response(collision: KinematicCollision3D) -> void:
+	var normal := collision.get_normal()
+	if normal.y >= 0.55:
+		return
+	_slip_speed *= 0.10
+	var planar_velocity := Vector3(_racer.velocity.x, 0.0, _racer.velocity.z)
+	var inward_speed := planar_velocity.dot(normal)
+	if inward_speed < 0.0:
+		planar_velocity -= normal * inward_speed
+		_racer.velocity.x = planar_velocity.x
+		_racer.velocity.z = planar_velocity.z
+	# Keep arcade flow: a wall scrape costs a little speed but does not stop the
+	# racer dead. Forward movement can continue tangentially on the next normal
+	# CharacterBody3D move_and_slide step.
+	_racer.current_speed = maxf(_racer.cruise_speed * 0.65, _racer.current_speed * 0.93)
 
 func _resolve_runtime_nodes() -> void:
 	if _racer == null or not is_instance_valid(_racer):
@@ -112,7 +136,7 @@ func _resolve_runtime_nodes() -> void:
 	if not _reported_ready and _racer != null and _camera != null:
 		_reported_ready = true
 		_base_fov = _camera.fov
-		print("RACING FEEL READY fov_base=%.1f dynamic_fov=true speed_lines=%s player_slip=true ai_slip=false" % [_base_fov, str(_overlay != null)])
+		print("RACING FEEL READY fov_base=%.1f dynamic_fov=true speed_lines=%s player_slip=true ai_slip=false barrier_safe=true" % [_base_fov, str(_overlay != null)])
 
 func _get_speed_ratio() -> float:
 	if _racer == null:
