@@ -1,6 +1,7 @@
 extends Node
 
 const TRACK_SCENE: PackedScene = preload("res://tracks/grand_prix_track.tscn")
+const NEON_TRACK_SCENE: PackedScene = preload("res://tracks/neon_harbor_track.tscn")
 const MIN_TRACK_LENGTH := 2200.0
 const MAX_TRACK_LENGTH := 2600.0
 const MIN_CHECKPOINTS := 10
@@ -18,7 +19,8 @@ func _ready() -> void:
 	_check(GameManager.HARD_AI_COUNT == 17, "Hard should be Player + 17 AI", failures)
 	_check(GameManager.DEFAULT_AI_COUNT == GameManager.NORMAL_AI_COUNT, "Normal should be production default", failures)
 	_check(GameManager.MAX_AI_COUNT >= GameManager.HARD_AI_COUNT, "Hard racer count supported", failures)
-	_check(GameManager.ROUND_IDS == [&"grand_prix", &"fruit_collection", &"floor_collapse", &"push_out"], "four-round campaign order", failures)
+	_check(GameManager.ROUND_IDS == [&"grand_prix", &"fruit_collection", &"neon_harbor_race", &"push_out"], "four-round campaign order with Neon Harbor round 3", failures)
+	_check(ResourceLoader.exists("res://modes/floor_collapse/floor_collapse.tscn"), "Floor Collapse preserved outside campaign", failures)
 
 	# Item challenge: 12 distinct definitions, rank weighting, shield frequency,
 	# dash ceiling, and chain-CC protection.
@@ -62,6 +64,7 @@ func _ready() -> void:
 	var elephant := WildDashAnimalCatalog.get_definition(&"elephant")
 	var cat := WildDashAnimalCatalog.get_definition(&"cat")
 	_check(dog != null and rabbit != null and elephant != null and cat != null, "four base characters", failures)
+	_check(WildDashAnimalCatalog.race_roster_ids().size() == 12, "twelve-species race NPC roster", failures)
 	if dog != null and rabbit != null and elephant != null and cat != null:
 		_check(dog.skill_id == &"rally_dash" and dog.skill_cooldown >= 9.0, "Dog Rally Dash cooldown", failures)
 		_check(dog.skill_speed_multiplier <= 1.15 and dog.skill_acceleration_multiplier <= 1.60, "Dog Rally Dash ceiling", failures)
@@ -71,12 +74,9 @@ func _ready() -> void:
 		var max_speed := maxf(maxf(dog.max_speed, rabbit.max_speed), maxf(elephant.max_speed, cat.max_speed))
 		var min_speed := minf(minf(dog.max_speed, rabbit.max_speed), minf(elephant.max_speed, cat.max_speed))
 		_check(max_speed / min_speed <= 1.12, "base character speed spread", failures)
-		# Dash Berry raises current speed to a capped floor instead of multiplying
-		# Rally Dash again. This guards the known Dog + Dash stacking concern.
 		_check(ItemSystem.DASH_SPEED_MULTIPLIER * dog.skill_speed_multiplier <= 1.75, "Dog + Dash theoretical ceiling", failures)
 
-	# Chimera can combine identity pieces but each passive tier remains bounded;
-	# no build gets an unbounded permanent movement multiplier.
+	# Chimera remains bounded and based on the original four playable animals.
 	var max_chimera_accel := 1.0
 	var max_chimera_turn := 1.0
 	for animal_id: StringName in WildDashAnimalCatalog.all_ids():
@@ -95,7 +95,7 @@ func _ready() -> void:
 	_check(max_chimera_accel <= 1.18 and max_chimera_turn <= 1.18, "Chimera combined passive ceiling", failures)
 	print("RC5 CHIMERA CAP PASS accel=%.3f turn=%.3f" % [max_chimera_accel, max_chimera_turn])
 
-	# Extended production track and shortcut risk/reward.
+	# Round 1 extended production track remains unchanged.
 	RaceManager.clear_racers()
 	RaceManager.clear_track()
 	var track := TRACK_SCENE.instantiate() as WildDashGrandPrixTrack
@@ -112,13 +112,32 @@ func _ready() -> void:
 		_check(shortcut_a >= 45.0 and shortcut_a <= 95.0, "Shortcut A risk/reward", failures)
 		_check(shortcut_b >= 45.0 and shortcut_b <= 95.0, "Shortcut B risk/reward", failures)
 		print("RC5 TRACK CHALLENGE PASS length=%.1fm checkpoints=%d shortcuts=2 save_a=%.1fm save_b=%.1fm" % [length, checkpoints, shortcut_a, shortcut_b])
+		track.queue_free()
+		await get_tree().process_frame
+
+	# Round 3 must be a distinct shorter night race, not another copy of Round 1.
+	RaceManager.clear_racers()
+	RaceManager.clear_track()
+	var neon := NEON_TRACK_SCENE.instantiate() as WildDashNeonHarborTrack
+	_check(neon != null, "Neon Harbor track instantiate", failures)
+	if neon != null:
+		add_child(neon)
+		await get_tree().physics_frame
+		_check(neon.get_track_length() >= 1500.0 and neon.get_track_length() <= 1900.0, "1.5-1.9km Neon Harbor", failures)
+		_check(neon.get_route_points().size() >= 22 and neon.get_route_points().size() <= 28, "22-28 Neon Harbor route points", failures)
+		_check(neon.get_checkpoint_positions().size() >= 8 and neon.get_checkpoint_positions().size() <= 10, "8-10 Neon Harbor checkpoints", failures)
+		_check(neon.get_zone_names().has("Industrial Tunnel") and neon.get_zone_names().has("Neon Downtown"), "Neon Harbor distinct zones", failures)
+		_check(neon.get_shortcut_a_saving() > 8.0, "Neon Harbor shortcut risk/reward", failures)
+		print("RC5 ROUND3 NEON HARBOR PASS length=%.1fm points=%d checkpoints=%d zones=%d npc_species=%d" % [
+			neon.get_track_length(), neon.get_route_points().size(), neon.get_checkpoint_positions().size(), neon.get_zone_names().size(), WildDashAnimalCatalog.race_roster_ids().size(),
+		])
 
 	if not failures.is_empty():
 		for failure in failures:
 			push_error("RC5 GAMEPLAY CHALLENGE FAIL " + failure)
 		get_tree().quit(1)
 		return
-	print("RC5 GAMEPLAY CHALLENGE PASS items=%d skills=4 racers=15 hard=18 checkpoints=%d shortcuts=2" % [ItemSystem.get_item_count(), RaceManager.get_checkpoint_count()])
+	print("RC5 GAMEPLAY CHALLENGE PASS items=%d skills=4 racers=15 hard=18 round3=neon_harbor" % ItemSystem.get_item_count())
 	get_tree().quit(0)
 
 func _bounded(value: Variant, minimum: float, maximum: float) -> bool:
