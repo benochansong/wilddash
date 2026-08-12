@@ -1,19 +1,7 @@
 name: WILD DASH Snowpeak Winter CI
 
+# Track-specific validation. Run manually when Snowpeak changes.
 on:
-  pull_request:
-    paths:
-      - "godot/tracks/snowpeak_winter_track.gd"
-      - "godot/tracks/snowpeak_winter_track.tscn"
-      - "godot/modes/snowpeak_winter_rally/**"
-      - "godot/effects/snowfall_controller.gd"
-      - "godot/systems/winter_surface_controller.gd"
-      - "godot/systems/racing_feel_controller.gd"
-      - "godot/scripts/game_manager.gd"
-      - "godot/tests/snowpeak_winter_*.gd"
-      - "godot/tests/snowpeak_winter_*.tscn"
-      - "godot/tests/rc5_gameplay_challenge.gd"
-      - ".github/workflows/snowpeak-winter-ci.yml"
   workflow_dispatch:
 
 permissions:
