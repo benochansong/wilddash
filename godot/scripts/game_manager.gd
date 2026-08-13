@@ -205,7 +205,7 @@ func _load_current_round() -> void:
 	print("LOAD MODE index=%d id=%s ai=%d" % [current_round_index + 1, mode_id, ai_count])
 	var error: Error = get_tree().change_scene_to_file(scene_path)
 	if error != OK:
-		push_error("Failed to load round scene %s: %s" % [scene_path, error_string(error))
+		push_error("Failed to load round scene %s: %s" % [scene_path, error_string(error)])
 
 func _transition_after_round() -> void:
 	var delay := 0.05 if DisplayServer.get_name() == "headless" else 1.2
@@ -245,9 +245,13 @@ func _race_theme_for_current_round() -> String:
 			return "race"
 
 func _arena_theme_for_current_round() -> String:
-	if get_current_round_id() == &"push_out":
-		return "arena_push_out"
-	return "arena"
+	match get_current_round_id():
+		&"fruit_collection":
+			return "arena_fruit_collection"
+		&"push_out":
+			return "arena_push_out"
+		_:
+			return "arena"
 
 func _update_audio_for_state(next_state: GameState) -> void:
 	var audio := get_node_or_null("/root/AudioManager")
