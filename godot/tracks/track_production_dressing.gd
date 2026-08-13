@@ -5,6 +5,8 @@ extends Node3D
 ## Builds readable hero arches, route beacons, continuous edge rails and
 ## landmark pylons from existing route points. No CollisionObject3D is created.
 
+const GUARDRAIL_SEGMENTS_PER_BATCH := 6
+
 @export var track_id: StringName = &"grand_prix"
 @export var beacon_stride := 4
 @export var beacon_offset := 8.6
@@ -139,11 +141,19 @@ func _build_route_beacons(route: Array[Vector3], palette: Dictionary) -> void:
 			_add_box(root, "Reflector", Vector3(0, 0.56, 0), Vector3(0.20, 0.26, 0.14), secondary if side < 0.0 else primary)
 
 func _build_continuous_guardrails(route: Array[Vector3], palette: Dictionary) -> void:
-	var upper_transforms: Array[Transform3D] = []
-	var lower_transforms: Array[Transform3D] = []
 	var rail_offset := float(palette.get("rail_offset", maxf(6.4, beacon_offset - 1.8)))
 	var upper_height := float(palette.get("rail_upper_height", 1.34))
 	var lower_height := float(palette.get("rail_lower_height", 0.62))
+	var primary := _material(palette["primary"], 0.42, 0.18, bool(palette["emission"]))
+	var secondary := _material(palette["secondary"], 0.48, 0.12, bool(palette["emission"]))
+	var upper_batch: Array[Transform3D] = []
+	var lower_batch: Array[Transform3D] = []
+	var batch_index := 0
+	var segment_in_batch := 0
+	var total_segments := 0
+	var total_upper := 0
+	var total_lower := 0
+
 	for index in range(route.size() - 1):
 		var a := route[index]
 		var b := route[index + 1]
@@ -155,22 +165,31 @@ func _build_continuous_guardrails(route: Array[Vector3], palette: Dictionary) ->
 		var right := Vector3(-direction.z, 0.0, direction.x)
 		for side in [-1.0, 1.0]:
 			var lateral := right * rail_offset * side
-			upper_transforms.append(_beam_transform(
+			upper_batch.append(_beam_transform(
 				a + lateral + Vector3.UP * upper_height,
 				b + lateral + Vector3.UP * upper_height,
 				0.16
 			))
-			lower_transforms.append(_beam_transform(
+			lower_batch.append(_beam_transform(
 				a + lateral + Vector3.UP * lower_height,
 				b + lateral + Vector3.UP * lower_height,
 				0.11
 			))
-	var primary := _material(palette["primary"], 0.42, 0.18, bool(palette["emission"]))
-	var secondary := _material(palette["secondary"], 0.48, 0.12, bool(palette["emission"]))
-	_add_box_multimesh("ContinuousGuardrailUpper", upper_transforms, primary)
-	_add_box_multimesh("ContinuousGuardrailLower", lower_transforms, secondary)
-	print("RC9 GUARDRAIL VISUAL track=%s upper=%d lower=%d collision=false" % [
-		track_id, upper_transforms.size(), lower_transforms.size(),
+		total_segments += 1
+		segment_in_batch += 1
+		var flush_batch := segment_in_batch >= GUARDRAIL_SEGMENTS_PER_BATCH or index == route.size() - 2
+		if flush_batch:
+			_add_box_multimesh("ContinuousGuardrailUpper_%02d" % batch_index, upper_batch, primary, true)
+			_add_box_multimesh("ContinuousGuardrailLower_%02d" % batch_index, lower_batch, secondary, true)
+			total_upper += upper_batch.size()
+			total_lower += lower_batch.size()
+			upper_batch.clear()
+			lower_batch.clear()
+			segment_in_batch = 0
+			batch_index += 1
+
+	print("RC9 GUARDRAIL FULL ROUTE track=%s route_segments=%d batches=%d upper=%d lower=%d collision=false" % [
+		track_id, total_segments, batch_index, total_upper, total_lower,
 	])
 
 func _beam_transform(from: Vector3, to: Vector3, thickness: float) -> Transform3D:
@@ -183,7 +202,7 @@ func _beam_transform(from: Vector3, to: Vector3, thickness: float) -> Transform3
 	transform.basis = transform.basis.scaled(Vector3(thickness, thickness, distance))
 	return transform
 
-func _add_box_multimesh(node_name: String, transforms: Array[Transform3D], material: Material) -> void:
+func _add_box_multimesh(node_name: String, transforms: Array[Transform3D], material: Material, guardrail_batch := false) -> void:
 	if transforms.is_empty():
 		return
 	var primitive := BoxMesh.new()
@@ -195,10 +214,34 @@ func _add_box_multimesh(node_name: String, transforms: Array[Transform3D], mater
 	multimesh.instance_count = transforms.size()
 	for index in range(transforms.size()):
 		multimesh.set_instance_transform(index, transforms[index])
+	# A very long single MultiMesh can be culled as one object while the player
+	# travels through a multi-kilometre course. Guardrail batches get an explicit
+	# local-space AABB matching every transformed cube so each route chunk is
+	# independently visible/cullable for the entire race.
+	if guardrail_batch:
+		multimesh.custom_aabb = _calculate_transforms_aabb(transforms)
 	var instance := MultiMeshInstance3D.new()
 	instance.name = node_name
 	instance.multimesh = multimesh
+	if guardrail_batch:
+		instance.extra_cull_margin = 35.0
 	_art_root.add_child(instance)
+
+func _calculate_transforms_aabb(transforms: Array[Transform3D]) -> AABB:
+	if transforms.is_empty():
+		return AABB(Vector3.ZERO, Vector3.ONE)
+	var corners: Array[Vector3] = [
+		Vector3(-0.5, -0.5, -0.5), Vector3(0.5, -0.5, -0.5),
+		Vector3(-0.5, 0.5, -0.5), Vector3(0.5, 0.5, -0.5),
+		Vector3(-0.5, -0.5, 0.5), Vector3(0.5, -0.5, 0.5),
+		Vector3(-0.5, 0.5, 0.5), Vector3(0.5, 0.5, 0.5),
+	]
+	var first_point := transforms[0] * corners[0]
+	var bounds := AABB(first_point, Vector3.ZERO)
+	for transform in transforms:
+		for corner in corners:
+			bounds = bounds.expand(transform * corner)
+	return bounds.grow(1.5)
 
 func _build_landmark_pylons(route: Array[Vector3], palette: Dictionary) -> void:
 	var primary := _material(palette["primary"], 0.48, 0.08, bool(palette["emission"]))
