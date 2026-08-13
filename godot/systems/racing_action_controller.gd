@@ -2,8 +2,8 @@ class_name WildDashRacingActionController
 extends Node
 
 ## RC9 arcade race actions layered on top of the CharacterController.
-## W/Up is now an energy-limited boost burst instead of an always-on speed
-## advantage. F / Gamepad Y performs a short-range body check.
+## W/Up is an energy-limited boost burst instead of an always-on advantage.
+## F / Gamepad Y performs a short-range body check.
 
 const BASE_RACE_SPEED_RATIO: float = 0.90
 const OVERDRIVE_SPEED_MULTIPLIER: float = 1.12
@@ -20,10 +20,6 @@ const BODY_CHECK_FORWARD_DOT: float = -0.08
 const ATTACKER_SPEED_RETENTION: float = 0.98
 const TARGET_SPEED_RETENTION: float = 0.93
 
-const META_BOOST_ACTIVE: StringName = &"wilddash_boost_active"
-const META_BOOST_SPEED: StringName = &"wilddash_boost_speed_multiplier"
-const META_BOOST_ACCEL: StringName = &"wilddash_boost_acceleration_multiplier"
-
 var _racer: WildDashCharacterController
 var _body_check_cooldown: float = 0.0
 var _boost_energy: float = BOOST_ENERGY_MAX
@@ -32,12 +28,10 @@ var _boost_rearmed: bool = true
 var _boost_reported: bool = false
 
 func _ready() -> void:
-	# Lower priorities run first. Publish boost state before CharacterController
-	# performs its movement pass, then RacingFeelController (100) samples it.
-	process_priority = -20
-
-func _exit_tree() -> void:
-	_clear_racer_boost_meta()
+	# CharacterController moves first at default priority. This controller then
+	# clamps the next-frame normal pace or applies a short boost burst. RacingFeel
+	# (priority 100) reads the resulting speed for FOV/speed-line feedback.
+	process_priority = 80
 
 func _physics_process(delta: float) -> void:
 	_resolve_player()
@@ -104,17 +98,28 @@ func _update_boost(delta: float) -> void:
 
 	if _boost_remaining > 0.0:
 		_boost_remaining = maxf(0.0, _boost_remaining - delta)
-		_publish_racer_boost_meta(true)
+		var boost_target: float = get_overdrive_target(_racer.max_speed)
+		var boost_accel: float = _racer.acceleration * _racer.get_active_acceleration_scale() * OVERDRIVE_ACCELERATION_MULTIPLIER
+		_racer.current_speed = move_toward(_racer.current_speed, boost_target, boost_accel * delta)
 		if _boost_remaining <= 0.0:
-			_publish_racer_boost_meta(false)
 			_boost_reported = false
 		return
 
-	_publish_racer_boost_meta(false)
 	_boost_energy = minf(BOOST_ENERGY_MAX, _boost_energy + BOOST_RECHARGE_PER_SECOND * delta)
 
+	# Normal race pace is automatic and deliberately below max speed. Holding W
+	# without energy cannot create a permanent full-throttle advantage.
+	var normal_target: float = get_normal_race_target(_racer.max_speed, _racer.cruise_speed)
+	if throttle >= -0.05:
+		if _racer.get_active_speed_scale() <= 1.02:
+			if _racer.current_speed > normal_target:
+				_racer.current_speed = normal_target
+			elif throttle <= 0.05:
+				var recovery_accel: float = _racer.acceleration * _racer.get_active_acceleration_scale() * 0.34
+				_racer.current_speed = move_toward(_racer.current_speed, normal_target, recovery_accel * delta)
+
 	# A held key never auto-fires when the meter eventually fills. Every boost
-	# needs a deliberate press after release, which prevents permanent W holding.
+	# needs a deliberate release/press cycle after the meter is full.
 	if throttle > 0.05 and _boost_rearmed:
 		_boost_rearmed = false
 		if _boost_energy >= BOOST_ENERGY_COST - BOOST_READY_EPSILON:
@@ -123,7 +128,6 @@ func _update_boost(delta: float) -> void:
 func _activate_boost() -> void:
 	_boost_energy = maxf(0.0, _boost_energy - BOOST_ENERGY_COST)
 	_boost_remaining = BOOST_DURATION
-	_publish_racer_boost_meta(true)
 	if not _boost_reported:
 		_boost_reported = true
 		print("RC9 BOOST BURST racer=%s duration=%.2f energy=%.0f recharge=%.1fs target=%.2f" % [
@@ -134,27 +138,12 @@ func _activate_boost() -> void:
 			get_overdrive_target(_racer.max_speed),
 		])
 
-func _publish_racer_boost_meta(active: bool) -> void:
-	if _racer == null:
-		return
-	_racer.set_meta(META_BOOST_ACTIVE, active)
-	_racer.set_meta(META_BOOST_SPEED, OVERDRIVE_SPEED_MULTIPLIER)
-	_racer.set_meta(META_BOOST_ACCEL, OVERDRIVE_ACCELERATION_MULTIPLIER)
-
-func _clear_racer_boost_meta() -> void:
-	if _racer == null or not is_instance_valid(_racer):
-		return
-	_racer.remove_meta(META_BOOST_ACTIVE)
-	_racer.remove_meta(META_BOOST_SPEED)
-	_racer.remove_meta(META_BOOST_ACCEL)
-
 func _reset_boost_runtime(refill: bool) -> void:
 	_boost_remaining = 0.0
 	_boost_rearmed = true
 	_boost_reported = false
 	if refill:
 		_boost_energy = BOOST_ENERGY_MAX
-	_publish_racer_boost_meta(false)
 
 func _try_body_check() -> void:
 	if _body_check_cooldown > 0.0:
@@ -219,4 +208,3 @@ func _resolve_player() -> void:
 		_boost_energy = BOOST_ENERGY_MAX
 		_boost_remaining = 0.0
 		_boost_rearmed = true
-		_publish_racer_boost_meta(false)
