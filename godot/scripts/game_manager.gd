@@ -233,6 +233,26 @@ func _autotest_start_character_select() -> void:
 		return
 	scene.call("_start_run")
 
+func _race_theme_for_current_round() -> String:
+	match get_current_round_id():
+		&"grand_prix":
+			return "race_grand_prix"
+		&"neon_harbor_race":
+			return "race_neon_harbor"
+		&"snowpeak_winter_rally":
+			return "race_snowpeak"
+		_:
+			return "race"
+
+func _arena_theme_for_current_round() -> String:
+	match get_current_round_id():
+		&"fruit_collection":
+			return "arena_fruit_collection"
+		&"push_out":
+			return "arena_push_out"
+		_:
+			return "arena"
+
 func _update_audio_for_state(next_state: GameState) -> void:
 	var audio := get_node_or_null("/root/AudioManager")
 	if audio == null:
@@ -241,8 +261,10 @@ func _update_audio_for_state(next_state: GameState) -> void:
 		GameState.LOBBY, GameState.CHARACTER_SELECT:
 			audio.call("play_theme", "menu")
 		GameState.RACE, GameState.COUNTDOWN:
-			audio.call("play_theme", "race")
-		GameState.ARENA, GameState.FINAL, GameState.ROUND_BREAK:
+			audio.call("play_theme", _race_theme_for_current_round())
+		GameState.ARENA, GameState.FINAL:
+			audio.call("play_theme", _arena_theme_for_current_round())
+		GameState.ROUND_BREAK:
 			audio.call("play_theme", "arena")
 		GameState.RESULT:
 			audio.call("play_theme", "result")
