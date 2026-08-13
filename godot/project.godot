@@ -1,10 +1,10 @@
 ; WILD DASH 3D - Godot project
-; RC7 Release Candidate.
+; RC9 racing polish + LAN party prototype branch.
 config_version=5
 
 [application]
 config/name="WILD DASH 3D"
-config/version="0.9.0-rc7"
+config/version="0.9.0-rc9-dev"
 run/main_scene="res://scenes/lobby.tscn"
 
 [autoload]
@@ -15,6 +15,7 @@ AudioManager="*res://scripts/audio_manager.gd"
 ResultManager="*res://scripts/result_manager.gd"
 RaceManager="*res://scripts/race_manager.gd"
 GameManager="*res://scripts/game_manager.gd"
+NetworkManager="*res://network/network_manager.gd"
 ItemSystem="*res://systems/item_system.gd"
 SkillSystem="*res://systems/skill_system.gd"
 PerformanceManager="*res://scripts/performance_manager.gd"
