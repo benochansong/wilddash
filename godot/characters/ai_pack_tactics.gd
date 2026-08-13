@@ -23,6 +23,8 @@ const NORMAL_FRONT_HEADWAY := 4.4
 const HARD_FRONT_HEADWAY := 4.0
 const SIDE_FRONT_CLEARANCE := 5.2
 const SIDE_REAR_CLEARANCE := 4.4
+const HARD_PASS_FRONT_CLEARANCE := 5.75
+const HARD_PASS_REAR_CLEARANCE := 5.05
 const NORMAL_ESCAPE_FRONT_CLEARANCE := 4.80
 const NORMAL_ESCAPE_REAR_CLEARANCE := 4.20
 const HARD_ESCAPE_FRONT_CLEARANCE := 4.25
@@ -240,8 +242,13 @@ func _update_pack_decision(decision_elapsed: float) -> void:
 	if large_body:
 		safe_front_gap += LARGE_BODY_HEADWAY_BONUS
 
-	var left_clear := front_left > SIDE_FRONT_CLEARANCE and rear_left > SIDE_REAR_CLEARANCE
-	var right_clear := front_right > SIDE_FRONT_CLEARANCE and rear_right > SIDE_REAR_CLEARANCE
+	# Normal keeps the Phase 7 clearances. Hard regular overtakes require a
+	# wider front/rear window; explicit blocked escapes below intentionally keep
+	# their tighter emergency clearances so tail throughput is not sacrificed.
+	var regular_front_clearance := HARD_PASS_FRONT_CLEARANCE if hard_mode else SIDE_FRONT_CLEARANCE
+	var regular_rear_clearance := HARD_PASS_REAR_CLEARANCE if hard_mode else SIDE_REAR_CLEARANCE
+	var left_clear := front_left > regular_front_clearance and rear_left > regular_rear_clearance
+	var right_clear := front_right > regular_front_clearance and rear_right > regular_rear_clearance
 	var preferred_side := -1.0 if front_side >= 0.0 else 1.0
 	var committed_clear := (_committed_side < 0.0 and left_clear) or (_committed_side > 0.0 and right_clear)
 	if _lane_commit_remaining > 0.0 and _committed_side != 0.0 and committed_clear:
@@ -292,6 +299,11 @@ func _update_pack_decision(decision_elapsed: float) -> void:
 	var breakout_ready := _blocked_elapsed >= escape_threshold and _escape_cooldown_remaining <= 0.0 and (left_escape_clear or right_escape_clear)
 
 	var can_change_lane := (preferred_side < 0.0 and left_clear) or (preferred_side > 0.0 and right_clear)
+	# In a dense Hard pack, do not initiate a fresh opportunistic pass. Existing
+	# lane commitments can finish, and a real blocked escape can still override.
+	var hard_dense_pass_hold := hard_mode and nearby_count >= CROWD_DENSITY_LIMIT and front_distance < safe_front_gap * 1.35 and not breakout_ready
+	if hard_dense_pass_hold and _lane_commit_remaining <= 0.0:
+		can_change_lane = false
 	if breakout_ready:
 		var escape_side := preferred_side
 		if left_escape_clear and right_escape_clear:
@@ -326,7 +338,9 @@ func _update_pack_decision(decision_elapsed: float) -> void:
 	var desired_shift := preferred_side * overtake_strength
 	if large_body:
 		desired_shift *= LARGE_BODY_LANE_SCALE
-	var traffic_hold_scale := 0.965 if hard_mode else 0.955
+	# Hard holds slightly more pace while waiting for a genuinely safe pass gap;
+	# this avoids reducing collisions by simply stretching the field.
+	var traffic_hold_scale := 0.975 if hard_mode else 0.955
 	var desired_speed_scale := traffic_hold_scale
 	var action: StringName = &"traffic_hold"
 
@@ -339,7 +353,7 @@ func _update_pack_decision(decision_elapsed: float) -> void:
 				desired_speed_scale = traffic_hold_scale
 				desired_shift *= 0.30
 		Personality.SAFE:
-			desired_speed_scale = (0.955 if hard_mode else 0.945) if not can_change_lane else 0.98
+			desired_speed_scale = (0.965 if hard_mode else 0.945) if not can_change_lane else 0.98
 			desired_shift *= 0.55
 			action = &"yield" if not can_change_lane or front_distance < safe_front_gap else &"line_change"
 		Personality.SHORTCUT:
@@ -348,7 +362,7 @@ func _update_pack_decision(decision_elapsed: float) -> void:
 			action = &"line_change" if can_change_lane else &"traffic_hold"
 		Personality.ITEM_FIGHTER:
 			if _racer.get_held_item() != &"":
-				desired_speed_scale = 0.98 if can_change_lane else (0.96 if hard_mode else 0.95)
+				desired_speed_scale = 0.98 if can_change_lane else (0.97 if hard_mode else 0.95)
 				desired_shift *= 0.64
 				action = &"attack_setup"
 			elif can_change_lane:
@@ -392,21 +406,21 @@ func _update_pack_decision(decision_elapsed: float) -> void:
 		desired_speed_scale = maxf(desired_speed_scale, 0.995 if hard_mode else 0.975)
 		action = &"blocked_escape"
 
-	# Never cut across an unsafe rear approach. Normal keeps a wider escape gap;
-	# Hard may use the tighter RC6 Phase 3 gap after an explicit blocked decision.
-	var rear_guard := escape_rear_clearance if breakout_ready else SIDE_REAR_CLEARANCE
+	# Never cut across an unsafe rear approach. Regular Hard passes use the wide
+	# pass guard; blocked escapes retain the tighter emergency guard.
+	var rear_guard := escape_rear_clearance if breakout_ready else regular_rear_clearance
 	if preferred_side < 0.0 and rear_left < rear_guard:
 		desired_shift = maxf(0.0, desired_shift)
-		desired_speed_scale = minf(desired_speed_scale, 0.97 if hard_mode else 0.955)
+		desired_speed_scale = minf(desired_speed_scale, 0.975 if hard_mode else 0.955)
 		action = &"yield"
 	elif preferred_side > 0.0 and rear_right < rear_guard:
 		desired_shift = minf(0.0, desired_shift)
-		desired_speed_scale = minf(desired_speed_scale, 0.97 if hard_mode else 0.955)
+		desired_speed_scale = minf(desired_speed_scale, 0.975 if hard_mode else 0.955)
 		action = &"yield"
 
 	if nearby_count >= CROWD_DENSITY_LIMIT and front_distance < safe_front_gap * 1.35 and not breakout_ready:
 		desired_shift *= CROWD_LANE_SCALE
-		desired_speed_scale = minf(desired_speed_scale, 0.985 if hard_mode else 0.97)
+		desired_speed_scale = minf(desired_speed_scale, 0.98 if hard_mode else 0.97)
 		_crowd_avoid_actions += 1
 		if action == &"overtake":
 			action = &"line_change"
