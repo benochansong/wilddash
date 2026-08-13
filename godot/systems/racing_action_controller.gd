@@ -108,14 +108,16 @@ func _update_boost(delta: float) -> void:
 	_boost_energy = minf(BOOST_ENERGY_MAX, _boost_energy + BOOST_RECHARGE_PER_SECOND * delta)
 
 	# Normal race pace is automatic and deliberately below max speed. Holding W
-	# without energy cannot create a permanent full-throttle advantage.
+	# without energy cannot create a permanent full-throttle advantage. The
+	# post-movement recovery slightly exceeds CharacterController's cruise pull,
+	# so releasing W does not make the player slower than holding it.
 	var normal_target: float = get_normal_race_target(_racer.max_speed, _racer.cruise_speed)
 	if throttle >= -0.05:
 		if _racer.get_active_speed_scale() <= 1.02:
 			if _racer.current_speed > normal_target:
 				_racer.current_speed = normal_target
-			elif throttle <= 0.05:
-				var recovery_accel: float = _racer.acceleration * _racer.get_active_acceleration_scale() * 0.34
+			else:
+				var recovery_accel: float = _racer.acceleration * _racer.get_active_acceleration_scale() * 1.20
 				_racer.current_speed = move_toward(_racer.current_speed, normal_target, recovery_accel * delta)
 
 	# A held key never auto-fires when the meter eventually fills. Every boost
