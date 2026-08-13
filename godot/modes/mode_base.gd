@@ -92,6 +92,7 @@ func spawn_ai_driver(
 	driver.preferred_lane = lane
 	driver.lane_wander = wander
 	driver.preserve_player_identity = preserve_player_identity
+	_apply_race_ai_mobility_profile(racer, driver, ai_mode)
 	add_child(driver)
 	ai_drivers.append(driver)
 
@@ -101,6 +102,38 @@ func spawn_ai_driver(
 		skill_brain.racer_path = NodePath("../%s" % racer.name)
 		add_child(skill_brain)
 	return driver
+
+func _apply_race_ai_mobility_profile(
+	racer: WildDashCharacterController,
+	driver: WildDashAIController,
+	ai_mode: WildDashAIController.AIMode,
+) -> void:
+	if ai_mode != WildDashAIController.AIMode.RACE:
+		return
+
+	# RC6 final stabilization: Panda and Bear consistently lose time from their
+	# heavy archetype's slow line reacquisition after corners and contact. Keep
+	# player stats, skills and top-speed identity untouched; only the NPC race
+	# driver's steering response, longitudinal recovery and look-ahead improve.
+	match racer.animal_id:
+		&"panda":
+			driver.steering_strength = 4.70
+			driver.acceleration = 13.80
+			driver.avoidance_distance = 7.40
+		&"bear":
+			driver.steering_strength = 4.50
+			driver.acceleration = 13.20
+			driver.avoidance_distance = 7.10
+		_:
+			return
+
+	print("AI MOBILITY PROFILE racer=%s animal=%s steering=%.2f accel=%.2f avoid=%.2f" % [
+		racer.name,
+		String(racer.animal_id),
+		driver.steering_strength,
+		driver.acceleration,
+		driver.avoidance_distance,
+	])
 
 func create_box(
 	node_name: String,
