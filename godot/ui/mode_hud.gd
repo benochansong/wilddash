@@ -158,7 +158,5 @@ func _update_racing_action_status() -> void:
 		meter += "■" if index < blocks else "□"
 	_boost_label.text = "BOOST ENERGY  [%s] %3d%%  ·  %s" % [meter, percent, _racing_actions.get_boost_status_text()]
 
-	var power: float = 0.0
-	if _bound_character != null:
-		power = WildDashRacingActionController.get_body_check_power(_bound_character.animal_id)
+	var power: float = _racing_actions.get_current_body_check_power()
 	_body_check_label.text = "BODY CHECK  POWER %.1f  ·  %s" % [power, _racing_actions.get_body_check_status_text()]
