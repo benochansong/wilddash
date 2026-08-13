@@ -23,17 +23,17 @@ const BODY_CHECK_FEEDBACK_SECONDS: float = 0.80
 const ATTACKER_SPEED_RETENTION: float = 0.97
 
 const ELEPHANT_OPENING_SECONDS: float = 6.0
-const ELEPHANT_TRUNK_RANGE: float = 5.40
-const ELEPHANT_TRUNK_FORWARD_DOT: float = -0.28
+const ELEPHANT_TRUNK_RANGE: float = 5.80
+const ELEPHANT_TRUNK_FORWARD_DOT: float = -0.32
 const ELEPHANT_TRUNK_MAX_TARGETS: int = 2
-const ELEPHANT_TRUNK_POWER_MULTIPLIER: float = 1.12
-const ELEPHANT_TRUNK_COOLDOWN: float = 3.15
-const ELEPHANT_OPENING_TRUNK_RANGE: float = 7.80
-const ELEPHANT_OPENING_TRUNK_FORWARD_DOT: float = -0.58
-const ELEPHANT_OPENING_TRUNK_MAX_TARGETS: int = 3
-const ELEPHANT_OPENING_POWER_MULTIPLIER: float = 1.35
-const ELEPHANT_OPENING_COOLDOWN: float = 1.65
-const ELEPHANT_OPENING_SPEED_ASSIST_RATIO: float = 0.94
+const ELEPHANT_TRUNK_POWER_MULTIPLIER: float = 1.25
+const ELEPHANT_TRUNK_COOLDOWN: float = 3.05
+const ELEPHANT_OPENING_TRUNK_RANGE: float = 11.50
+const ELEPHANT_OPENING_TRUNK_FORWARD_DOT: float = -0.80
+const ELEPHANT_OPENING_TRUNK_MAX_TARGETS: int = 5
+const ELEPHANT_OPENING_POWER_MULTIPLIER: float = 1.65
+const ELEPHANT_OPENING_COOLDOWN: float = 1.45
+const ELEPHANT_OPENING_SPEED_ASSIST_RATIO: float = 0.98
 
 var _racer: WildDashCharacterController
 var _body_check_cooldown: float = 0.0
@@ -242,15 +242,19 @@ func _try_elephant_trunk_sweep() -> void:
 		if planar_offset.length_squared() <= 0.001:
 			continue
 		var radial: Vector3 = planar_offset.normalized()
-		var push_direction: Vector3 = (radial * 0.90 + forward * 0.10).normalized()
+		var push_direction: Vector3 = (radial * 0.94 + forward * 0.06).normalized()
 		var impulse: float = calculate_body_check_impulse(_racer.animal_id, target.animal_id) * power_multiplier
 		strongest_impulse = maxf(strongest_impulse, impulse)
 		target.apply_knockback(push_direction, impulse)
-		var target_retention: float = clampf(0.91 - maxf(0.0, impulse - 4.0) * 0.022, 0.70, 0.90)
+		var target_retention: float = 0.0
+		if opening:
+			target_retention = clampf(0.80 - maxf(0.0, impulse - 8.0) * 0.025, 0.52, 0.78)
+		else:
+			target_retention = clampf(0.88 - maxf(0.0, impulse - 5.0) * 0.021, 0.66, 0.86)
 		target.current_speed *= target_retention
 		var target_visual: WildDashCharacterVisual = target.get_visual()
 		if target_visual != null:
-			target_visual.play_action(&"Hit", 0.36 if opening else 0.30)
+			target_visual.play_action(&"Hit", 0.42 if opening else 0.32)
 		hit_count += 1
 
 	if hit_count <= 0:
@@ -265,7 +269,7 @@ func _try_elephant_trunk_sweep() -> void:
 	AudioManager.play_sfx_id("hit", 1.0)
 	var attacker_visual: WildDashCharacterVisual = _racer.get_visual()
 	if attacker_visual != null:
-		attacker_visual.play_action(&"Skill", 0.38 if opening else 0.30)
+		attacker_visual.play_action(&"Skill", 0.42 if opening else 0.32)
 	print("RC9 ELEPHANT TRUNK SWEEP hits=%d opening=%s power=%.2f range=%.2f cooldown=%.2f" % [
 		hit_count,
 		str(opening),
@@ -345,7 +349,7 @@ func _find_elephant_trunk_targets(opening: bool) -> Array[WildDashCharacterContr
 			var alignment: float = forward.dot(planar_offset / distance)
 			if alignment < dot_limit:
 				continue
-			var score: float = distance - maxf(0.0, alignment) * 0.20
+			var score: float = distance - maxf(0.0, alignment) * 0.55
 			if score < best_score:
 				best_score = score
 				best = controller
