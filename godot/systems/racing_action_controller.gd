@@ -21,14 +21,23 @@ const BODY_CHECK_MAX_VERTICAL_DELTA: float = 1.80
 const BODY_CHECK_FEEDBACK_SECONDS: float = 0.80
 const ATTACKER_SPEED_RETENTION: float = 0.97
 
+# Elephant identity: it is deliberately slow, so its opening strength must be
+# available before the light racers can simply escape the contact game.
+const ELEPHANT_OPENING_SECONDS: float = 6.0
+const ELEPHANT_OPENING_RANGE: float = 5.20
+const ELEPHANT_OPENING_FORWARD_DOT: float = -0.55
+const ELEPHANT_OPENING_POWER_MULTIPLIER: float = 1.35
+const ELEPHANT_OPENING_COOLDOWN: float = 1.55
+const ELEPHANT_OPENING_SPEED_ASSIST_RATIO: float = 0.97
+
 var _racer: WildDashCharacterController
 var _body_check_cooldown: float = 0.0
 var _body_check_feedback_remaining: float = 0.0
 var _body_check_feedback_text: String = ""
 var _boost_energy: float = BOOST_ENERGY_MAX
 var _boost_remaining: float = 0.0
-var _boost_rearmed: bool = true
 var _boost_reported: bool = false
+var _race_elapsed: float = 0.0
 
 func _ready() -> void:
 	# CharacterController moves first at default priority. This controller then
@@ -45,9 +54,11 @@ func _physics_process(delta: float) -> void:
 	if _racer == null:
 		return
 	if not RaceManager.active or _racer.finished:
+		_race_elapsed = 0.0
 		_reset_boost_runtime(false)
 		return
 
+	_race_elapsed += delta
 	_update_boost(delta)
 	if InputManager.consume_race_bump():
 		_try_body_check()
@@ -60,9 +71,22 @@ func get_body_check_status_text() -> String:
 		return _body_check_feedback_text
 	if _body_check_cooldown > 0.01:
 		return "COOLDOWN %.1fs" % _body_check_cooldown
+	if _is_elephant_opening():
+		var opening_left: float = maxf(0.0, ELEPHANT_OPENING_SECONDS - _race_elapsed)
+		if _find_body_check_target() != null:
+			return "OPENING STAMPEDE %.1fs · TARGET · F / Y" % opening_left
+		return "OPENING STAMPEDE %.1fs · F / Y" % opening_left
 	if _find_body_check_target() != null:
 		return "TARGET IN RANGE · F / Y"
 	return "READY · F / Y"
+
+func get_current_body_check_power() -> float:
+	if _racer == null:
+		return 0.0
+	var power: float = get_body_check_power(_racer.animal_id)
+	if _is_elephant_opening():
+		power *= ELEPHANT_OPENING_POWER_MULTIPLIER
+	return power
 
 func is_overdrive_active() -> bool:
 	return _boost_remaining > 0.0
@@ -80,7 +104,7 @@ func get_boost_status_text() -> String:
 	if _boost_remaining > 0.0:
 		return "BOOSTING %.1fs" % _boost_remaining
 	if is_boost_ready():
-		return "READY · W / ↑"
+		return "READY · PRESS W / ↑"
 	return "CHARGING %d%%" % int(round(get_boost_energy_ratio() * 100.0))
 
 static func get_overdrive_target(max_speed: float, throttle: float = 1.0) -> float:
@@ -135,8 +159,7 @@ static func get_body_check_strength(animal_id: StringName) -> float:
 
 func _update_boost(delta: float) -> void:
 	var throttle: float = InputManager.get_throttle_axis()
-	if throttle <= 0.05:
-		_boost_rearmed = true
+	var boost_pressed: bool = InputManager.consume_boost_press()
 
 	if _boost_remaining > 0.0:
 		_boost_remaining = maxf(0.0, _boost_remaining - delta)
@@ -159,12 +182,10 @@ func _update_boost(delta: float) -> void:
 			var recovery_accel: float = _racer.acceleration * _racer.get_active_acceleration_scale() * 1.20
 			_racer.current_speed = move_toward(_racer.current_speed, normal_target, recovery_accel * delta)
 
-	# Holding W never auto-fires when the meter eventually fills. A new burst
-	# requires a release/press cycle, which makes boost timing an actual decision.
-	if throttle > 0.05 and _boost_rearmed:
-		_boost_rearmed = false
-		if _boost_energy >= BOOST_ENERGY_COST - BOOST_READY_EPSILON:
-			_activate_boost()
+	# Boost activation is now a dedicated press edge. A full meter + a fresh W/Up
+	# press always fires; holding the key cannot auto-fire a later recharge.
+	if boost_pressed and _boost_energy >= BOOST_ENERGY_COST - BOOST_READY_EPSILON:
+		_activate_boost()
 
 func _activate_boost() -> void:
 	_boost_energy = maxf(0.0, _boost_energy - BOOST_ENERGY_COST)
@@ -181,7 +202,6 @@ func _activate_boost() -> void:
 
 func _reset_boost_runtime(refill: bool) -> void:
 	_boost_remaining = 0.0
-	_boost_rearmed = true
 	_boost_reported = false
 	if refill:
 		_boost_energy = BOOST_ENERGY_MAX
@@ -189,9 +209,10 @@ func _reset_boost_runtime(refill: bool) -> void:
 func _try_body_check() -> void:
 	if _body_check_cooldown > 0.0:
 		return
+	var opening_stampede: bool = _is_elephant_opening()
 	var target: WildDashCharacterController = _find_body_check_target()
 	if target == null:
-		_body_check_feedback_text = "BODY CHECK · NO TARGET"
+		_body_check_feedback_text = "OPENING STAMPEDE · NO TARGET" if opening_stampede else "BODY CHECK · NO TARGET"
 		_body_check_feedback_remaining = 0.45
 		return
 
@@ -211,23 +232,40 @@ func _try_body_check() -> void:
 	var push_direction: Vector3 = (lateral_push * 0.78 + contact_direction * 0.22).normalized()
 
 	var impulse: float = calculate_body_check_impulse(_racer.animal_id, target.animal_id)
+	if opening_stampede:
+		impulse *= ELEPHANT_OPENING_POWER_MULTIPLIER
 	target.apply_knockback(push_direction, impulse)
 	var target_retention: float = clampf(0.94 - maxf(0.0, impulse - 3.0) * 0.018, 0.80, 0.94)
 	target.current_speed *= target_retention
 	_racer.current_speed *= ATTACKER_SPEED_RETENTION
-	_body_check_cooldown = BODY_CHECK_COOLDOWN
+	if opening_stampede:
+		# A successful opening shoulder keeps the elephant inside the pack without
+		# permanently raising its top speed.
+		_racer.current_speed = maxf(_racer.current_speed, _racer.max_speed * ELEPHANT_OPENING_SPEED_ASSIST_RATIO)
+	_body_check_cooldown = ELEPHANT_OPENING_COOLDOWN if opening_stampede else BODY_CHECK_COOLDOWN
 	_body_check_feedback_remaining = BODY_CHECK_FEEDBACK_SECONDS
-	_body_check_feedback_text = "HIT %s · POWER %.1f" % [target.get_display_name().to_upper(), impulse]
+	_body_check_feedback_text = "%s %s · POWER %.1f" % [
+		"OPENING HIT" if opening_stampede else "HIT",
+		target.get_display_name().to_upper(),
+		impulse,
+	]
 
-	AudioManager.play_sfx_id("hit", 0.90)
+	AudioManager.play_sfx_id("hit", 0.96 if opening_stampede else 0.90)
 	var attacker_visual: WildDashCharacterVisual = _racer.get_visual()
 	if attacker_visual != null:
-		attacker_visual.play_action(&"Skill", 0.24)
+		attacker_visual.play_action(&"Skill", 0.28 if opening_stampede else 0.24)
 	var target_visual: WildDashCharacterVisual = target.get_visual()
 	if target_visual != null:
-		target_visual.play_action(&"Hit", 0.28)
-	print("RC9 BODY CHECK HIT attacker=%s animal=%s target=%s target_animal=%s impulse=%.2f retention=%.2f cooldown=%.2f" % [
-		_racer.name, String(_racer.animal_id), target.name, String(target.animal_id), impulse, target_retention, BODY_CHECK_COOLDOWN,
+		target_visual.play_action(&"Hit", 0.32 if opening_stampede else 0.28)
+	print("RC9 BODY CHECK HIT attacker=%s animal=%s target=%s target_animal=%s impulse=%.2f opening=%s retention=%.2f cooldown=%.2f" % [
+		_racer.name,
+		String(_racer.animal_id),
+		target.name,
+		String(target.animal_id),
+		impulse,
+		str(opening_stampede),
+		target_retention,
+		_body_check_cooldown,
 	])
 
 func _find_body_check_target() -> WildDashCharacterController:
@@ -236,6 +274,8 @@ func _find_body_check_target() -> WildDashCharacterController:
 	var best: WildDashCharacterController = null
 	var best_score: float = INF
 	var forward: Vector3 = -_racer.global_transform.basis.z.normalized()
+	var range_limit: float = ELEPHANT_OPENING_RANGE if _is_elephant_opening() else BODY_CHECK_RANGE
+	var forward_dot_limit: float = ELEPHANT_OPENING_FORWARD_DOT if _is_elephant_opening() else BODY_CHECK_FORWARD_DOT
 	for candidate: Node3D in RaceManager.racers:
 		if candidate == _racer or not candidate is WildDashCharacterController:
 			continue
@@ -247,10 +287,10 @@ func _find_body_check_target() -> WildDashCharacterController:
 			continue
 		var offset: Vector3 = Vector3(raw_offset.x, 0.0, raw_offset.z)
 		var distance: float = offset.length()
-		if distance <= 0.01 or distance > BODY_CHECK_RANGE:
+		if distance <= 0.01 or distance > range_limit:
 			continue
 		var alignment: float = forward.dot(offset / distance)
-		if alignment < BODY_CHECK_FORWARD_DOT:
+		if alignment < forward_dot_limit:
 			continue
 		# Prefer closer targets, with a small bias toward racers in front so a
 		# crowded side-by-side pack feels predictable rather than random.
@@ -259,6 +299,9 @@ func _find_body_check_target() -> WildDashCharacterController:
 			best_score = score
 			best = controller
 	return best
+
+func _is_elephant_opening() -> bool:
+	return _racer != null and _racer.animal_id == &"elephant" and _race_elapsed <= ELEPHANT_OPENING_SECONDS
 
 func _resolve_player() -> void:
 	if _racer != null and is_instance_valid(_racer):
@@ -270,4 +313,4 @@ func _resolve_player() -> void:
 	if _racer != null:
 		_boost_energy = BOOST_ENERGY_MAX
 		_boost_remaining = 0.0
-		_boost_rearmed = true
+		_race_elapsed = 0.0
