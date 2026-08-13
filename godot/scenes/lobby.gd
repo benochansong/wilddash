@@ -74,7 +74,7 @@ func _build_ui(profile: Dictionary) -> void:
 	box.add_child(settings_button)
 
 	var controls := Label.new()
-	controls.text = "Race: W/↑ accelerate · S/↓ brake · A/D steer · Space jump · E skill · Q item\nGamepad: Left Stick / D-Pad · A Jump · X Skill · B Item · Start Pause"
+	controls.text = "Race: Hold W/↑ OVERDRIVE · S/↓ brake · A/D steer · Space jump · E animal skill · Q item · F body check\nGamepad: Left Stick / D-Pad · A Jump · X Skill · B Item · Y Body Check · Start Pause"
 	controls.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	controls.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(controls)
