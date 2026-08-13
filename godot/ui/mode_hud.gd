@@ -7,6 +7,7 @@ var _title_label: Label
 var _metrics_label: Label
 var _message_label: Label
 var _boost_label: Label
+var _body_check_label: Label
 var _item_icon_label: Label
 var _item_label: Label
 var _item_status_label: Label
@@ -33,8 +34,14 @@ func _ready() -> void:
 	_boost_label.text = ""
 	add_child(_boost_label)
 
+	_body_check_label = Label.new()
+	_body_check_label.position = Vector2(28, 114)
+	_body_check_label.add_theme_font_size_override("font_size", 16)
+	_body_check_label.text = ""
+	add_child(_body_check_label)
+
 	_message_label = Label.new()
-	_message_label.position = Vector2(28, 116)
+	_message_label.position = Vector2(28, 142)
 	_message_label.add_theme_font_size_override("font_size", 16)
 	add_child(_message_label)
 
@@ -103,7 +110,7 @@ func _process(_delta: float) -> void:
 	var cooldown: float = _bound_character.skill_cooldown_remaining
 	var status: String = "READY · E / X" if cooldown <= 0.01 else "%.1f sec" % cooldown
 	set_skill_state(_bound_character.get_skill_icon_text(), _bound_character.get_skill_name(), status)
-	_update_boost_status()
+	_update_racing_action_status()
 
 func configure(title: String, message: String) -> void:
 	_title_label.text = title
@@ -137,14 +144,21 @@ func _resolve_racing_actions() -> void:
 		return
 	_racing_actions = parent.get_node_or_null("RacingActionController") as WildDashRacingActionController
 
-func _update_boost_status() -> void:
+func _update_racing_action_status() -> void:
 	_resolve_racing_actions()
 	if _racing_actions == null:
 		_boost_label.text = ""
+		_body_check_label.text = ""
 		return
+
 	var percent: int = int(round(_racing_actions.get_boost_energy_ratio() * 100.0))
 	var blocks: int = clampi(int(round(float(percent) / 10.0)), 0, 10)
 	var meter: String = ""
 	for index: int in range(10):
 		meter += "■" if index < blocks else "□"
 	_boost_label.text = "BOOST ENERGY  [%s] %3d%%  ·  %s" % [meter, percent, _racing_actions.get_boost_status_text()]
+
+	var power: float = 0.0
+	if _bound_character != null:
+		power = WildDashRacingActionController.get_body_check_power(_bound_character.animal_id)
+	_body_check_label.text = "BODY CHECK  POWER %.1f  ·  %s" % [power, _racing_actions.get_body_check_status_text()]
