@@ -6,6 +6,7 @@ extends Node3D
 ## landmark pylons from existing route points. No CollisionObject3D is created.
 
 const GUARDRAIL_SEGMENTS_PER_BATCH := 6
+const RAIL_SIDES: Array[float] = [-1.0, 1.0]
 
 @export var track_id: StringName = &"grand_prix"
 @export var beacon_stride := 4
@@ -111,7 +112,7 @@ func _build_arch(point: Vector3, tangent: Vector3, node_name: String, palette: D
 	var structure := _material(palette["structure"], 0.52, 0.35)
 	var primary := _material(palette["primary"], 0.50, 0.05, bool(palette["emission"]))
 	var secondary := _material(palette["secondary"], 0.48, 0.02, bool(palette["emission"]))
-	for side in [-1.0, 1.0]:
+	for side in RAIL_SIDES:
 		_add_box(root, "ArchPost", right * side * 6.4 + Vector3.UP * 2.6, Vector3(0.42, 5.2, 0.52), structure)
 		_add_box(root, "AccentPost", right * side * 6.4 + Vector3.UP * 3.2 - tangent * 0.30, Vector3(0.52, 2.3, 0.22), primary if side < 0.0 else secondary)
 	_add_box(root, "TopBeam", Vector3.UP * 5.05, Vector3(13.2, 0.55, 0.65), structure)
@@ -131,7 +132,7 @@ func _build_route_beacons(route: Array[Vector3], palette: Dictionary) -> void:
 			continue
 		tangent = tangent.normalized()
 		var right := Vector3(-tangent.z, 0.0, tangent.x)
-		for side in [-1.0, 1.0]:
+		for side in RAIL_SIDES:
 			var root := Node3D.new()
 			root.name = "RouteBeacon_%02d_%s" % [index, "L" if side < 0.0 else "R"]
 			root.position = route[index] + right * beacon_offset * side
@@ -141,30 +142,30 @@ func _build_route_beacons(route: Array[Vector3], palette: Dictionary) -> void:
 			_add_box(root, "Reflector", Vector3(0, 0.56, 0), Vector3(0.20, 0.26, 0.14), secondary if side < 0.0 else primary)
 
 func _build_continuous_guardrails(route: Array[Vector3], palette: Dictionary) -> void:
-	var rail_offset := float(palette.get("rail_offset", maxf(6.4, beacon_offset - 1.8)))
-	var upper_height := float(palette.get("rail_upper_height", 1.34))
-	var lower_height := float(palette.get("rail_lower_height", 0.62))
-	var primary := _material(palette["primary"], 0.42, 0.18, bool(palette["emission"]))
-	var secondary := _material(palette["secondary"], 0.48, 0.12, bool(palette["emission"]))
+	var rail_offset: float = float(palette.get("rail_offset", maxf(6.4, beacon_offset - 1.8)))
+	var upper_height: float = float(palette.get("rail_upper_height", 1.34))
+	var lower_height: float = float(palette.get("rail_lower_height", 0.62))
+	var primary: StandardMaterial3D = _material(palette["primary"], 0.42, 0.18, bool(palette["emission"]))
+	var secondary: StandardMaterial3D = _material(palette["secondary"], 0.48, 0.12, bool(palette["emission"]))
 	var upper_batch: Array[Transform3D] = []
 	var lower_batch: Array[Transform3D] = []
-	var batch_index := 0
-	var segment_in_batch := 0
-	var total_segments := 0
-	var total_upper := 0
-	var total_lower := 0
+	var batch_index: int = 0
+	var segment_in_batch: int = 0
+	var total_segments: int = 0
+	var total_upper: int = 0
+	var total_lower: int = 0
 
 	for index in range(route.size() - 1):
-		var a := route[index]
-		var b := route[index + 1]
-		var planar := b - a
+		var a: Vector3 = route[index]
+		var b: Vector3 = route[index + 1]
+		var planar: Vector3 = b - a
 		planar.y = 0.0
 		if planar.length_squared() <= 0.001:
 			continue
-		var direction := planar.normalized()
-		var right := Vector3(-direction.z, 0.0, direction.x)
-		for side in [-1.0, 1.0]:
-			var lateral := right * rail_offset * side
+		var direction: Vector3 = planar.normalized()
+		var right: Vector3 = Vector3(-direction.z, 0.0, direction.x)
+		for side in RAIL_SIDES:
+			var lateral: Vector3 = right * rail_offset * side
 			upper_batch.append(_beam_transform(
 				a + lateral + Vector3.UP * upper_height,
 				b + lateral + Vector3.UP * upper_height,
@@ -177,7 +178,7 @@ func _build_continuous_guardrails(route: Array[Vector3], palette: Dictionary) ->
 			))
 		total_segments += 1
 		segment_in_batch += 1
-		var flush_batch := segment_in_batch >= GUARDRAIL_SEGMENTS_PER_BATCH or index == route.size() - 2
+		var flush_batch: bool = segment_in_batch >= GUARDRAIL_SEGMENTS_PER_BATCH or index == route.size() - 2
 		if flush_batch:
 			_add_box_multimesh("ContinuousGuardrailUpper_%02d" % batch_index, upper_batch, primary, true)
 			_add_box_multimesh("ContinuousGuardrailLower_%02d" % batch_index, lower_batch, secondary, true)
