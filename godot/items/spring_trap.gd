@@ -47,6 +47,12 @@ func _on_body_entered(body: Node) -> void:
 		ItemSystem.apply_attack(racer, owner_racer, &"spring_trap", 0.0, 1.0, 0.0)
 		queue_free()
 		return
-	racer.velocity.y = maxf(racer.velocity.y, racer.jump_velocity * 0.76)
-	racer.current_speed *= 0.86
+	var defense: float = WildDashRaceCombatBalance.get_defense_rating(racer.animal_id)
+	var launch_multiplier: float = WildDashRaceCombatBalance.get_trap_launch_multiplier(racer.animal_id)
+	var disruption: float = WildDashRaceCombatBalance.get_item_disruption_multiplier(racer.animal_id)
+	var launch_velocity: float = racer.jump_velocity * 0.76 * launch_multiplier
+	racer.velocity.y = maxf(racer.velocity.y, launch_velocity)
+	var speed_retention: float = clampf(0.86 + (1.0 - disruption) * 0.24, 0.86, 0.97)
+	racer.current_speed *= speed_retention
+	print("SPRING TRAP DEFENSE target=%s defense=%.1f launch=%.2f retention=%.2f" % [RaceManager.get_racer_label(racer), defense, launch_velocity, speed_retention])
 	queue_free()
