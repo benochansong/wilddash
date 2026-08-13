@@ -8,6 +8,8 @@ const GRAND_PRIX_THEME_PATH := "res://audio/music/wild_dash_race_theme.ogg"
 const NEON_HARBOR_THEME_PATH := "res://audio/music/wild_dash_race_theme_alt.ogg"
 const SNOWPEAK_THEME_PATH := "res://audio/music/wild_dash_snowpeak_theme.ogg"
 const PUSH_OUT_THEME_PATH := "res://audio/music/wild_dash_arena_theme_alt.ogg"
+const FRUIT_COLLECTION_THEME_PATH := "res://audio/music/wild_dash_fruit_collection_theme.ogg"
+const RESULT_THEME_PATH := "res://audio/music/wild_dash_result_theme.ogg"
 
 var muted := false
 var master_volume := 0.85
@@ -138,6 +140,8 @@ func _load_external_music() -> void:
 	_load_external_theme("race_neon_harbor", NEON_HARBOR_THEME_PATH)
 	_load_external_theme("race_snowpeak", SNOWPEAK_THEME_PATH)
 	_load_external_theme("arena_push_out", PUSH_OUT_THEME_PATH)
+	_load_external_theme("arena_fruit_collection", FRUIT_COLLECTION_THEME_PATH)
+	_load_external_theme("result", RESULT_THEME_PATH)
 
 func _load_external_theme(theme_id: String, path: String) -> void:
 	if not ResourceLoader.exists(path):
@@ -167,6 +171,7 @@ func _build_procedural_audio() -> void:
 	_themes["race_snowpeak"] = _themes["race"]
 	_themes["arena"] = _make_theme([174.61, 261.63, 349.23], 3.6, 0.18)
 	_themes["arena_push_out"] = _themes["arena"]
+	_themes["arena_fruit_collection"] = _themes["arena"]
 	_themes["result"] = _make_theme([261.63, 329.63, 392.0], 4.4, 0.15)
 	_sfx_library["ui"] = _make_tone(660.0, 0.07, 0.32)
 	_sfx_library["jump"] = _make_sweep(360.0, 720.0, 0.12, 0.28)
