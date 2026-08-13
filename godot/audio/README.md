@@ -9,10 +9,12 @@ WILD DASH의 실제 WAV/OGG SFX와 BGM을 배치합니다.
 게임용 Ogg Vorbis 파일은 `godot/audio/music/` 아래에 둡니다.
 
 - `wild_dash_race_theme.ogg` → Wild World Grand Prix
+- `wild_dash_fruit_collection_theme.ogg` → Fruit Collection
 - `wild_dash_race_theme_alt.ogg` → Neon Harbor Night Race
-- `wild_dash_snowpeak_theme.ogg` → Snowpeak Winter Rally
 - `wild_dash_arena_theme_alt.ogg` → Push Out
-- Fruit Collection / 메뉴 / 결과화면 → 현재 procedural BGM fallback 사용
+- `wild_dash_snowpeak_theme.ogg` → Snowpeak Winter Rally
+- `wild_dash_result_theme.ogg` → Result 화면
+- 메뉴 / Round Break / Floor Collapse Free Play → 현재 procedural BGM fallback 사용
 
 외부 음악 파일이 없거나 로드되지 않으면 `AudioManager`가 기존 procedural BGM으로 안전하게 fallback합니다.
 
