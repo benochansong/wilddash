@@ -7,11 +7,12 @@ const ACTION_BRAKE: StringName = &"brake"
 const ACTION_JUMP: StringName = &"jump"
 const ACTION_SKILL: StringName = &"skill"
 const ACTION_ITEM: StringName = &"item"
+const ACTION_BUMP: StringName = &"race_bump"
 const ACTION_PAUSE: StringName = &"pause"
 
 const GAME_ACTIONS: Array[StringName] = [
 	ACTION_LEFT, ACTION_RIGHT, ACTION_ACCELERATE, ACTION_BRAKE,
-	ACTION_JUMP, ACTION_SKILL, ACTION_ITEM, ACTION_PAUSE,
+	ACTION_JUMP, ACTION_SKILL, ACTION_ITEM, ACTION_BUMP, ACTION_PAUSE,
 ]
 
 const DEFAULT_KEYS: Dictionary = {
@@ -22,6 +23,7 @@ const DEFAULT_KEYS: Dictionary = {
 	"jump": [KEY_SPACE],
 	"skill": [KEY_E],
 	"item": [KEY_Q],
+	"race_bump": [KEY_F],
 	"pause": [KEY_ESCAPE, KEY_P],
 }
 
@@ -62,6 +64,7 @@ func sample_racer_input_state() -> WildDashRacerInputState:
 	state.jump_pressed = consume_jump()
 	state.skill_pressed = consume_skill()
 	state.item_pressed = consume_item()
+	state.bump_pressed = consume_race_bump()
 	state.sequence = _input_sequence
 	return state
 
@@ -74,6 +77,7 @@ func get_input_debug_snapshot() -> Dictionary:
 		"throttle": get_throttle_axis(),
 		"accelerate_binding": get_keyboard_binding_text(ACTION_ACCELERATE),
 		"brake_binding": get_keyboard_binding_text(ACTION_BRAKE),
+		"bump_binding": get_keyboard_binding_text(ACTION_BUMP),
 	}
 
 func consume_jump() -> bool:
@@ -84,6 +88,9 @@ func consume_skill() -> bool:
 
 func consume_item() -> bool:
 	return Input.is_action_just_pressed(ACTION_ITEM)
+
+func consume_race_bump() -> bool:
+	return Input.is_action_just_pressed(ACTION_BUMP)
 
 func consume_pause() -> bool:
 	return Input.is_action_just_pressed(ACTION_PAUSE)
@@ -138,6 +145,7 @@ func get_gamepad_hint(action: StringName) -> String:
 		ACTION_JUMP: return "A"
 		ACTION_SKILL: return "X"
 		ACTION_ITEM: return "B"
+		ACTION_BUMP: return "Y"
 		ACTION_PAUSE: return "Start"
 		ACTION_LEFT, ACTION_RIGHT, ACTION_ACCELERATE, ACTION_BRAKE: return "Left Stick / D-Pad"
 		_: return ""
@@ -171,6 +179,7 @@ func _ensure_core_keyboard_safety_aliases() -> void:
 	_ensure_key_event(ACTION_ACCELERATE, KEY_UP)
 	_ensure_key_event(ACTION_BRAKE, KEY_S)
 	_ensure_key_event(ACTION_BRAKE, KEY_DOWN)
+	_ensure_key_event(ACTION_BUMP, KEY_F)
 
 func _ensure_key_event(action: StringName, keycode: Key) -> void:
 	for existing: InputEvent in InputMap.action_get_events(action):
@@ -194,6 +203,7 @@ func _add_default_gamepad() -> void:
 	_add_joy_button(ACTION_JUMP, JOY_BUTTON_A)
 	_add_joy_button(ACTION_SKILL, JOY_BUTTON_X)
 	_add_joy_button(ACTION_ITEM, JOY_BUTTON_B)
+	_add_joy_button(ACTION_BUMP, JOY_BUTTON_Y)
 	_add_joy_button(ACTION_PAUSE, JOY_BUTTON_START)
 
 func _add_joy_button(action: StringName, button_index: JoyButton) -> void:
