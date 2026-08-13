@@ -25,20 +25,56 @@ const DEFAULT_KEYS: Dictionary = {
 	"pause": [KEY_ESCAPE, KEY_P],
 }
 
+var _input_sequence := 0
+
 func _ready() -> void:
 	for action: StringName in GAME_ACTIONS:
 		_ensure_action(action)
 		_add_default_keyboard(action)
 	_add_default_gamepad()
+	# Saved single-key bindings from older builds can erase the default aliases.
+	# Keep the canonical WASD/arrow driving controls available as safety aliases.
+	_ensure_core_keyboard_safety_aliases()
 
 func get_steer_axis() -> float:
 	return Input.get_axis(ACTION_LEFT, ACTION_RIGHT)
 
 func get_throttle_axis() -> float:
-	return Input.get_action_strength(ACTION_ACCELERATE) - Input.get_action_strength(ACTION_BRAKE)
+	var accelerate_strength := Input.get_action_strength(ACTION_ACCELERATE)
+	var brake_strength := Input.get_action_strength(ACTION_BRAKE)
+	# Physical-key fallback protects the core drive controls even if an old save
+	# contains a stale/partial binding map. This is intentionally limited to
+	# movement safety aliases; skill/item custom bindings remain user-controlled.
+	if Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP):
+		accelerate_strength = maxf(accelerate_strength, 1.0)
+	if Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN):
+		brake_strength = maxf(brake_strength, 1.0)
+	return clampf(accelerate_strength - brake_strength, -1.0, 1.0)
 
 func get_move_vector() -> Vector2:
 	return Input.get_vector(ACTION_LEFT, ACTION_RIGHT, ACTION_ACCELERATE, ACTION_BRAKE, 0.2)
+
+func sample_racer_input_state() -> WildDashRacerInputState:
+	_input_sequence += 1
+	var state := WildDashRacerInputState.new()
+	state.steer = get_steer_axis()
+	state.throttle = get_throttle_axis()
+	state.jump_pressed = consume_jump()
+	state.skill_pressed = consume_skill()
+	state.item_pressed = consume_item()
+	state.sequence = _input_sequence
+	return state
+
+func get_input_debug_snapshot() -> Dictionary:
+	return {
+		"w_pressed": Input.is_physical_key_pressed(KEY_W),
+		"up_pressed": Input.is_physical_key_pressed(KEY_UP),
+		"accelerate_action": Input.get_action_strength(ACTION_ACCELERATE),
+		"brake_action": Input.get_action_strength(ACTION_BRAKE),
+		"throttle": get_throttle_axis(),
+		"accelerate_binding": get_keyboard_binding_text(ACTION_ACCELERATE),
+		"brake_binding": get_keyboard_binding_text(ACTION_BRAKE),
+	}
 
 func consume_jump() -> bool:
 	return Input.is_action_just_pressed(ACTION_JUMP)
@@ -62,6 +98,7 @@ func rebind_keyboard(action: StringName, physical_keycode: int) -> bool:
 	var replacement := InputEventKey.new()
 	replacement.physical_keycode = physical_keycode
 	InputMap.action_add_event(action, replacement)
+	_ensure_core_keyboard_safety_aliases()
 	return true
 
 func export_keyboard_bindings() -> Dictionary:
@@ -87,6 +124,7 @@ func apply_keyboard_bindings(bindings: Dictionary) -> void:
 		var keycode: int = int(raw_key)
 		if keycode != int(KEY_NONE):
 			rebind_keyboard(action, keycode)
+	_ensure_core_keyboard_safety_aliases()
 
 func get_keyboard_binding_text(action: StringName) -> String:
 	for event: InputEvent in InputMap.action_get_events(action):
@@ -123,6 +161,26 @@ func _add_default_keyboard(action: StringName) -> void:
 		var event := InputEventKey.new()
 		event.physical_keycode = int(code)
 		InputMap.action_add_event(action, event)
+
+func _ensure_core_keyboard_safety_aliases() -> void:
+	_ensure_key_event(ACTION_LEFT, KEY_A)
+	_ensure_key_event(ACTION_LEFT, KEY_LEFT)
+	_ensure_key_event(ACTION_RIGHT, KEY_D)
+	_ensure_key_event(ACTION_RIGHT, KEY_RIGHT)
+	_ensure_key_event(ACTION_ACCELERATE, KEY_W)
+	_ensure_key_event(ACTION_ACCELERATE, KEY_UP)
+	_ensure_key_event(ACTION_BRAKE, KEY_S)
+	_ensure_key_event(ACTION_BRAKE, KEY_DOWN)
+
+func _ensure_key_event(action: StringName, keycode: Key) -> void:
+	for existing: InputEvent in InputMap.action_get_events(action):
+		if existing is InputEventKey:
+			var key_event := existing as InputEventKey
+			if key_event.physical_keycode == keycode or key_event.keycode == keycode:
+				return
+	var event := InputEventKey.new()
+	event.physical_keycode = keycode
+	InputMap.action_add_event(action, event)
 
 func _add_default_gamepad() -> void:
 	_add_joy_axis(ACTION_LEFT, JOY_AXIS_LEFT_X, -1.0)
