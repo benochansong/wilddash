@@ -93,18 +93,18 @@ func _spawn_client_remote_proxies() -> void:
 		var state := roster[peer_id] as Dictionary
 		var animal := StringName(String(state.get("animal_id", "dog")))
 		var spawn := _local_player.global_position + Vector3(float(slot) * 2.4, 0.05, 1.8)
-		_client_remote_proxies[peer_id] = _instantiate_network_racer("RemotePeer_%d" % peer_id, animal, spawn, false)
+		# Client copies also register with RaceManager so rank/field counts match
+		# the host. They have no AI driver and are moved only by host snapshots.
+		_client_remote_proxies[peer_id] = _instantiate_network_racer("RemotePeer_%d" % peer_id, animal, spawn, true)
 		slot += 1
 
-func _instantiate_network_racer(node_name: String, animal: StringName, position: Vector3, authoritative_race_body: bool) -> WildDashCharacterController:
+func _instantiate_network_racer(node_name: String, animal: StringName, position: Vector3, race_body: bool) -> WildDashCharacterController:
 	var racer := RACER_SCENE.instantiate() as WildDashCharacterController
 	if racer == null:
 		return null
 	racer.name = node_name
 	racer.is_player = false
-	# Host copies participate in RaceManager/finish order. Client presentation
-	# proxies use ARENA mode so they do not pollute the local race roster.
-	racer.movement_mode = WildDashCharacterController.MovementMode.RACE if authoritative_race_body else WildDashCharacterController.MovementMode.ARENA
+	racer.movement_mode = WildDashCharacterController.MovementMode.RACE if race_body else WildDashCharacterController.MovementMode.ARENA
 	racer.animal_id = animal if WildDashAnimalCatalog.is_playable(animal) else &"dog"
 	racer.position = position
 	_mode.add_child(racer)
@@ -214,7 +214,7 @@ func _client_receive_authoritative_state(snapshot: Array) -> void:
 			var roster := NetworkManager.get_players()
 			var player_state := roster.get(peer_id, {}) as Dictionary
 			var animal := StringName(String(player_state.get("animal_id", "dog")))
-			proxy = _instantiate_network_racer("RemotePeer_%d" % peer_id, animal, position, false)
+			proxy = _instantiate_network_racer("RemotePeer_%d" % peer_id, animal, position, true)
 			_client_remote_proxies[peer_id] = proxy
 		if proxy != null:
 			proxy.global_position = proxy.global_position.lerp(position, 0.42)
