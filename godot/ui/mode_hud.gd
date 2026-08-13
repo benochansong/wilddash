@@ -159,4 +159,8 @@ func _update_racing_action_status() -> void:
 	_boost_label.text = "BOOST ENERGY  [%s] %3d%%  ·  %s" % [meter, percent, _racing_actions.get_boost_status_text()]
 
 	var power: float = _racing_actions.get_current_body_check_power()
-	_body_check_label.text = "BODY CHECK  POWER %.1f  ·  %s" % [power, _racing_actions.get_body_check_status_text()]
+	_body_check_label.text = "%s  POWER %.1f  ·  %s" % [
+		_racing_actions.get_contact_action_name(),
+		power,
+		_racing_actions.get_body_check_status_text(),
+	]
