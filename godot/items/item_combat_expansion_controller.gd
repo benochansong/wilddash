@@ -13,6 +13,8 @@ const AI_DECISION_INTERVAL := 0.20
 const EXPANSION_REPLACE_CHANCE := 0.34
 const TURBO_CHILI_DURATION := 2.35
 const SWAP_BOOST_DURATION := 1.75
+const NORMAL_AI_HOLD_MSEC := 650
+const HARD_AI_HOLD_MSEC := 420
 
 var _rng := RandomNumberGenerator.new()
 var _buffer_until_msec := 0
@@ -21,10 +23,15 @@ var _buffer_reported_empty := false
 var _ai_elapsed := 0.0
 var _boost_effects: Dictionary = {}
 var _expansion_history: Dictionary = {}
+var _expanded_ready_at_msec: Dictionary = {}
 var _reported_ready := false
 
 func _ready() -> void:
-	_rng.randomize()
+	if OS.has_environment("WILDDASH_BALANCE_SEED"):
+		_rng.seed = int(OS.get_environment("WILDDASH_BALANCE_SEED"))
+		print("ITEM EXPANSION RNG seed=%d source=balance" % _rng.seed)
+	else:
+		_rng.randomize()
 	if not ItemSystem.item_granted.is_connected(_on_item_granted):
 		ItemSystem.item_granted.connect(_on_item_granted)
 	set_process_input(true)
@@ -47,7 +54,8 @@ func _physics_process(delta: float) -> void:
 	_update_boost_effects()
 	_resolve_player_input_buffer()
 	_ai_elapsed += delta
-	if _ai_elapsed >= AI_DECISION_INTERVAL:
+	var decision_interval := 0.16 if GameManager.difficulty == &"nightmare" else AI_DECISION_INTERVAL
+	if _ai_elapsed >= decision_interval:
 		_ai_elapsed = 0.0
 		_update_ai_expanded_items()
 	if not _reported_ready and _resolve_player() != null:
@@ -81,6 +89,7 @@ func use_expanded_item(character: WildDashCharacterController, item_id: StringNa
 			used = _use_swap_boost(character)
 	if not used:
 		return false
+	_expanded_ready_at_msec.erase(character.get_instance_id())
 	character.set_held_item(&"")
 	character.set_meta(&"wilddash_last_expanded_item", item_id)
 	ItemSystem.item_used.emit(character, item_id)
@@ -96,9 +105,6 @@ func _resolve_player_input_buffer() -> void:
 	var player := _resolve_player()
 	if player != null and _buffer_item_at_press != &"":
 		var current := player.get_held_item()
-		# The legacy CharacterController also consumes Q/B. If it already used the
-		# item successfully, stop here so this 170ms buffer cannot auto-fire a new
-		# Item Box pickup that happens immediately afterwards.
 		if current == &"" or current != _buffer_item_at_press:
 			_clear_input_buffer()
 			return
@@ -133,9 +139,6 @@ func _try_use_any_item(character: WildDashCharacterController, item_id: StringNa
 	if ItemSystem.use_held_item(character):
 		AudioManager.play_sfx_id("item", 1.0)
 		return true
-	# Rocket Nut used to fail silently whenever no valid homing target existed.
-	# Preserve homing when possible, but fire a straight, wall-aware projectile
-	# instead of eating the player's button press when the road ahead is empty.
 	if item_id == ItemSystem.ROCKET_NUT:
 		return _fire_rocket_forward_fallback(character)
 	return false
@@ -170,6 +173,7 @@ func _on_item_granted(character: Node, item_id: StringName) -> void:
 		return
 	racer.set_held_item(replacement)
 	_record_expansion_history(racer, replacement)
+	_expanded_ready_at_msec[racer.get_instance_id()] = Time.get_ticks_msec() + _ai_hold_msec()
 	print("ITEM EXPANSION ROLL racer=%s base=%s replacement=%s" % [
 		RaceManager.get_racer_label(racer), ItemSystem.get_display_name(item_id), CATALOG.get_display_name(replacement),
 	])
@@ -301,6 +305,7 @@ func _update_boost_effects() -> void:
 func _update_ai_expanded_items() -> void:
 	if not RaceManager.active:
 		return
+	var now_msec := Time.get_ticks_msec()
 	for racer_node in RaceManager.racers:
 		if not racer_node is WildDashCharacterController:
 			continue
@@ -309,8 +314,19 @@ func _update_ai_expanded_items() -> void:
 			continue
 		var item_id := racer.get_held_item()
 		if not CATALOG.is_expanded(item_id):
+			_expanded_ready_at_msec.erase(racer.get_instance_id())
 			continue
-		if _ai_utility(racer, item_id) >= 0.62:
+		var id := racer.get_instance_id()
+		if not _expanded_ready_at_msec.has(id):
+			_expanded_ready_at_msec[id] = now_msec + _ai_hold_msec()
+			continue
+		if now_msec < int(_expanded_ready_at_msec[id]):
+			continue
+		var threshold := 0.58 if GameManager.difficulty == &"nightmare" else 0.64
+		var rank := RaceManager.get_rank(racer)
+		if rank > int(ceil(float(maxi(1, RaceManager.racers.size())) * 0.66)):
+			threshold -= 0.04
+		if _ai_utility(racer, item_id) >= threshold:
 			use_expanded_item(racer, item_id)
 
 func _ai_utility(racer: WildDashCharacterController, item_id: StringName) -> float:
@@ -321,7 +337,7 @@ func _ai_utility(racer: WildDashCharacterController, item_id: StringName) -> flo
 		CATALOG.SNOWBALL:
 			return 0.86 if ItemSystem.has_target_ahead(racer, 46.0) else 0.46
 		CATALOG.BEE_SWARM:
-			return 0.88 if ItemSystem.has_target_ahead(racer, 58.0) else 0.52
+			return 0.90 if ItemSystem.has_target_ahead(racer, 58.0) else 0.52
 		CATALOG.TURBO_CHILI:
 			return 0.54 + back_ratio * 0.38
 		CATALOG.MUD_SPLASH:
@@ -331,6 +347,9 @@ func _ai_utility(racer: WildDashCharacterController, item_id: StringName) -> flo
 		CATALOG.SWAP_BOOST:
 			return 0.48 + back_ratio * 0.48
 	return 0.0
+
+func _ai_hold_msec() -> int:
+	return HARD_AI_HOLD_MSEC if GameManager.difficulty == &"nightmare" else NORMAL_AI_HOLD_MSEC
 
 func _safe_forward_spawn(character: WildDashCharacterController, distance: float, height: float) -> Vector3:
 	var forward := -character.global_transform.basis.z.normalized()

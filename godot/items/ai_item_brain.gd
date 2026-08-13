@@ -1,13 +1,17 @@
 class_name WildDashAIItemBrain
 extends Node
 
-const DECISION_INTERVAL := 0.20 # 5 Hz: enough reaction without per-frame pack scans.
+const NORMAL_DECISION_INTERVAL := 0.20
+const HARD_DECISION_INTERVAL := 0.16
+const NORMAL_MIN_HOLD_SECONDS := 0.65
+const HARD_MIN_HOLD_SECONDS := 0.42
 
 var _racer: WildDashCharacterController
 var _driver: WildDashAIController
 var _think_elapsed := 0.0
 var _held_age := 0.0
 var _last_item: StringName = &""
+var _items_used := 0
 
 func configure(racer: WildDashCharacterController, driver: WildDashAIController) -> void:
 	_racer = racer
@@ -26,7 +30,8 @@ func _process(delta: float) -> void:
 		_held_age = 0.0
 	_held_age += delta
 	_think_elapsed += delta
-	if _think_elapsed < DECISION_INTERVAL:
+	var interval := HARD_DECISION_INTERVAL if GameManager.difficulty == &"nightmare" else NORMAL_DECISION_INTERVAL
+	if _think_elapsed < interval:
 		return
 	_think_elapsed = 0.0
 	evaluate_and_use_now()
@@ -37,15 +42,29 @@ func evaluate_and_use_now() -> bool:
 	var item_id := _racer.get_held_item()
 	if item_id == &"":
 		return false
+	var minimum_hold := HARD_MIN_HOLD_SECONDS if GameManager.difficulty == &"nightmare" else NORMAL_MIN_HOLD_SECONDS
+	# Recovery Feather may be used faster when the racer is genuinely crawling.
+	if item_id == ItemSystem.RECOVERY_FEATHER and _driver != null and _racer.current_speed < _driver.target_speed * 0.45:
+		minimum_hold = 0.20
+	if _held_age < minimum_hold:
+		return false
+
 	var utility := _utility_for_item(item_id)
-	var threshold := 0.62
+	var rank := RaceManager.get_rank(_racer)
+	var total := maxi(1, RaceManager.racers.size())
+	var threshold := 0.58 if GameManager.difficulty == &"nightmare" else 0.64
+	if rank > int(ceil(float(total) * 0.66)):
+		threshold -= 0.04
 	if _held_age >= 4.0:
 		threshold = 0.36
 	if utility < threshold:
 		return false
 	var used := ItemSystem.use_held_item(_racer)
 	if used:
-		print("AI ITEM USE racer=%s item=%s utility=%.2f rank=%d" % [RaceManager.get_racer_label(_racer), ItemSystem.get_display_name(item_id), utility, RaceManager.get_rank(_racer)])
+		_items_used += 1
+		print("AI ITEM USE racer=%s item=%s utility=%.2f threshold=%.2f age=%.2f rank=%d" % [
+			RaceManager.get_racer_label(_racer), ItemSystem.get_display_name(item_id), utility, threshold, _held_age, rank,
+		])
 		if ItemSystem.is_new_item(item_id):
 			print("AI NEW ITEM USE racer=%s item=%s utility=%.2f" % [RaceManager.get_racer_label(_racer), ItemSystem.get_display_name(item_id), utility])
 		_last_item = &""
@@ -54,6 +73,9 @@ func evaluate_and_use_now() -> bool:
 
 func get_utility_score_for_test(item_id: StringName) -> float:
 	return _utility_for_item(item_id)
+
+func get_balance_telemetry() -> Dictionary:
+	return {"item_uses": _items_used}
 
 func _utility_for_item(item_id: StringName) -> float:
 	var rank := RaceManager.get_rank(_racer)
@@ -65,17 +87,17 @@ func _utility_for_item(item_id: StringName) -> float:
 			return 0.38 + straight_bonus + back_ratio * 0.18
 		ItemSystem.BUBBLE_SHIELD:
 			var nearby := ItemSystem.count_racers_near(_racer, 6.0)
-			return 0.38 + minf(0.34, float(nearby) * 0.13) + (0.12 if rank <= 3 else 0.0)
+			return 0.38 + minf(0.34, float(nearby) * 0.13) + (0.16 if rank <= 3 else 0.0)
 		ItemSystem.STICKY_FRUIT:
-			return 0.82 if ItemSystem.has_racer_behind(_racer, 10.0) else 0.24 + (0.16 if rank <= 3 else 0.0)
+			return 0.86 if ItemSystem.has_racer_behind(_racer, 10.0) else 0.24 + (0.18 if rank <= 3 else 0.0)
 		ItemSystem.SHOCKWAVE:
 			var crowded := ItemSystem.count_racers_near(_racer, 7.0)
 			return 0.25 + minf(0.62, float(crowded) * 0.24) + back_ratio * 0.12
 		ItemSystem.ROCKET_NUT:
-			return 0.86 if ItemSystem.has_target_ahead(_racer, 48.0) else 0.18
+			return 0.88 if ItemSystem.has_target_ahead(_racer, 48.0) else 0.18
 		ItemSystem.RECOVERY_FEATHER:
-			var target_speed := _driver.target_speed if _driver != null else _racer.max_speed
-			var struggling := _racer.current_speed < target_speed * 0.72
+			var active_target_speed := _driver.target_speed if _driver != null else _racer.max_speed
+			var struggling := _racer.current_speed < active_target_speed * 0.72
 			var progress := RaceManager.get_progress_percent(_racer)
 			var shortcut_window := progress >= 65.0 and progress <= 82.0
 			return 0.42 + (0.38 if struggling else 0.0) + (0.22 if shortcut_window else 0.0) + back_ratio * 0.14
@@ -91,7 +113,7 @@ func _utility_for_item(item_id: StringName) -> float:
 				return 0.66 + back_ratio * 0.08
 			return 0.20
 		ItemSystem.BANANA_PEEL:
-			return 0.88 if ItemSystem.has_racer_behind(_racer, 9.5) else 0.26 + (0.12 if rank <= 3 else 0.0)
+			return 0.90 if ItemSystem.has_racer_behind(_racer, 9.5) else 0.26 + (0.14 if rank <= 3 else 0.0)
 		ItemSystem.MAGNET:
 			return 0.84 if ItemSystem.is_item_station_ahead(_racer, 34.0) else 0.28 + back_ratio * 0.10
 		ItemSystem.WIND_BOOST:
@@ -103,7 +125,7 @@ func _utility_for_item(item_id: StringName) -> float:
 				return 0.88
 			if not _is_long_straight():
 				return 0.68
-			return 0.30 + (0.10 if rank <= 3 else 0.0)
+			return 0.30 + (0.12 if rank <= 3 else 0.0)
 	return 0.0
 
 func _is_long_straight() -> bool:
