@@ -1,15 +1,15 @@
 class_name WildDashTrackProductionDressing
 extends Node3D
 
-## Visual-only RC7 production dressing for race tracks.
-## Builds readable hero arches, route beacons and landmark pylons from the
-## existing route points. No CollisionObject3D is created and gameplay route,
-## checkpoints, shortcuts, obstacles and AI remain untouched.
+## Visual-only RC7/RC9 production dressing for race tracks.
+## Builds readable hero arches, route beacons, continuous edge rails and
+## landmark pylons from existing route points. No CollisionObject3D is created.
 
 @export var track_id: StringName = &"grand_prix"
 @export var beacon_stride := 4
 @export var beacon_offset := 8.6
 @export var enable_finish_arch := true
+@export var enable_continuous_guardrail := true
 
 var _art_root: Node3D
 
@@ -37,9 +37,12 @@ func _build_when_track_ready() -> void:
 	if enable_finish_arch:
 		_build_arch(route[-1], route[-1] - route[-2], "FinishHeroArch", palette, true)
 	_build_route_beacons(route, palette)
+	if enable_continuous_guardrail:
+		_build_continuous_guardrails(route, palette)
 	_build_landmark_pylons(route, palette)
-	print("RC7 PRODUCTION ART track=%s beacons=%d route_points=%d collision=false" % [
-		track_id, int(ceil(float(route.size()) / maxf(1.0, float(beacon_stride)))) * 2, route.size(),
+	print("RC9 PRODUCTION ART track=%s beacons=%d route_points=%d continuous_guardrail=%s collision=false" % [
+		track_id, int(ceil(float(route.size()) / maxf(1.0, float(beacon_stride)))) * 2,
+		route.size(), str(enable_continuous_guardrail),
 	])
 
 func _find_track(node: Node) -> Node:
@@ -68,20 +71,29 @@ func _palette() -> Dictionary:
 				"secondary": Color(1.0, 0.16, 0.72, 1.0),
 				"structure": Color(0.10, 0.16, 0.28, 1.0),
 				"emission": true,
+				"rail_offset": 6.85,
+				"rail_upper_height": 1.42,
+				"rail_lower_height": 0.68,
 			}
 		&"snowpeak_winter_rally":
 			return {
 				"primary": Color(1.0, 0.36, 0.12, 1.0),
-				"secondary": Color(0.12, 0.62, 0.92, 1.0),
+				"secondary": Color(0.95, 0.92, 0.80, 1.0),
 				"structure": Color(0.20, 0.28, 0.38, 1.0),
 				"emission": false,
+				"rail_offset": 6.65,
+				"rail_upper_height": 1.38,
+				"rail_lower_height": 0.62,
 			}
 		_:
 			return {
-				"primary": Color(0.06, 0.76, 0.80, 1.0),
-				"secondary": Color(1.0, 0.45, 0.12, 1.0),
-				"structure": Color(0.22, 0.16, 0.10, 1.0),
+				"primary": Color(0.08, 0.82, 0.72, 1.0),
+				"secondary": Color(1.0, 0.48, 0.10, 1.0),
+				"structure": Color(0.25, 0.17, 0.09, 1.0),
 				"emission": false,
+				"rail_offset": 6.75,
+				"rail_upper_height": 1.34,
+				"rail_lower_height": 0.60,
 			}
 
 func _build_arch(point: Vector3, tangent: Vector3, node_name: String, palette: Dictionary, finish: bool) -> void:
@@ -125,6 +137,68 @@ func _build_route_beacons(route: Array[Vector3], palette: Dictionary) -> void:
 			_add_cylinder(root, "Pole", Vector3.UP * 1.15, 0.075, 2.3, structure)
 			_add_box(root, "Flag", Vector3(side * 0.34, 1.78, 0), Vector3(0.64, 0.72, 0.08), primary if side < 0.0 else secondary)
 			_add_box(root, "Reflector", Vector3(0, 0.56, 0), Vector3(0.20, 0.26, 0.14), secondary if side < 0.0 else primary)
+
+func _build_continuous_guardrails(route: Array[Vector3], palette: Dictionary) -> void:
+	var upper_transforms: Array[Transform3D] = []
+	var lower_transforms: Array[Transform3D] = []
+	var rail_offset := float(palette.get("rail_offset", maxf(6.4, beacon_offset - 1.8)))
+	var upper_height := float(palette.get("rail_upper_height", 1.34))
+	var lower_height := float(palette.get("rail_lower_height", 0.62))
+	for index in range(route.size() - 1):
+		var a := route[index]
+		var b := route[index + 1]
+		var planar := b - a
+		planar.y = 0.0
+		if planar.length_squared() <= 0.001:
+			continue
+		var direction := planar.normalized()
+		var right := Vector3(-direction.z, 0.0, direction.x)
+		for side in [-1.0, 1.0]:
+			var lateral := right * rail_offset * side
+			upper_transforms.append(_beam_transform(
+				a + lateral + Vector3.UP * upper_height,
+				b + lateral + Vector3.UP * upper_height,
+				0.16
+			))
+			lower_transforms.append(_beam_transform(
+				a + lateral + Vector3.UP * lower_height,
+				b + lateral + Vector3.UP * lower_height,
+				0.11
+			))
+	var primary := _material(palette["primary"], 0.42, 0.18, bool(palette["emission"]))
+	var secondary := _material(palette["secondary"], 0.48, 0.12, bool(palette["emission"]))
+	_add_box_multimesh("ContinuousGuardrailUpper", upper_transforms, primary)
+	_add_box_multimesh("ContinuousGuardrailLower", lower_transforms, secondary)
+	print("RC9 GUARDRAIL VISUAL track=%s upper=%d lower=%d collision=false" % [
+		track_id, upper_transforms.size(), lower_transforms.size(),
+	])
+
+func _beam_transform(from: Vector3, to: Vector3, thickness: float) -> Transform3D:
+	var distance := from.distance_to(to)
+	if distance <= 0.001:
+		return Transform3D.IDENTITY
+	var midpoint := (from + to) * 0.5
+	var transform := Transform3D(Basis.IDENTITY, midpoint)
+	transform = transform.looking_at(to, Vector3.UP)
+	transform.basis = transform.basis.scaled(Vector3(thickness, thickness, distance))
+	return transform
+
+func _add_box_multimesh(node_name: String, transforms: Array[Transform3D], material: Material) -> void:
+	if transforms.is_empty():
+		return
+	var primitive := BoxMesh.new()
+	primitive.size = Vector3.ONE
+	primitive.material = material
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.mesh = primitive
+	multimesh.instance_count = transforms.size()
+	for index in range(transforms.size()):
+		multimesh.set_instance_transform(index, transforms[index])
+	var instance := MultiMeshInstance3D.new()
+	instance.name = node_name
+	instance.multimesh = multimesh
+	_art_root.add_child(instance)
 
 func _build_landmark_pylons(route: Array[Vector3], palette: Dictionary) -> void:
 	var primary := _material(palette["primary"], 0.48, 0.08, bool(palette["emission"]))
