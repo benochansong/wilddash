@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://modes/grand_prix/grand_prix_rc5_mode.gd" id="1_mode"]
 [ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="2_feel"]
@@ -10,6 +10,7 @@
 [ext_resource type="Script" path="res://tracks/grand_prix_tunnel_failsafe.gd" id="8_tunnel"]
 [ext_resource type="Script" path="res://network/network_race_sync.gd" id="9_network"]
 [ext_resource type="Script" path="res://systems/racing_action_controller.gd" id="10_actions"]
+[ext_resource type="Script" path="res://tracks/grand_prix_route_safety.gd" id="11_route_safety"]
 
 [node name="GrandPrix" type="Node3D"]
 script = ExtResource("1_mode")
@@ -35,6 +36,9 @@ script = ExtResource("3_collision")
 
 [node name="GrandPrixTunnelFailsafe" type="Node" parent="."]
 script = ExtResource("8_tunnel")
+
+[node name="GrandPrixRouteSafety" type="Node" parent="."]
+script = ExtResource("11_route_safety")
 
 [node name="GrandPrixRivalPressure" type="Node" parent="."]
 script = ExtResource("7_rival")
