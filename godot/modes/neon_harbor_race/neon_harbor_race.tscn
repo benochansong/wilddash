@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://modes/neon_harbor_race/neon_harbor_race_mode.gd" id="1_mode"]
 [ext_resource type="Script" path="res://tracks/neon_harbor_lighting_polish.gd" id="2_lighting"]
@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://items/item_combat_expansion_controller.gd" id="5_items"]
 [ext_resource type="Script" path="res://tracks/race_obstacle_expansion_controller.gd" id="6_obstacles"]
 [ext_resource type="Script" path="res://tracks/track_production_dressing.gd" id="7_art"]
+[ext_resource type="Script" path="res://systems/racing_action_controller.gd" id="8_actions"]
 
 [node name="NeonHarborRace" type="Node3D"]
 script = ExtResource("1_mode")
@@ -16,6 +17,9 @@ script = ExtResource("7_art")
 track_id = &"neon_harbor_race"
 beacon_stride = 3
 beacon_offset = 8.4
+
+[node name="RacingActionController" type="Node" parent="."]
+script = ExtResource("8_actions")
 
 [node name="NeonHarborLightingPolish" type="Node3D" parent="."]
 script = ExtResource("2_lighting")
