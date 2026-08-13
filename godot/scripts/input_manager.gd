@@ -29,6 +29,7 @@ const DEFAULT_KEYS: Dictionary = {
 
 var _input_sequence: int = 0
 var _race_bump_physical_was_down: bool = false
+var _boost_physical_was_down: bool = false
 
 func _ready() -> void:
 	for action: StringName in GAME_ACTIONS:
@@ -87,6 +88,16 @@ func consume_skill() -> bool:
 
 func consume_item() -> bool:
 	return Input.is_action_just_pressed(ACTION_ITEM)
+
+func consume_boost_press() -> bool:
+	# Boost is an edge-triggered resource action. Do not infer the edge from the
+	# throttle value: a held throttle and a newly pressed W must be distinguishable.
+	# The physical-key edge is a safety fallback for stale saved InputMap bindings.
+	var action_edge: bool = Input.is_action_just_pressed(ACTION_ACCELERATE)
+	var physical_down: bool = Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP)
+	var physical_edge: bool = physical_down and not _boost_physical_was_down
+	_boost_physical_was_down = physical_down
+	return action_edge or physical_edge
 
 func consume_race_bump() -> bool:
 	# Keep the InputMap action, but also detect the physical F rising edge. This
