@@ -4,7 +4,8 @@ const BUS_MASTER := "Master"
 const BUS_MUSIC := "Music"
 const BUS_SFX := "SFX"
 const SFX_POOL_SIZE := 8
-const RACE_THEME_PATH := "res://audio/music/wild_dash_race_theme.ogg"
+const GRAND_PRIX_THEME_PATH := "res://audio/music/wild_dash_race_theme.ogg"
+const NEON_HARBOR_THEME_PATH := "res://audio/music/wild_dash_race_theme_alt.ogg"
 
 var muted := false
 var master_volume := 0.85
@@ -131,16 +132,20 @@ func _set_bus_volume(bus_name: String, value: float) -> void:
 	AudioServer.set_bus_volume_db(index, -80.0 if value <= 0.0001 else linear_to_db(value))
 
 func _load_external_music() -> void:
-	if not ResourceLoader.exists(RACE_THEME_PATH):
-		print("AUDIO external race theme missing; using procedural fallback")
+	_load_external_theme("race_grand_prix", GRAND_PRIX_THEME_PATH)
+	_load_external_theme("race_neon_harbor", NEON_HARBOR_THEME_PATH)
+
+func _load_external_theme(theme_id: String, path: String) -> void:
+	if not ResourceLoader.exists(path):
+		print("AUDIO external theme missing id=%s; using procedural fallback" % theme_id)
 		return
-	var stream := ResourceLoader.load(RACE_THEME_PATH) as AudioStream
+	var stream := ResourceLoader.load(path) as AudioStream
 	if stream == null:
-		push_warning("Could not load race theme: %s" % RACE_THEME_PATH)
+		push_warning("Could not load external theme id=%s path=%s" % [theme_id, path])
 		return
 	_set_stream_loop(stream, true)
-	_themes["race"] = stream
-	print("AUDIO external race theme loaded path=%s" % RACE_THEME_PATH)
+	_themes[theme_id] = stream
+	print("AUDIO external theme loaded id=%s path=%s" % [theme_id, path])
 
 func _set_stream_loop(stream: AudioStream, loop: bool) -> void:
 	if stream is AudioStreamOggVorbis:
@@ -153,6 +158,9 @@ func _set_stream_loop(stream: AudioStream, loop: bool) -> void:
 func _build_procedural_audio() -> void:
 	_themes["menu"] = _make_theme([196.0, 246.94, 293.66], 4.0, 0.16)
 	_themes["race"] = _make_theme([220.0, 329.63, 440.0], 3.2, 0.18)
+	_themes["race_grand_prix"] = _themes["race"]
+	_themes["race_neon_harbor"] = _themes["race"]
+	_themes["race_snowpeak"] = _themes["race"]
 	_themes["arena"] = _make_theme([174.61, 261.63, 349.23], 3.6, 0.18)
 	_themes["result"] = _make_theme([261.63, 329.63, 392.0], 4.4, 0.15)
 	_sfx_library["ui"] = _make_tone(660.0, 0.07, 0.32)
