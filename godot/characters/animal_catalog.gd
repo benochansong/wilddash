@@ -1,7 +1,17 @@
 class_name WildDashAnimalCatalog
 extends RefCounted
 
-const PLAYABLE_IDS: Array[StringName] = [&"dog", &"rabbit", &"elephant", &"cat"]
+# RC8 expands the complete race roster to player selection while preserving
+# the original four as the balanced Chimera-part pool.
+const CHIMERA_IDS: Array[StringName] = [&"dog", &"rabbit", &"elephant", &"cat"]
+const PLAYABLE_IDS: Array[StringName] = [
+	&"dog", &"wolf", &"boar",
+	&"rabbit", &"deer", &"monkey",
+	&"elephant", &"bear", &"panda",
+	&"cat", &"fox", &"raccoon",
+]
+# Compatibility group: these eight began life as NPC-only species. They remain
+# useful for roster/visual tests even though RC8 now allows the player to pick them.
 const NPC_IDS: Array[StringName] = [&"fox", &"bear", &"raccoon", &"panda", &"wolf", &"boar", &"deer", &"monkey"]
 const RACE_ROSTER_IDS: Array[StringName] = [
 	&"dog", &"fox", &"rabbit", &"bear", &"cat", &"raccoon",
@@ -30,12 +40,14 @@ static func get_definition(animal_id: StringName) -> WildDashAnimalDefinition:
 		push_error("Failed to load animal definition: %s" % path)
 	return definition
 
-# Backward-compatible: all_ids/all_definitions remain the four player/chimera animals.
 static func all_ids() -> Array[StringName]:
 	return PLAYABLE_IDS.duplicate()
 
 static func playable_ids() -> Array[StringName]:
 	return PLAYABLE_IDS.duplicate()
+
+static func chimera_ids() -> Array[StringName]:
+	return CHIMERA_IDS.duplicate()
 
 static func npc_ids() -> Array[StringName]:
 	return NPC_IDS.duplicate()
@@ -44,9 +56,7 @@ static func race_roster_ids() -> Array[StringName]:
 	return RACE_ROSTER_IDS.duplicate()
 
 static func all_known_ids() -> Array[StringName]:
-	var ids := PLAYABLE_IDS.duplicate()
-	ids.append_array(NPC_IDS)
-	return ids
+	return PLAYABLE_IDS.duplicate()
 
 static func get_race_npc_id(index: int) -> StringName:
 	if RACE_ROSTER_IDS.is_empty():
@@ -71,6 +81,9 @@ static func npc_definitions() -> Array[WildDashAnimalDefinition]:
 
 static func is_playable(animal_id: StringName) -> bool:
 	return PLAYABLE_IDS.has(animal_id)
+
+static func is_chimera_part(animal_id: StringName) -> bool:
+	return CHIMERA_IDS.has(animal_id)
 
 static func is_npc(animal_id: StringName) -> bool:
 	return NPC_IDS.has(animal_id)
