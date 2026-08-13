@@ -4,6 +4,7 @@ const BUS_MASTER := "Master"
 const BUS_MUSIC := "Music"
 const BUS_SFX := "SFX"
 const SFX_POOL_SIZE := 8
+const RACE_THEME_PATH := "res://audio/music/wild_dash_race_theme.ogg"
 
 var muted := false
 var master_volume := 0.85
@@ -31,6 +32,7 @@ func _ready() -> void:
 		_sfx_players.append(player)
 	if DisplayServer.get_name() != "headless":
 		_build_procedural_audio()
+		_load_external_music()
 	apply_settings(SettingsManager.get_audio_settings())
 	if DisplayServer.get_name() != "headless":
 		play_theme("menu")
@@ -85,8 +87,7 @@ func play_music(stream: AudioStream, loop := true) -> void:
 	_current_theme = "custom"
 	_music_player.stop()
 	_music_player.stream = stream
-	if stream is AudioStreamWAV:
-		(stream as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD if loop else AudioStreamWAV.LOOP_DISABLED
+	_set_stream_loop(stream, loop)
 	_music_player.play()
 
 func stop_music() -> void:
@@ -128,6 +129,26 @@ func _set_bus_volume(bus_name: String, value: float) -> void:
 	if index < 0:
 		return
 	AudioServer.set_bus_volume_db(index, -80.0 if value <= 0.0001 else linear_to_db(value))
+
+func _load_external_music() -> void:
+	if not ResourceLoader.exists(RACE_THEME_PATH):
+		print("AUDIO external race theme missing; using procedural fallback")
+		return
+	var stream := ResourceLoader.load(RACE_THEME_PATH) as AudioStream
+	if stream == null:
+		push_warning("Could not load race theme: %s" % RACE_THEME_PATH)
+		return
+	_set_stream_loop(stream, true)
+	_themes["race"] = stream
+	print("AUDIO external race theme loaded path=%s" % RACE_THEME_PATH)
+
+func _set_stream_loop(stream: AudioStream, loop: bool) -> void:
+	if stream is AudioStreamOggVorbis:
+		(stream as AudioStreamOggVorbis).loop = loop
+	elif stream is AudioStreamMP3:
+		(stream as AudioStreamMP3).loop = loop
+	elif stream is AudioStreamWAV:
+		(stream as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD if loop else AudioStreamWAV.LOOP_DISABLED
 
 func _build_procedural_audio() -> void:
 	_themes["menu"] = _make_theme([196.0, 246.94, 293.66], 4.0, 0.16)
