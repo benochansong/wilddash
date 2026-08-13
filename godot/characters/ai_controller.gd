@@ -476,20 +476,43 @@ func _get_rubber_band_scale() -> float:
 		return 1.0
 	if DisplayServer.get_name() == "headless" and not OS.has_environment("WILDDASH_REALTIME_BALANCE") and not OS.has_environment("WILDDASH_BALANCE_RUN"):
 		return 1.0
-	var player: WildDashCharacterController = null
-	for candidate in RaceManager.racers:
-		if candidate is WildDashCharacterController and (candidate as WildDashCharacterController).is_player:
-			player = candidate as WildDashCharacterController
-			break
-	if player == null or player == _racer or RaceManager.get_track_length() <= 1.0:
+	var field_size := RaceManager.racers.size()
+	var rank := RaceManager.get_rank(_racer)
+	var track_length := RaceManager.get_track_length()
+	if rank <= 0 or track_length <= 1.0:
 		return 1.0
-	var gap_ratio := (RaceManager.get_track_progress(player) - RaceManager.get_track_progress(_racer)) / RaceManager.get_track_length()
-	if gap_ratio > 0.10:
-		var trailing_strength := clampf((gap_ratio - 0.10) / 0.24, 0.0, 1.0)
-		return 1.0 + trailing_strength * RUBBER_BAND_TRAILING_MAX
-	if gap_ratio < -0.10:
-		var leading_strength := clampf((-gap_ratio - 0.10) / 0.24, 0.0, 1.0)
-		return 1.0 - leading_strength * RUBBER_BAND_LEADING_MAX
+
+	var own_progress := RaceManager.get_track_progress(_racer)
+	var leader_progress := own_progress
+	var tail_progress := own_progress
+	for candidate in RaceManager.racers:
+		if not candidate is WildDashCharacterController:
+			continue
+		var other := candidate as WildDashCharacterController
+		var progress := RaceManager.get_track_progress(other)
+		leader_progress = maxf(leader_progress, progress)
+		tail_progress = minf(tail_progress, progress)
+
+	var gap_to_leader_ratio := maxf(0.0, (leader_progress - own_progress) / track_length)
+	var field_spread_ratio := maxf(0.0, (leader_progress - tail_progress) / track_length)
+	var rank_ratio := float(rank - 1) / float(maxi(1, field_size - 1))
+
+	# The actual race leader gets a subtle 2-4% drag only when a field exists to
+	# compress. This replaces the old Player-Dog-relative comparison.
+	if rank == 1:
+		var lead_strength := clampf((field_spread_ratio - 0.025) / 0.14, 0.0, 1.0)
+		var lead_drag := lerpf(0.02, RUBBER_BAND_LEADING_MAX, lead_strength)
+		return 1.0 - lead_drag
+
+	# The trailing half receives roughly +3% to +6% based on both real rank and
+	# actual distance to the leader. The cap remains exactly +6%.
+	if rank_ratio >= 0.48:
+		var rank_strength := clampf((rank_ratio - 0.48) / 0.52, 0.0, 1.0)
+		var gap_strength := clampf((gap_to_leader_ratio - 0.025) / 0.20, 0.0, 1.0)
+		var trailing_strength := maxf(rank_strength, gap_strength)
+		var trailing_boost := lerpf(0.028, RUBBER_BAND_TRAILING_MAX, trailing_strength)
+		return 1.0 + minf(RUBBER_BAND_TRAILING_MAX, trailing_boost)
+
 	return 1.0
 
 func _soft_recovery_threshold() -> float:
