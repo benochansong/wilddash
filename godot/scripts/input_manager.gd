@@ -27,7 +27,8 @@ const DEFAULT_KEYS: Dictionary = {
 	"pause": [KEY_ESCAPE, KEY_P],
 }
 
-var _input_sequence := 0
+var _input_sequence: int = 0
+var _race_bump_physical_was_down: bool = false
 
 func _ready() -> void:
 	for action: StringName in GAME_ACTIONS:
@@ -35,18 +36,15 @@ func _ready() -> void:
 		_add_default_keyboard(action)
 	_add_default_gamepad()
 	# Saved single-key bindings from older builds can erase the default aliases.
-	# Keep the canonical WASD/arrow driving controls available as safety aliases.
+	# Keep the canonical driving/body-check controls available as safety aliases.
 	_ensure_core_keyboard_safety_aliases()
 
 func get_steer_axis() -> float:
 	return Input.get_axis(ACTION_LEFT, ACTION_RIGHT)
 
 func get_throttle_axis() -> float:
-	var accelerate_strength := Input.get_action_strength(ACTION_ACCELERATE)
-	var brake_strength := Input.get_action_strength(ACTION_BRAKE)
-	# Physical-key fallback protects the core drive controls even if an old save
-	# contains a stale/partial binding map. This is intentionally limited to
-	# movement safety aliases; skill/item custom bindings remain user-controlled.
+	var accelerate_strength: float = Input.get_action_strength(ACTION_ACCELERATE)
+	var brake_strength: float = Input.get_action_strength(ACTION_BRAKE)
 	if Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP):
 		accelerate_strength = maxf(accelerate_strength, 1.0)
 	if Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN):
@@ -58,7 +56,7 @@ func get_move_vector() -> Vector2:
 
 func sample_racer_input_state() -> WildDashRacerInputState:
 	_input_sequence += 1
-	var state := WildDashRacerInputState.new()
+	var state: WildDashRacerInputState = WildDashRacerInputState.new()
 	state.steer = get_steer_axis()
 	state.throttle = get_throttle_axis()
 	state.jump_pressed = consume_jump()
@@ -72,6 +70,7 @@ func get_input_debug_snapshot() -> Dictionary:
 	return {
 		"w_pressed": Input.is_physical_key_pressed(KEY_W),
 		"up_pressed": Input.is_physical_key_pressed(KEY_UP),
+		"f_pressed": Input.is_physical_key_pressed(KEY_F),
 		"accelerate_action": Input.get_action_strength(ACTION_ACCELERATE),
 		"brake_action": Input.get_action_strength(ACTION_BRAKE),
 		"throttle": get_throttle_axis(),
@@ -90,7 +89,14 @@ func consume_item() -> bool:
 	return Input.is_action_just_pressed(ACTION_ITEM)
 
 func consume_race_bump() -> bool:
-	return Input.is_action_just_pressed(ACTION_BUMP)
+	# Keep the InputMap action, but also detect the physical F rising edge. This
+	# mirrors the driving safety aliases and makes the core race-contact action
+	# survive stale user bindings or Godot project InputMap drift.
+	var action_edge: bool = Input.is_action_just_pressed(ACTION_BUMP)
+	var physical_down: bool = Input.is_physical_key_pressed(KEY_F)
+	var physical_edge: bool = physical_down and not _race_bump_physical_was_down
+	_race_bump_physical_was_down = physical_down
+	return action_edge or physical_edge
 
 func consume_pause() -> bool:
 	return Input.is_action_just_pressed(ACTION_PAUSE)
@@ -102,7 +108,7 @@ func rebind_keyboard(action: StringName, physical_keycode: int) -> bool:
 	for event: InputEvent in events:
 		if event is InputEventKey:
 			InputMap.action_erase_event(action, event)
-	var replacement := InputEventKey.new()
+	var replacement: InputEventKey = InputEventKey.new()
 	replacement.physical_keycode = physical_keycode
 	InputMap.action_add_event(action, replacement)
 	_ensure_core_keyboard_safety_aliases()
@@ -113,7 +119,7 @@ func export_keyboard_bindings() -> Dictionary:
 	for action: StringName in GAME_ACTIONS:
 		for event: InputEvent in InputMap.action_get_events(action):
 			if event is InputEventKey:
-				var key_event := event as InputEventKey
+				var key_event: InputEventKey = event as InputEventKey
 				result[String(action)] = int(key_event.physical_keycode)
 				break
 	return result
@@ -122,7 +128,7 @@ func apply_keyboard_bindings(bindings: Dictionary) -> void:
 	for action_text: Variant in bindings.keys():
 		if typeof(action_text) != TYPE_STRING:
 			continue
-		var action := StringName(String(action_text))
+		var action: StringName = StringName(String(action_text))
 		if action not in GAME_ACTIONS:
 			continue
 		var raw_key: Variant = bindings[action_text]
@@ -136,7 +142,7 @@ func apply_keyboard_bindings(bindings: Dictionary) -> void:
 func get_keyboard_binding_text(action: StringName) -> String:
 	for event: InputEvent in InputMap.action_get_events(action):
 		if event is InputEventKey:
-			var key_event := event as InputEventKey
+			var key_event: InputEventKey = event as InputEventKey
 			return OS.get_keycode_string(key_event.physical_keycode)
 	return "Unbound"
 
@@ -157,7 +163,7 @@ func _ensure_action(action: StringName) -> void:
 		InputMap.action_set_deadzone(action, 0.2)
 
 func _add_default_keyboard(action: StringName) -> void:
-	var has_keyboard := false
+	var has_keyboard: bool = false
 	for existing: InputEvent in InputMap.action_get_events(action):
 		if existing is InputEventKey:
 			has_keyboard = true
@@ -166,7 +172,7 @@ func _add_default_keyboard(action: StringName) -> void:
 		return
 	var codes: Array = DEFAULT_KEYS.get(String(action), [])
 	for code: Variant in codes:
-		var event := InputEventKey.new()
+		var event: InputEventKey = InputEventKey.new()
 		event.physical_keycode = int(code)
 		InputMap.action_add_event(action, event)
 
@@ -184,10 +190,10 @@ func _ensure_core_keyboard_safety_aliases() -> void:
 func _ensure_key_event(action: StringName, keycode: Key) -> void:
 	for existing: InputEvent in InputMap.action_get_events(action):
 		if existing is InputEventKey:
-			var key_event := existing as InputEventKey
+			var key_event: InputEventKey = existing as InputEventKey
 			if key_event.physical_keycode == keycode or key_event.keycode == keycode:
 				return
-	var event := InputEventKey.new()
+	var event: InputEventKey = InputEventKey.new()
 	event.physical_keycode = keycode
 	InputMap.action_add_event(action, event)
 
@@ -210,17 +216,17 @@ func _add_joy_button(action: StringName, button_index: JoyButton) -> void:
 	for existing: InputEvent in InputMap.action_get_events(action):
 		if existing is InputEventJoypadButton and (existing as InputEventJoypadButton).button_index == button_index:
 			return
-	var event := InputEventJoypadButton.new()
+	var event: InputEventJoypadButton = InputEventJoypadButton.new()
 	event.button_index = button_index
 	InputMap.action_add_event(action, event)
 
 func _add_joy_axis(action: StringName, axis: JoyAxis, axis_value: float) -> void:
 	for existing: InputEvent in InputMap.action_get_events(action):
 		if existing is InputEventJoypadMotion:
-			var motion := existing as InputEventJoypadMotion
+			var motion: InputEventJoypadMotion = existing as InputEventJoypadMotion
 			if motion.axis == axis and is_equal_approx(signf(motion.axis_value), signf(axis_value)):
 				return
-	var event := InputEventJoypadMotion.new()
+	var event: InputEventJoypadMotion = InputEventJoypadMotion.new()
 	event.axis = axis
 	event.axis_value = axis_value
 	InputMap.action_add_event(action, event)
