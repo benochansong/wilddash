@@ -2,27 +2,34 @@ class_name WildDashElephantTrunkLungeController
 extends Node
 
 ## Elephant race identity pass.
-## - Mid-race F/Y is a powerful multi-target trunk sweep with a short lunge.
-## - Low-defense racers can be launched hard enough to lose the racing line.
+## - Opening F/Y adds a ring-out supplement on top of the normal opening sweep.
+## - Mid-race F/Y is a high-power multi-target trunk sweep with a short lunge.
+## - Feather/light racers can be launched hard enough to leave the racing line.
 ## - Successful hits grant Heavy Momentum so Elephant can fight back into the pack.
 ## - IRON HIDE mitigates item disruption, knockback and trap launch.
 
 const OPENING_SECONDS: float = 6.0
-const MIDRACE_SWEEP_RANGE: float = 8.20
-const MIDRACE_LUNGE_ACQUIRE_RANGE: float = 11.50
+const OPENING_RINGOUT_RANGE: float = 11.50
+const OPENING_RINGOUT_MAX_TARGETS: int = 5
+const OPENING_RINGOUT_FORWARD_DOT: float = -0.80
+const OPENING_RINGOUT_POWER: float = 18.00
+const OPENING_RINGOUT_COOLDOWN: float = 1.45
+
+const MIDRACE_SWEEP_RANGE: float = 8.50
+const MIDRACE_LUNGE_ACQUIRE_RANGE: float = 12.00
 const MIDRACE_MAX_TARGETS: int = 3
-const MIDRACE_FORWARD_DOT: float = -0.46
+const MIDRACE_FORWARD_DOT: float = -0.48
 const MIDRACE_MAX_VERTICAL_DELTA: float = 1.90
-const MIDRACE_COOLDOWN: float = 2.00
+const MIDRACE_COOLDOWN: float = 1.90
 const CLOSE_RANGE_THRESHOLD: float = 5.80
-const CLOSE_SUPPLEMENTAL_POWER: float = 14.00
-const FAR_SWEEP_POWER: float = 24.00
-const TARGET_SPEED_RETENTION_MIN: float = 0.42
-const TARGET_SPEED_RETENTION_MAX: float = 0.72
-const LUNGE_DURATION: float = 0.52
-const LUNGE_PENDING_SWEEP_DELAY: float = 0.13
-const LUNGE_SPEED_RATIO: float = 1.18
-const LUNGE_ACCELERATION_MULTIPLIER: float = 4.20
+const CLOSE_SUPPLEMENTAL_POWER: float = 20.00
+const FAR_SWEEP_POWER: float = 32.00
+const TARGET_SPEED_RETENTION_MIN: float = 0.28
+const TARGET_SPEED_RETENTION_MAX: float = 0.66
+const LUNGE_DURATION: float = 0.56
+const LUNGE_PENDING_SWEEP_DELAY: float = 0.12
+const LUNGE_SPEED_RATIO: float = 1.20
+const LUNGE_ACCELERATION_MULTIPLIER: float = 4.40
 const HEAVY_MOMENTUM_DURATION: float = 1.20
 const HEAVY_MOMENTUM_SPEED_RATIO: float = 1.12
 const HEAVY_MOMENTUM_ACCELERATION_MULTIPLIER: float = 1.55
@@ -63,18 +70,34 @@ func _physics_process(delta: float) -> void:
 	_update_iron_hide(delta)
 
 	var pressed: bool = _consume_local_bump_press()
-	if not pressed or _race_elapsed <= OPENING_SECONDS or _cooldown_remaining > 0.0:
-		return
-	if _racer.animal_id != &"elephant":
+	if not pressed or _cooldown_remaining > 0.0 or _racer.animal_id != &"elephant":
 		return
 
-	var immediate_targets: Array[WildDashCharacterController] = _find_targets(MIDRACE_SWEEP_RANGE)
+	if _race_elapsed <= OPENING_SECONDS:
+		var opening_targets: Array[WildDashCharacterController] = _find_targets(
+			OPENING_RINGOUT_RANGE,
+			OPENING_RINGOUT_MAX_TARGETS,
+			OPENING_RINGOUT_FORWARD_DOT
+		)
+		if not opening_targets.is_empty():
+			_apply_opening_ringout_supplement(opening_targets)
+		return
+
+	var immediate_targets: Array[WildDashCharacterController] = _find_targets(
+		MIDRACE_SWEEP_RANGE,
+		MIDRACE_MAX_TARGETS,
+		MIDRACE_FORWARD_DOT
+	)
 	if not immediate_targets.is_empty():
 		_start_lunge()
 		_apply_midrace_sweep(immediate_targets, false)
 		return
 
-	var acquire_targets: Array[WildDashCharacterController] = _find_targets(MIDRACE_LUNGE_ACQUIRE_RANGE)
+	var acquire_targets: Array[WildDashCharacterController] = _find_targets(
+		MIDRACE_LUNGE_ACQUIRE_RANGE,
+		MIDRACE_MAX_TARGETS,
+		MIDRACE_FORWARD_DOT
+	)
 	if not acquire_targets.is_empty():
 		_start_lunge()
 		_pending_sweep_delay = LUNGE_PENDING_SWEEP_DELAY
@@ -99,7 +122,11 @@ func _update_pending_sweep(delta: float) -> void:
 	if _pending_sweep_delay > 0.0:
 		return
 	_pending_sweep_delay = -1.0
-	var targets: Array[WildDashCharacterController] = _find_targets(MIDRACE_SWEEP_RANGE)
+	var targets: Array[WildDashCharacterController] = _find_targets(
+		MIDRACE_SWEEP_RANGE,
+		MIDRACE_MAX_TARGETS,
+		MIDRACE_FORWARD_DOT
+	)
 	if not targets.is_empty():
 		_apply_midrace_sweep(targets, true)
 
@@ -126,6 +153,51 @@ func _start_lunge() -> void:
 	_lunge_remaining = LUNGE_DURATION
 	_racer.current_speed = maxf(_racer.current_speed, _racer.max_speed * 0.99)
 
+func _apply_opening_ringout_supplement(targets: Array[WildDashCharacterController]) -> void:
+	if targets.is_empty():
+		return
+	var forward: Vector3 = -_racer.global_transform.basis.z.normalized()
+	var right: Vector3 = _racer.global_transform.basis.x.normalized()
+	var hits: int = 0
+	var strongest: float = 0.0
+	for target: WildDashCharacterController in targets:
+		if target == null:
+			continue
+		var offset: Vector3 = target.global_position - _racer.global_position
+		var planar: Vector3 = Vector3(offset.x, 0.0, offset.z)
+		if planar.length_squared() <= 0.001:
+			continue
+		var side_amount: float = planar.dot(right)
+		var side_sign: float = signf(side_amount)
+		if absf(side_amount) < 0.20:
+			side_sign = -1.0 if hits % 2 == 0 else 1.0
+		var lateral: Vector3 = right * side_sign
+		var radial: Vector3 = planar.normalized()
+		var push_direction: Vector3 = (lateral * 0.92 + radial * 0.07 + forward * 0.01).normalized()
+		var impulse: float = WildDashRaceCombatBalance.get_ring_out_impulse(OPENING_RINGOUT_POWER, target.animal_id)
+		var launch_strength: float = WildDashRaceCombatBalance.get_launch_strength(OPENING_RINGOUT_POWER, target.animal_id)
+		target.apply_knockback(push_direction, impulse)
+		if launch_strength > 0.0:
+			target.velocity.y = maxf(target.velocity.y, launch_strength)
+		var retention: float = clampf(0.78 - maxf(0.0, impulse - 8.0) * 0.022, 0.34, 0.68)
+		target.current_speed *= retention
+		strongest = maxf(strongest, impulse)
+		hits += 1
+		var visual: WildDashCharacterVisual = target.get_visual()
+		if visual != null:
+			visual.play_action(&"Hit", 0.48 if launch_strength > 0.0 else 0.38)
+	if hits <= 0:
+		return
+	_cooldown_remaining = OPENING_RINGOUT_COOLDOWN
+	_racer.current_speed = maxf(_racer.current_speed, _racer.max_speed * 0.99)
+	AudioManager.play_sfx_id("hit", 1.0)
+	print("RC9 ELEPHANT OPENING RINGOUT hits=%d power=%.2f range=%.1f cooldown=%.2f" % [
+		hits,
+		strongest,
+		OPENING_RINGOUT_RANGE,
+		OPENING_RINGOUT_COOLDOWN,
+	])
+
 func _apply_midrace_sweep(targets: Array[WildDashCharacterController], from_lunge: bool) -> void:
 	if targets.is_empty():
 		return
@@ -149,24 +221,24 @@ func _apply_midrace_sweep(targets: Array[WildDashCharacterController], from_lung
 		if absf(side_amount) < 0.20:
 			side_sign = -1.0 if hits % 2 == 0 else 1.0
 		var lateral: Vector3 = right * side_sign
-		var push_direction: Vector3 = (lateral * 0.88 + radial * 0.10 + forward * 0.02).normalized()
+		var push_direction: Vector3 = (lateral * 0.94 + radial * 0.05 + forward * 0.01).normalized()
 
 		var raw_power: float = CLOSE_SUPPLEMENTAL_POWER if distance <= CLOSE_RANGE_THRESHOLD else FAR_SWEEP_POWER
-		var effective_impulse: float = WildDashRaceCombatBalance.get_effective_impulse(raw_power, target.animal_id)
+		var effective_impulse: float = WildDashRaceCombatBalance.get_ring_out_impulse(raw_power, target.animal_id)
 		var launch_strength: float = WildDashRaceCombatBalance.get_launch_strength(raw_power, target.animal_id)
 		target.apply_knockback(push_direction, effective_impulse)
-		if launch_strength > 0.0 and target.is_on_floor():
+		if launch_strength > 0.0:
 			target.velocity.y = maxf(target.velocity.y, launch_strength)
 
 		var retention: float = clampf(
-			0.84 - maxf(0.0, effective_impulse - 7.0) * 0.030,
+			0.80 - maxf(0.0, effective_impulse - 7.0) * 0.026,
 			TARGET_SPEED_RETENTION_MIN,
 			TARGET_SPEED_RETENTION_MAX
 		)
 		target.current_speed *= retention
 		var visual: WildDashCharacterVisual = target.get_visual()
 		if visual != null:
-			visual.play_action(&"Hit", 0.46 if launch_strength > 0.0 else 0.36)
+			visual.play_action(&"Hit", 0.50 if launch_strength > 0.0 else 0.38)
 
 		strongest_effective_impulse = maxf(strongest_effective_impulse, effective_impulse)
 		hits += 1
@@ -188,7 +260,7 @@ func _apply_midrace_sweep(targets: Array[WildDashCharacterController], from_lung
 	AudioManager.play_sfx_id("hit", 1.0)
 	var attacker_visual: WildDashCharacterVisual = _racer.get_visual()
 	if attacker_visual != null:
-		attacker_visual.play_action(&"Skill", 0.42)
+		attacker_visual.play_action(&"Skill", 0.44)
 	print("RC9 ELEPHANT MIDRACE TRUNK hits=%d range=%.1f effective_power=%.2f lunge=%s cooldown=%.2f heavy_momentum=%.2fs" % [
 		hits,
 		MIDRACE_SWEEP_RANGE,
@@ -198,12 +270,12 @@ func _apply_midrace_sweep(targets: Array[WildDashCharacterController], from_lung
 		HEAVY_MOMENTUM_DURATION,
 	])
 
-func _find_targets(range_limit: float) -> Array[WildDashCharacterController]:
+func _find_targets(range_limit: float, max_targets: int, forward_dot_limit: float) -> Array[WildDashCharacterController]:
 	var targets: Array[WildDashCharacterController] = []
 	if _racer == null:
 		return targets
 	var forward: Vector3 = -_racer.global_transform.basis.z.normalized()
-	while targets.size() < MIDRACE_MAX_TARGETS:
+	while targets.size() < max_targets:
 		var best: WildDashCharacterController = null
 		var best_score: float = INF
 		for candidate: Node3D in RaceManager.racers:
@@ -220,9 +292,9 @@ func _find_targets(range_limit: float) -> Array[WildDashCharacterController]:
 			if distance <= 0.01 or distance > range_limit:
 				continue
 			var alignment: float = forward.dot(planar_offset / distance)
-			if alignment < MIDRACE_FORWARD_DOT:
+			if alignment < forward_dot_limit:
 				continue
-			var score: float = distance - maxf(0.0, alignment) * 0.78
+			var score: float = distance - maxf(0.0, alignment) * 0.82
 			if score < best_score:
 				best_score = score
 				best = controller
