@@ -15,6 +15,12 @@ const SOFT_RECOVERY_COOLDOWN := 1.20
 const COLLISION_COUNT_DEBOUNCE := 0.35
 const RUBBER_BAND_TRAILING_MAX := 0.06
 const RUBBER_BAND_LEADING_MAX := 0.04
+const RUBBER_BAND_SAMPLE_INTERVAL := 0.40
+const RUBBER_BAND_SLEW_PER_SECOND := 0.022
+const RUBBER_BAND_TRAILING_ENTER_RANK_RATIO := 0.62
+const RUBBER_BAND_TRAILING_EXIT_RANK_RATIO := 0.48
+const RUBBER_BAND_TRAILING_ENTER_GAP_RATIO := 0.055
+const RUBBER_BAND_TRAILING_EXIT_GAP_RATIO := 0.032
 
 @export var racer_path: NodePath
 @export var ai_mode: AIMode = AIMode.RACE
@@ -56,6 +62,10 @@ var _collision_count := 0
 var _overtake_count := 0
 var _low_speed_seconds := 0.0
 var _last_rank := 0
+var _rubber_band_scale := 1.0
+var _rubber_band_target := 1.0
+var _rubber_band_sample_elapsed := 999.0
+var _rubber_band_trailing_latched := false
 
 func _ready() -> void:
 	_racer = get_node_or_null(racer_path) as WildDashCharacterController
@@ -136,6 +146,8 @@ func get_balance_telemetry() -> Dictionary:
 		"collisions": _collision_count,
 		"overtakes": _overtake_count,
 		"low_speed_seconds": _low_speed_seconds,
+		"rubber_band_scale": _rubber_band_scale,
+		"rubber_band_target": _rubber_band_target,
 	}
 
 func _process_race_ai_baseline(delta: float) -> void:
@@ -423,7 +435,7 @@ func _find_nearest_route_index(position: Vector3) -> int:
 	return best_index
 
 func _move_racer(delta: float, inspect_blocking_collision: bool) -> void:
-	var rubber_band_scale := _get_rubber_band_scale()
+	var rubber_band_scale := _get_rubber_band_scale(delta)
 	var skill_target_speed := target_speed * _racer.get_active_speed_scale() * rubber_band_scale
 	var skill_acceleration := acceleration * _racer.get_active_acceleration_scale()
 	_racer.current_speed = move_toward(_racer.current_speed, skill_target_speed, skill_acceleration * delta)
@@ -471,15 +483,36 @@ func _update_balance_telemetry(delta: float) -> void:
 		_overtake_count += _last_rank - rank
 	_last_rank = rank
 
-func _get_rubber_band_scale() -> float:
+func _get_rubber_band_scale(delta: float) -> float:
 	if _racer == null or RaceManager.racers.size() < 10:
+		_rubber_band_scale = 1.0
+		_rubber_band_target = 1.0
+		_rubber_band_trailing_latched = false
 		return 1.0
 	if DisplayServer.get_name() == "headless" and not OS.has_environment("WILDDASH_REALTIME_BALANCE") and not OS.has_environment("WILDDASH_BALANCE_RUN"):
+		_rubber_band_scale = 1.0
+		_rubber_band_target = 1.0
+		_rubber_band_trailing_latched = false
 		return 1.0
+
+	_rubber_band_sample_elapsed += delta
+	if _rubber_band_sample_elapsed >= RUBBER_BAND_SAMPLE_INTERVAL:
+		_rubber_band_sample_elapsed = 0.0
+		_rubber_band_target = _calculate_rubber_band_target()
+
+	_rubber_band_scale = move_toward(
+		_rubber_band_scale,
+		_rubber_band_target,
+		RUBBER_BAND_SLEW_PER_SECOND * delta
+	)
+	return clampf(_rubber_band_scale, 1.0 - RUBBER_BAND_LEADING_MAX, 1.0 + RUBBER_BAND_TRAILING_MAX)
+
+func _calculate_rubber_band_target() -> float:
 	var field_size := RaceManager.racers.size()
 	var rank := RaceManager.get_rank(_racer)
 	var track_length := RaceManager.get_track_length()
 	if rank <= 0 or track_length <= 1.0:
+		_rubber_band_trailing_latched = false
 		return 1.0
 
 	var own_progress := RaceManager.get_track_progress(_racer)
@@ -497,23 +530,27 @@ func _get_rubber_band_scale() -> float:
 	var field_spread_ratio := maxf(0.0, (leader_progress - tail_progress) / track_length)
 	var rank_ratio := float(rank - 1) / float(maxi(1, field_size - 1))
 
-	# The actual race leader gets a subtle 2-4% drag only when a field exists to
-	# compress. This replaces the old Player-Dog-relative comparison.
 	if rank == 1:
-		var lead_strength := clampf((field_spread_ratio - 0.025) / 0.14, 0.0, 1.0)
+		_rubber_band_trailing_latched = false
+		var lead_strength := clampf((field_spread_ratio - 0.035) / 0.15, 0.0, 1.0)
 		var lead_drag := lerpf(0.02, RUBBER_BAND_LEADING_MAX, lead_strength)
 		return 1.0 - lead_drag
 
-	# The trailing half receives roughly +3% to +6% based on both real rank and
-	# actual distance to the leader. The cap remains exactly +6%.
-	if rank_ratio >= 0.48:
-		var rank_strength := clampf((rank_ratio - 0.48) / 0.52, 0.0, 1.0)
-		var gap_strength := clampf((gap_to_leader_ratio - 0.025) / 0.20, 0.0, 1.0)
-		var trailing_strength := maxf(rank_strength, gap_strength)
-		var trailing_boost := lerpf(0.028, RUBBER_BAND_TRAILING_MAX, trailing_strength)
-		return 1.0 + minf(RUBBER_BAND_TRAILING_MAX, trailing_boost)
+	var enter_trailing := rank_ratio >= RUBBER_BAND_TRAILING_ENTER_RANK_RATIO or gap_to_leader_ratio >= RUBBER_BAND_TRAILING_ENTER_GAP_RATIO
+	var stay_trailing := rank_ratio >= RUBBER_BAND_TRAILING_EXIT_RANK_RATIO and gap_to_leader_ratio >= RUBBER_BAND_TRAILING_EXIT_GAP_RATIO
+	if _rubber_band_trailing_latched:
+		_rubber_band_trailing_latched = stay_trailing
+	else:
+		_rubber_band_trailing_latched = enter_trailing
 
-	return 1.0
+	if not _rubber_band_trailing_latched:
+		return 1.0
+
+	var rank_strength := clampf((rank_ratio - RUBBER_BAND_TRAILING_ENTER_RANK_RATIO) / maxf(0.01, 1.0 - RUBBER_BAND_TRAILING_ENTER_RANK_RATIO), 0.0, 1.0)
+	var gap_strength := clampf((gap_to_leader_ratio - RUBBER_BAND_TRAILING_ENTER_GAP_RATIO) / 0.18, 0.0, 1.0)
+	var trailing_strength := maxf(rank_strength, gap_strength)
+	var trailing_boost := lerpf(0.03, RUBBER_BAND_TRAILING_MAX, trailing_strength)
+	return 1.0 + minf(RUBBER_BAND_TRAILING_MAX, trailing_boost)
 
 func _soft_recovery_threshold() -> float:
 	return HARD_MODE_SOFT_RECOVERY_SECONDS if GameManager.difficulty == &"nightmare" else SOFT_RECOVERY_SECONDS
