@@ -16,10 +16,16 @@ func _init() -> void:
 	if raccoon_knockback <= 1.15:
 		failures.append("Raccoon must remain a clearly launchable featherweight")
 
-	var light_launch: float = WildDashRaceCombatBalance.get_launch_strength(24.0, &"raccoon")
-	var heavy_launch: float = WildDashRaceCombatBalance.get_launch_strength(24.0, &"elephant")
-	if light_launch < 4.0:
-		failures.append("Elephant full trunk power must visibly launch a featherweight")
+	var ringout_impulse: float = WildDashRaceCombatBalance.get_ring_out_impulse(32.0, &"raccoon")
+	var light_launch: float = WildDashRaceCombatBalance.get_launch_strength(32.0, &"raccoon")
+	var rabbit_launch: float = WildDashRaceCombatBalance.get_launch_strength(32.0, &"rabbit")
+	var heavy_launch: float = WildDashRaceCombatBalance.get_launch_strength(32.0, &"elephant")
+	if ringout_impulse < 40.0:
+		failures.append("full Elephant trunk power must create ring-out-level lateral impulse on Raccoon")
+	if light_launch < 6.0:
+		failures.append("full Elephant trunk power must visibly launch a featherweight")
+	if rabbit_launch < 5.0:
+		failures.append("Rabbit must remain launchable by full Elephant trunk power")
 	if heavy_launch > 0.01:
 		failures.append("Elephant should not be vertically launched by the same trunk power")
 
@@ -32,8 +38,8 @@ func _init() -> void:
 		failures.append("Elephant spring-trap launch resistance is too weak")
 
 	if failures.is_empty():
-		print("RC9 ELEPHANT TANK BALANCE PASS defense=%.1f item=%.2f trunk_light_launch=%.2f trap=%.2f" % [
-			elephant_defense, elephant_item, light_launch, elephant_trap,
+		print("RC9 ELEPHANT TANK BALANCE PASS defense=%.1f item=%.2f ringout=%.2f light_launch=%.2f rabbit_launch=%.2f trap=%.2f" % [
+			elephant_defense, elephant_item, ringout_impulse, light_launch, rabbit_launch, elephant_trap,
 		])
 		quit(0)
 		return
