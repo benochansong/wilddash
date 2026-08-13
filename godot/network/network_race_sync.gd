@@ -8,9 +8,9 @@ extends Node
 ## This is intentionally limited to Grand Prix for the first multiplayer milestone.
 
 const RACER_SCENE: PackedScene = preload("res://characters/test_racer.tscn")
-const INPUT_SEND_HZ := 30.0
-const STATE_SEND_HZ := 15.0
-const CLIENT_CORRECTION_WEIGHT := 0.22
+const INPUT_SEND_HZ: float = 30.0
+const STATE_SEND_HZ: float = 15.0
+const CLIENT_CORRECTION_WEIGHT: float = 0.22
 
 var _mode: WildDashModeController
 var _local_player: WildDashCharacterController
@@ -18,9 +18,9 @@ var _host_remote_racers: Dictionary = {}
 var _client_remote_proxies: Dictionary = {}
 var _remote_inputs: Dictionary = {}
 var _remote_bump_cooldowns: Dictionary = {}
-var _input_elapsed := 0.0
-var _state_elapsed := 0.0
-var _active := false
+var _input_elapsed: float = 0.0
+var _state_elapsed: float = 0.0
+var _active: bool = false
 
 func _ready() -> void:
 	if not NetworkManager.is_party_active() or not NetworkManager.party_game_active:
@@ -30,7 +30,7 @@ func _ready() -> void:
 	call_deferred("_bind_after_mode_ready")
 
 func _bind_after_mode_ready() -> void:
-	for _frame in range(5):
+	for _frame: int in range(5):
 		await get_tree().physics_frame
 	_mode = get_parent() as WildDashModeController
 	if _mode == null or _mode.mode_id != &"grand_prix":
@@ -64,45 +64,43 @@ func _physics_process(delta: float) -> void:
 		_input_elapsed += delta
 		if _input_elapsed >= 1.0 / INPUT_SEND_HZ:
 			_input_elapsed = 0.0
-			var input_state := InputManager.sample_racer_input_state()
+			var input_state: WildDashRacerInputState = InputManager.sample_racer_input_state()
 			rpc_id(1, "_server_receive_input", input_state.to_dictionary())
 
 func _spawn_host_remote_humans() -> void:
-	var roster := NetworkManager.get_players()
-	var peer_ids := roster.keys()
+	var roster: Dictionary = NetworkManager.get_players()
+	var peer_ids: Array = roster.keys()
 	peer_ids.sort()
-	var slot := 1
-	for peer_id_value in peer_ids:
-		var peer_id := int(peer_id_value)
+	var slot: int = 1
+	for peer_id_value: Variant in peer_ids:
+		var peer_id: int = int(peer_id_value)
 		if peer_id == 1:
 			continue
-		var state := roster[peer_id] as Dictionary
-		var animal := StringName(String(state.get("animal_id", "dog")))
-		var spawn := _local_player.global_position + Vector3(float(slot) * 2.55, 0.05, float(slot % 2) * 2.2)
-		var racer := _instantiate_network_racer("HumanPeer_%d" % peer_id, animal, spawn, true)
+		var state: Dictionary = roster[peer_id] as Dictionary
+		var animal: StringName = StringName(String(state.get("animal_id", "dog")))
+		var spawn: Vector3 = _local_player.global_position + Vector3(float(slot) * 2.55, 0.05, float(slot % 2) * 2.2)
+		var racer: WildDashCharacterController = _instantiate_network_racer("HumanPeer_%d" % peer_id, animal, spawn, true)
 		_host_remote_racers[peer_id] = racer
 		_remote_inputs[peer_id] = WildDashRacerInputState.new().to_dictionary()
 		_remote_bump_cooldowns[peer_id] = 0.0
 		slot += 1
 
 func _spawn_client_remote_proxies() -> void:
-	var roster := NetworkManager.get_players()
-	var local_peer := multiplayer.get_unique_id()
-	var slot := 1
-	for peer_id_value in roster.keys():
-		var peer_id := int(peer_id_value)
+	var roster: Dictionary = NetworkManager.get_players()
+	var local_peer: int = multiplayer.get_unique_id()
+	var slot: int = 1
+	for peer_id_value: Variant in roster.keys():
+		var peer_id: int = int(peer_id_value)
 		if peer_id == local_peer:
 			continue
-		var state := roster[peer_id] as Dictionary
-		var animal := StringName(String(state.get("animal_id", "dog")))
-		var spawn := _local_player.global_position + Vector3(float(slot) * 2.4, 0.05, 1.8)
-		# Client copies also register with RaceManager so rank/field counts match
-		# the host. They have no AI driver and are moved only by host snapshots.
+		var state: Dictionary = roster[peer_id] as Dictionary
+		var animal: StringName = StringName(String(state.get("animal_id", "dog")))
+		var spawn: Vector3 = _local_player.global_position + Vector3(float(slot) * 2.4, 0.05, 1.8)
 		_client_remote_proxies[peer_id] = _instantiate_network_racer("RemotePeer_%d" % peer_id, animal, spawn, true)
 		slot += 1
 
 func _instantiate_network_racer(node_name: String, animal: StringName, position: Vector3, race_body: bool) -> WildDashCharacterController:
-	var racer := RACER_SCENE.instantiate() as WildDashCharacterController
+	var racer: WildDashCharacterController = RACER_SCENE.instantiate() as WildDashCharacterController
 	if racer == null:
 		return null
 	racer.name = node_name
@@ -117,7 +115,7 @@ func _instantiate_network_racer(node_name: String, animal: StringName, position:
 func _server_receive_input(payload: Dictionary) -> void:
 	if not multiplayer.is_server():
 		return
-	var peer_id := multiplayer.get_remote_sender_id()
+	var peer_id: int = multiplayer.get_remote_sender_id()
 	if not _host_remote_racers.has(peer_id):
 		return
 	_remote_inputs[peer_id] = WildDashRacerInputState.from_dictionary(payload).to_dictionary()
@@ -125,16 +123,15 @@ func _server_receive_input(payload: Dictionary) -> void:
 func _apply_host_remote_inputs(delta: float) -> void:
 	if not RaceManager.active:
 		return
-	for peer_id_value in _host_remote_racers.keys():
-		var peer_id := int(peer_id_value)
-		var racer := _host_remote_racers[peer_id] as WildDashCharacterController
+	for peer_id_value: Variant in _host_remote_racers.keys():
+		var peer_id: int = int(peer_id_value)
+		var racer: WildDashCharacterController = _host_remote_racers[peer_id] as WildDashCharacterController
 		if racer == null or racer.finished:
 			continue
-		var input := WildDashRacerInputState.from_dictionary(_remote_inputs.get(peer_id, {}))
+		var input: WildDashRacerInputState = WildDashRacerInputState.from_dictionary(_remote_inputs.get(peer_id, {}))
 		_drive_remote_racer(racer, input, delta)
 		if input.bump_pressed:
 			_try_remote_body_check(peer_id, racer)
-		# One-shot actions must not repeat if no new packet arrives this frame.
 		input.jump_pressed = false
 		input.skill_pressed = false
 		input.item_pressed = false
@@ -142,8 +139,11 @@ func _apply_host_remote_inputs(delta: float) -> void:
 		_remote_inputs[peer_id] = input.to_dictionary()
 
 func _drive_remote_racer(racer: WildDashCharacterController, input: WildDashRacerInputState, delta: float) -> void:
-	var target_speed := racer.cruise_speed
-	var acceleration_scale := 1.0
+	# LAN boost is still prototype-only and will receive the same energy authority
+	# state in the dedicated multiplayer balance pass. Keep existing input response
+	# here so this change stays focused on body-check parity.
+	var target_speed: float = racer.cruise_speed
+	var acceleration_scale: float = 1.0
 	if input.throttle > 0.05:
 		target_speed = WildDashRacingActionController.get_overdrive_target(racer.max_speed, input.throttle)
 		acceleration_scale = WildDashRacingActionController.OVERDRIVE_ACCELERATION_MULTIPLIER
@@ -168,8 +168,8 @@ func _drive_remote_racer(racer: WildDashCharacterController, input: WildDashRace
 		racer.velocity.y -= racer.gravity * delta
 	elif racer.velocity.y < 0.0:
 		racer.velocity.y = 0.0
-	var forward := -racer.global_transform.basis.z.normalized()
-	var knockback := racer.get_knockback_velocity()
+	var forward: Vector3 = -racer.global_transform.basis.z.normalized()
+	var knockback: Vector3 = racer.get_knockback_velocity()
 	racer.velocity.x = forward.x * racer.current_speed + knockback.x
 	racer.velocity.z = forward.z * racer.current_speed + knockback.z
 	racer.move_and_slide()
@@ -181,45 +181,57 @@ func _drive_remote_racer(racer: WildDashCharacterController, input: WildDashRace
 func _try_remote_body_check(peer_id: int, racer: WildDashCharacterController) -> void:
 	if float(_remote_bump_cooldowns.get(peer_id, 0.0)) > 0.0:
 		return
-	var target := _find_body_check_target(racer)
+	var target: WildDashCharacterController = _find_body_check_target(racer)
 	if target == null:
 		return
-	var offset := target.global_position - racer.global_position
-	offset.y = 0.0
+	var raw_offset: Vector3 = target.global_position - racer.global_position
+	var offset: Vector3 = Vector3(raw_offset.x, 0.0, raw_offset.z)
 	if offset.length_squared() <= 0.001:
 		return
-	var forward := -racer.global_transform.basis.z.normalized()
-	var push_direction := (offset.normalized() * 0.78 + forward * 0.22).normalized()
-	var strength := WildDashRacingActionController.get_body_check_strength(racer.animal_id)
-	target.apply_knockback(push_direction, strength)
-	target.current_speed *= WildDashRacingActionController.TARGET_SPEED_RETENTION
+
+	var attacker_right: Vector3 = racer.global_transform.basis.x.normalized()
+	var side_amount: float = offset.dot(attacker_right)
+	var side_sign: float = signf(side_amount)
+	if absf(side_amount) < 0.18:
+		side_sign = 1.0
+	var lateral_push: Vector3 = attacker_right * side_sign
+	var push_direction: Vector3 = (lateral_push * 0.78 + offset.normalized() * 0.22).normalized()
+	var impulse: float = WildDashRacingActionController.calculate_body_check_impulse(racer.animal_id, target.animal_id)
+	target.apply_knockback(push_direction, impulse)
+	var target_retention: float = clampf(0.94 - maxf(0.0, impulse - 3.0) * 0.018, 0.80, 0.94)
+	target.current_speed *= target_retention
 	racer.current_speed *= WildDashRacingActionController.ATTACKER_SPEED_RETENTION
 	_remote_bump_cooldowns[peer_id] = WildDashRacingActionController.BODY_CHECK_COOLDOWN
+	print("RC9 NETWORK BODY CHECK attacker=%s target=%s impulse=%.2f" % [racer.name, target.name, impulse])
 
 func _find_body_check_target(racer: WildDashCharacterController) -> WildDashCharacterController:
 	var best: WildDashCharacterController = null
-	var best_distance := INF
-	var forward := -racer.global_transform.basis.z.normalized()
+	var best_score: float = INF
+	var forward: Vector3 = -racer.global_transform.basis.z.normalized()
 	for candidate: Node3D in RaceManager.racers:
 		if candidate == racer or not candidate is WildDashCharacterController:
 			continue
-		var target := candidate as WildDashCharacterController
+		var target: WildDashCharacterController = candidate as WildDashCharacterController
 		if target.finished:
 			continue
-		var offset := target.global_position - racer.global_position
-		offset.y = 0.0
-		var distance := offset.length()
+		var raw_offset: Vector3 = target.global_position - racer.global_position
+		if absf(raw_offset.y) > WildDashRacingActionController.BODY_CHECK_MAX_VERTICAL_DELTA:
+			continue
+		var offset: Vector3 = Vector3(raw_offset.x, 0.0, raw_offset.z)
+		var distance: float = offset.length()
 		if distance <= 0.01 or distance > WildDashRacingActionController.BODY_CHECK_RANGE:
 			continue
-		if forward.dot(offset / distance) < WildDashRacingActionController.BODY_CHECK_FORWARD_DOT:
+		var alignment: float = forward.dot(offset / distance)
+		if alignment < WildDashRacingActionController.BODY_CHECK_FORWARD_DOT:
 			continue
-		if distance < best_distance:
-			best_distance = distance
+		var score: float = distance - maxf(0.0, alignment) * 0.35
+		if score < best_score:
+			best_score = score
 			best = target
 	return best
 
 func _tick_remote_bump_cooldowns(delta: float) -> void:
-	for peer_id in _remote_bump_cooldowns.keys():
+	for peer_id: Variant in _remote_bump_cooldowns.keys():
 		_remote_bump_cooldowns[peer_id] = maxf(0.0, float(_remote_bump_cooldowns[peer_id]) - delta)
 
 func _broadcast_authoritative_state() -> void:
@@ -227,9 +239,9 @@ func _broadcast_authoritative_state() -> void:
 		return
 	var snapshot: Array = []
 	snapshot.append(_racer_state(1, _local_player))
-	for peer_id_value in _host_remote_racers.keys():
-		var peer_id := int(peer_id_value)
-		var racer := _host_remote_racers[peer_id] as WildDashCharacterController
+	for peer_id_value: Variant in _host_remote_racers.keys():
+		var peer_id: int = int(peer_id_value)
+		var racer: WildDashCharacterController = _host_remote_racers[peer_id] as WildDashCharacterController
 		if racer != null:
 			snapshot.append(_racer_state(peer_id, racer))
 	rpc("_client_receive_authoritative_state", snapshot)
@@ -249,27 +261,26 @@ func _racer_state(peer_id: int, racer: WildDashCharacterController) -> Dictionar
 func _client_receive_authoritative_state(snapshot: Array) -> void:
 	if multiplayer.is_server() or _local_player == null:
 		return
-	var local_peer := multiplayer.get_unique_id()
-	for value in snapshot:
+	var local_peer: int = multiplayer.get_unique_id()
+	for value: Variant in snapshot:
 		if typeof(value) != TYPE_DICTIONARY:
 			continue
-		var state := value as Dictionary
-		var peer_id := int(state.get("peer_id", 0))
+		var state: Dictionary = value as Dictionary
+		var peer_id: int = int(state.get("peer_id", 0))
 		var position: Vector3 = state.get("position", Vector3.ZERO)
-		var rotation_y := float(state.get("rotation_y", 0.0))
-		var speed := float(state.get("speed", 0.0))
+		var rotation_y: float = float(state.get("rotation_y", 0.0))
+		var speed: float = float(state.get("speed", 0.0))
 		if peer_id == local_peer:
-			# Local prediction stays responsive; host only pulls meaningful drift back.
 			if _local_player.global_position.distance_to(position) > 0.18:
 				_local_player.global_position = _local_player.global_position.lerp(position, CLIENT_CORRECTION_WEIGHT)
 				_local_player.rotation.y = lerp_angle(_local_player.rotation.y, rotation_y, CLIENT_CORRECTION_WEIGHT)
 				_local_player.current_speed = lerpf(_local_player.current_speed, speed, CLIENT_CORRECTION_WEIGHT)
 			continue
-		var proxy := _client_remote_proxies.get(peer_id) as WildDashCharacterController
+		var proxy: WildDashCharacterController = _client_remote_proxies.get(peer_id) as WildDashCharacterController
 		if proxy == null:
-			var roster := NetworkManager.get_players()
-			var player_state := roster.get(peer_id, {}) as Dictionary
-			var animal := StringName(String(player_state.get("animal_id", "dog")))
+			var roster: Dictionary = NetworkManager.get_players()
+			var player_state: Dictionary = roster.get(peer_id, {}) as Dictionary
+			var animal: StringName = StringName(String(player_state.get("animal_id", "dog")))
 			proxy = _instantiate_network_racer("RemotePeer_%d" % peer_id, animal, position, true)
 			_client_remote_proxies[peer_id] = proxy
 		if proxy != null:
