@@ -3,6 +3,7 @@ extends RefCounted
 
 ## Shared race-contact defense model for all 12 playable animals.
 ## A higher defense rating means less received knockback, launch and item disruption.
+## Feather/light racers receive an extra ring-out multiplier from very strong trunk attacks.
 
 const DEFENSE_RATINGS: Dictionary = {
 	&"elephant": 10.0,
@@ -61,19 +62,33 @@ static func get_item_disruption_multiplier(animal_id: StringName) -> float:
 static func get_effective_impulse(raw_power: float, target_id: StringName) -> float:
 	return raw_power * get_knockback_multiplier(target_id)
 
-static func get_launch_strength(raw_power: float, target_id: StringName) -> float:
-	var effective: float = get_effective_impulse(raw_power, target_id)
+static func get_ring_out_multiplier(target_id: StringName) -> float:
 	var defense: float = get_defense_rating(target_id)
-	if effective < 10.0:
+	if defense <= 3.5:
+		return 1.30
+	if defense <= 4.5:
+		return 1.20
+	if defense <= 5.5:
+		return 1.08
+	return 1.0
+
+static func get_ring_out_impulse(raw_power: float, target_id: StringName) -> float:
+	var impulse: float = get_effective_impulse(raw_power, target_id) * get_ring_out_multiplier(target_id)
+	return minf(impulse, 48.0)
+
+static func get_launch_strength(raw_power: float, target_id: StringName) -> float:
+	var effective: float = get_ring_out_impulse(raw_power, target_id)
+	var defense: float = get_defense_rating(target_id)
+	if effective < 9.0:
 		return 0.0
 	if defense <= 3.5:
-		return clampf(2.8 + (effective - 10.0) * 0.22, 2.8, 5.6)
+		return clampf(3.8 + (effective - 9.0) * 0.20, 3.8, 7.4)
 	if defense <= 4.5:
-		return clampf(2.1 + (effective - 10.0) * 0.18, 2.1, 4.8)
+		return clampf(3.0 + (effective - 9.0) * 0.17, 3.0, 6.4)
 	if defense <= 5.5:
-		return clampf(1.25 + (effective - 10.0) * 0.12, 1.25, 3.1)
+		return clampf(1.7 + (effective - 9.0) * 0.11, 1.7, 3.8)
 	if defense <= 7.0:
-		return clampf(0.55 + (effective - 10.0) * 0.07, 0.55, 1.6)
+		return clampf(0.70 + (effective - 9.0) * 0.06, 0.70, 1.8)
 	return 0.0
 
 static func get_item_speed_floor_ratio(animal_id: StringName) -> float:
