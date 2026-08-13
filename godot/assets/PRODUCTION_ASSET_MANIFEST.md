@@ -6,10 +6,10 @@ This manifest defines the hand-authored asset slots that replace the RC7 in-engi
 
 | Species | Runtime GLB target | Wrapper scene | Status |
 | --- | --- | --- | --- |
-| Dog | `assets/characters/playable/dog/chr_dog_lod0.glb` | `characters/visuals/dog_visual.tscn` | RC7 production-detail proxy active; GLB pending |
-| Rabbit | `assets/characters/playable/rabbit/chr_rabbit_lod0.glb` | `characters/visuals/rabbit_visual.tscn` | RC7 production-detail proxy active; GLB pending |
-| Cat | `assets/characters/playable/cat/chr_cat_lod0.glb` | `characters/visuals/cat_visual.tscn` | RC7 production-detail proxy active; GLB pending |
-| Elephant | `assets/characters/playable/elephant/chr_elephant_lod0.glb` | `characters/visuals/elephant_visual.tscn` | RC7 production-detail proxy active; GLB pending |
+| Dog | `assets/characters/playable/dog/chr_dog_lod0.glb` | `characters/visuals/dog_visual.tscn` | RC7 hero production-polish active; GLB pending |
+| Rabbit | `assets/characters/playable/rabbit/chr_rabbit_lod0.glb` | `characters/visuals/rabbit_visual.tscn` | RC7 hero production-polish active; GLB pending |
+| Cat | `assets/characters/playable/cat/chr_cat_lod0.glb` | `characters/visuals/cat_visual.tscn` | RC7 hero production-polish active; GLB pending |
+| Elephant | `assets/characters/playable/elephant/chr_elephant_lod0.glb` | `characters/visuals/elephant_visual.tscn` | RC7 hero production-polish active; GLB pending |
 
 ### Required character animation names
 `Idle`, `Run`, `Jump`, `Hit`, `Skill`, `Win`, `Lose`
@@ -24,21 +24,22 @@ This manifest defines the hand-authored asset slots that replace the RC7 in-engi
 - Prefer one material, two maximum.
 - Wrapper scene is responsible for visual scale/orientation correction.
 
-## NPC slots
+## NPC character slots
 
-Target root: `assets/characters/npc/<species>/`
+All eight race NPC species now receive the same RC7 `WildDashProductionCharacterPolish` layer from `npc_animal_visual.gd`. The base procedural species builder remains authoritative until authored GLBs arrive.
 
-Planned species:
-- bear
-- panda
-- fox
-- deer
-- wolf
-- monkey
-- boar
-- raccoon
+| Species | Runtime GLB target | Runtime wrapper | RC7 status |
+| --- | --- | --- | --- |
+| Bear | `assets/characters/npc/bear/chr_bear_lod0.glb` | `characters/visuals/bear_visual.tscn` | production-polish active; GLB pending |
+| Panda | `assets/characters/npc/panda/chr_panda_lod0.glb` | `characters/visuals/panda_visual.tscn` | production-polish active; GLB pending |
+| Fox | `assets/characters/npc/fox/chr_fox_lod0.glb` | `characters/visuals/fox_visual.tscn` | production-polish active; GLB pending |
+| Deer | `assets/characters/npc/deer/chr_deer_lod0.glb` | `characters/visuals/deer_visual.tscn` | production-polish active; GLB pending |
+| Wolf | `assets/characters/npc/wolf/chr_wolf_lod0.glb` | `characters/visuals/wolf_visual.tscn` | production-polish active; GLB pending |
+| Monkey | `assets/characters/npc/monkey/chr_monkey_lod0.glb` | `characters/visuals/monkey_visual.tscn` | production-polish active; GLB pending |
+| Boar | `assets/characters/npc/boar/chr_boar_lod0.glb` | `characters/visuals/boar_visual.tscn` | production-polish active; GLB pending |
+| Raccoon | `assets/characters/npc/raccoon/chr_raccoon_lod0.glb` | `characters/visuals/raccoon_visual.tscn` | production-polish active; GLB pending |
 
-The NPC gameplay definitions and skills are not replaced by art assets.
+The NPC gameplay definitions, AI personality, stats and skills are not replaced by art assets.
 
 ## Environment kit slots
 
@@ -83,6 +84,7 @@ If a production asset needs collision, create a dedicated `_col` proxy and conne
 - Hero assets can use normal MeshInstance3D nodes with visibility ranges.
 - Never add per-prop `_process()` loops for static scenery.
 - Keep small micro detail out of distant LODs.
+- RC7 procedural production-polish is a bridge; authored GLBs should replace, not stack indefinitely on top of, equivalent proxy detail.
 
 ## Replacement protocol
 1. Add GLB under the appropriate asset slot.
