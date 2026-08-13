@@ -14,4 +14,6 @@ WILD DASH의 실제 WAV/OGG SFX와 BGM을 배치합니다.
 
 외부 음악 파일이 없거나 로드되지 않으면 `AudioManager`가 기존 procedural BGM으로 안전하게 fallback합니다.
 
+원본 WAV는 저장소에 넣지 않고, 배포용으로 변환한 OGG만 runtime asset으로 사용합니다. Suno 등 외부 생성 도구에서 만든 음악은 실제 배포 전에 해당 계정/플랜의 상업적 이용 권한을 별도로 확인합니다.
+
 추가 트랙 음악은 `AudioManager`의 theme slot에 등록하고 `GameManager`의 round-to-theme mapping에 연결합니다.
