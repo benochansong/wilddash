@@ -205,7 +205,7 @@ func _load_current_round() -> void:
 	print("LOAD MODE index=%d id=%s ai=%d" % [current_round_index + 1, mode_id, ai_count])
 	var error: Error = get_tree().change_scene_to_file(scene_path)
 	if error != OK:
-		push_error("Failed to load round scene %s: %s" % [scene_path, error_string(error)])
+		push_error("Failed to load round scene %s: %s" % [scene_path, error_string(error))
 
 func _transition_after_round() -> void:
 	var delay := 0.05 if DisplayServer.get_name() == "headless" else 1.2
@@ -244,6 +244,11 @@ func _race_theme_for_current_round() -> String:
 		_:
 			return "race"
 
+func _arena_theme_for_current_round() -> String:
+	if get_current_round_id() == &"push_out":
+		return "arena_push_out"
+	return "arena"
+
 func _update_audio_for_state(next_state: GameState) -> void:
 	var audio := get_node_or_null("/root/AudioManager")
 	if audio == null:
@@ -253,7 +258,9 @@ func _update_audio_for_state(next_state: GameState) -> void:
 			audio.call("play_theme", "menu")
 		GameState.RACE, GameState.COUNTDOWN:
 			audio.call("play_theme", _race_theme_for_current_round())
-		GameState.ARENA, GameState.FINAL, GameState.ROUND_BREAK:
+		GameState.ARENA, GameState.FINAL:
+			audio.call("play_theme", _arena_theme_for_current_round())
+		GameState.ROUND_BREAK:
 			audio.call("play_theme", "arena")
 		GameState.RESULT:
 			audio.call("play_theme", "result")
