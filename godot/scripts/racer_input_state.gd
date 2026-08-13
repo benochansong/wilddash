@@ -10,6 +10,7 @@ var throttle := 0.0
 var jump_pressed := false
 var skill_pressed := false
 var item_pressed := false
+var bump_pressed := false
 var sequence := 0
 
 func to_dictionary() -> Dictionary:
@@ -19,6 +20,7 @@ func to_dictionary() -> Dictionary:
 		"jump_pressed": jump_pressed,
 		"skill_pressed": skill_pressed,
 		"item_pressed": item_pressed,
+		"bump_pressed": bump_pressed,
 		"sequence": sequence,
 	}
 
@@ -29,5 +31,6 @@ static func from_dictionary(data: Dictionary) -> WildDashRacerInputState:
 	state.jump_pressed = bool(data.get("jump_pressed", false))
 	state.skill_pressed = bool(data.get("skill_pressed", false))
 	state.item_pressed = bool(data.get("item_pressed", false))
+	state.bump_pressed = bool(data.get("bump_pressed", false))
 	state.sequence = maxi(0, int(data.get("sequence", 0)))
 	return state
