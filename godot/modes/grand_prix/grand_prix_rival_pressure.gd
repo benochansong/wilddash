@@ -57,7 +57,8 @@ func _bind_signature_rivals() -> void:
 		if not RIVAL_PROFILES.has(racer_name):
 			continue
 
-		var profile: Dictionary = (RIVAL_PROFILES[racer_name] as Dictionary).duplicate(true)
+		var profile: Dictionary = RIVAL_PROFILES[racer_name]
+		profile = profile.duplicate(true)
 		var base_speed := driver.target_speed
 		var base_acceleration := driver.acceleration
 		driver.acceleration = maxf(driver.acceleration, base_acceleration * float(profile["accel_scale"]))
@@ -105,7 +106,7 @@ func _process(delta: float) -> void:
 		var racer := entry["racer"] as WildDashCharacterController
 		if driver == null or racer == null or racer.finished:
 			continue
-		var profile: Dictionary = entry["profile"] as Dictionary
+		var profile: Dictionary = entry["profile"]
 		var base_speed := float(entry["base_speed"])
 		var base_acceleration := float(entry["base_acceleration"])
 		var rival_progress := RaceManager.get_track_progress(racer)
