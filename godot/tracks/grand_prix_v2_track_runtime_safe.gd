@@ -11,7 +11,7 @@ extends "res://tracks/grand_prix_v2_track.gd"
 const START_GRID_SAFE_LIFT: float = 0.75
 
 func _ready() -> void:
-	await super._ready()
+	super._ready()
 	var updated: int = _enable_two_sided_road_collision(self)
 	print("GRAND PRIX V2 START SAFETY READY two_sided_road_shapes=%d start_lift=%.2fm" % [
 		updated,
