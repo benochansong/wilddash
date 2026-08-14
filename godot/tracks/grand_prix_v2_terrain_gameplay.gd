@@ -11,6 +11,7 @@ const TERRAIN_ZONE_HEIGHT := 8.0
 const RIVER_CURRENT_BASE := 2.15
 const RIVER_CURRENT_STRONG := 2.70
 const RIVER_CURRENT_EXIT := 1.35
+const VISUAL_CHUNK_LENGTH: float = 100.0
 
 var _track: WildDashGrandPrixV2Track
 var _route: Array[Vector3] = []
@@ -19,6 +20,8 @@ var _terrain_root: Node3D
 var _visual_root: Node3D
 var _obstacle_root: Node3D
 var _palette: Dictionary = {}
+var _route_distances: PackedFloat32Array = PackedFloat32Array()
+var _visual_multimesh_count: int = 0
 
 func _ready() -> void:
 	call_deferred("_build_when_ready")
@@ -35,6 +38,7 @@ func _build_when_ready() -> void:
 	if _route.size() < 2:
 		return
 	_palette = WildDashEnvironmentMaterialLibrary.get_palette()
+	_build_route_distances()
 	_build_roots()
 	_build_long_river()
 	_build_mountain_gameplay()
@@ -42,12 +46,25 @@ func _build_when_ready() -> void:
 	_build_rough_descent()
 	_build_stage2_obstacles()
 
-	print("GRAND PRIX V2 TERRAIN READY river=%.1fm mountain=%.1fm summit=%.1fm rough=%.1fm water_visual=true ai_shared=true" % [
+	print("GRAND PRIX V2 TERRAIN READY river=%.1fm mountain=%.1fm summit=%.1fm rough=%.1fm water_visual=true ai_shared=true visual_multimeshes=%d chunk_target=%.0fm giant_aabb=false" % [
 		_section_length(&"long_river"),
 		_section_length(&"mountain_ascent"),
 		_section_length(&"summit_ridge"),
 		_section_length(&"rough_descent"),
+		_visual_multimesh_count,
+		VISUAL_CHUNK_LENGTH,
 	])
+
+func get_visual_multimesh_count() -> int:
+	return _visual_multimesh_count
+
+func _build_route_distances() -> void:
+	_route_distances.resize(_route.size())
+	if _route.is_empty():
+		return
+	_route_distances[0] = 0.0
+	for point_index: int in range(1, _route.size()):
+		_route_distances[point_index] = _route_distances[point_index - 1] + _route[point_index - 1].distance_to(_route[point_index])
 
 func _build_roots() -> void:
 	_terrain_root = Node3D.new()
@@ -182,16 +199,10 @@ func _build_rough_descent() -> void:
 	_add_box_multimesh("V2RoughGravelPatches", gravel_transforms, _gravel_material())
 
 func _build_stage2_obstacles() -> void:
-	# River: rock islands and logs break up the 320m swim without turning it into
-	# an obstacle maze. High-Power racers can clear breakable pieces; Agility
-	# reduces the penalty for everyone else.
 	_spawn_obstacle(&"long_river", 0.24, -4.2, &"river_rock_a", Vector3(3.2, 1.7, 3.2), 4.2, 0.56, false, &"rock", 0.72)
 	_spawn_obstacle(&"long_river", 0.43, 3.4, &"river_log_a", Vector3(4.8, 0.75, 1.15), 3.6, 0.62, true, &"log", 0.83)
 	_spawn_obstacle(&"long_river", 0.66, -2.8, &"river_rock_b", Vector3(2.8, 1.45, 2.8), 4.0, 0.58, false, &"rock", 0.70)
 	_spawn_obstacle(&"long_river", 0.82, 3.8, &"river_log_b", Vector3(4.2, 0.72, 1.0), 3.4, 0.64, true, &"log", 0.82)
-
-	# Mountain / descent: enough light obstacles to make Power and Agility matter
-	# without replacing the dedicated Stage 3 obstacle pass.
 	_spawn_obstacle(&"mountain_ascent", 0.28, -2.8, &"mountain_rock_a", Vector3(2.4, 1.6, 2.4), 4.5, 0.55, true, &"rock", 0.78)
 	_spawn_obstacle(&"mountain_ascent", 0.58, 2.6, &"mountain_rock_b", Vector3(2.2, 1.45, 2.2), 4.3, 0.57, true, &"rock", 0.74)
 	_spawn_obstacle(&"mountain_ascent", 0.78, 0.0, &"mountain_log", Vector3(4.6, 0.72, 1.0), 3.9, 0.60, true, &"log", 0.74)
@@ -213,11 +224,7 @@ func _spawn_obstacle(
 	var section_range: Vector2i = _get_range(section_id)
 	if section_range.x < 0:
 		return
-	var segment_index: int = clampi(
-		roundi(lerpf(float(section_range.x), float(section_range.y), clampf(progress, 0.0, 1.0))),
-		section_range.x,
-		section_range.y
-	)
+	var segment_index: int = clampi(roundi(lerpf(float(section_range.x), float(section_range.y), clampf(progress, 0.0, 1.0))), section_range.x, section_range.y)
 	var a: Vector3 = _route[segment_index]
 	var b: Vector3 = _route[segment_index + 1]
 	var forward: Vector3 = _planar_forward(a, b)
@@ -227,15 +234,7 @@ func _spawn_obstacle(
 	obstacle.position = a.lerp(b, 0.5) + right * lateral_offset + Vector3.UP * vertical_offset
 	_obstacle_root.add_child(obstacle)
 	obstacle.look_at(obstacle.global_position + forward, Vector3.UP)
-	obstacle.configure(
-		obstacle_id,
-		size,
-		_rock_material() if shape_kind == &"rock" else _wood_material(),
-		impact_strength,
-		retention,
-		breakable,
-		shape_kind
-	)
+	obstacle.configure(obstacle_id, size, _rock_material() if shape_kind == &"rock" else _wood_material(), impact_strength, retention, breakable, shape_kind)
 
 func _add_terrain_zone_for_segment(segment_index: int, terrain_type: StringName, prefix: String) -> void:
 	if segment_index < 0 or segment_index + 1 >= _route.size():
@@ -246,14 +245,7 @@ func _add_terrain_zone_for_segment(segment_index: int, terrain_type: StringName,
 	var zone := WildDashTerrainZone.new()
 	zone.name = "%s_%03d" % [prefix, segment_index]
 	_terrain_root.add_child(zone)
-	zone.configure_route_box(
-		StringName("%s_%03d" % [prefix, segment_index]),
-		terrain_type,
-		a,
-		b,
-		width + 0.8,
-		TERRAIN_ZONE_HEIGHT
-	)
+	zone.configure_route_box(StringName("%s_%03d" % [prefix, segment_index]), terrain_type, a, b, width + 0.8, TERRAIN_ZONE_HEIGHT)
 
 func _build_mountain_mass(section_range: Vector2i) -> void:
 	var transforms: Array[Transform3D] = []
@@ -305,13 +297,7 @@ func _planar_forward(a: Vector3, b: Vector3) -> Vector3:
 		return Vector3.FORWARD
 	return result.normalized()
 
-func _segment_transform(
-	from_point: Vector3,
-	to_point: Vector3,
-	width: float,
-	height: float,
-	length_extra: float
-) -> Transform3D:
+func _segment_transform(from_point: Vector3, to_point: Vector3, width: float, height: float, length_extra: float) -> Transform3D:
 	var distance: float = from_point.distance_to(to_point)
 	var midpoint: Vector3 = (from_point + to_point) * 0.5
 	var transform := Transform3D(Basis.IDENTITY, midpoint)
@@ -322,42 +308,76 @@ func _segment_transform(
 func _add_box_multimesh(node_name: String, transforms: Array[Transform3D], material: Material) -> void:
 	if transforms.is_empty():
 		return
-	var mesh := BoxMesh.new()
+	var mesh: BoxMesh = BoxMesh.new()
 	mesh.size = Vector3.ONE
-	var multimesh := MultiMesh.new()
-	multimesh.transform_format = MultiMesh.TRANSFORM_3D
-	multimesh.mesh = mesh
-	multimesh.instance_count = transforms.size()
-	for index: int in range(transforms.size()):
-		multimesh.set_instance_transform(index, transforms[index])
-	multimesh.custom_aabb = AABB(Vector3(-300.0, -30.0, -1950.0), Vector3(600.0, 140.0, 2150.0))
-	var instance := MultiMeshInstance3D.new()
-	instance.name = node_name
-	instance.multimesh = multimesh
-	instance.material_override = material
-	_visual_root.add_child(instance)
+	_add_chunked_multimesh(node_name, mesh, transforms, material)
 
 func _add_mountain_multimesh(node_name: String, transforms: Array[Transform3D], material: Material) -> void:
 	if transforms.is_empty():
 		return
-	var mountain := CylinderMesh.new()
+	var mountain: CylinderMesh = CylinderMesh.new()
 	mountain.top_radius = 0.22
 	mountain.bottom_radius = 1.0
 	mountain.height = 1.0
 	mountain.radial_segments = 7
 	mountain.rings = 1
-	var multimesh := MultiMesh.new()
-	multimesh.transform_format = MultiMesh.TRANSFORM_3D
-	multimesh.mesh = mountain
-	multimesh.instance_count = transforms.size()
-	for index: int in range(transforms.size()):
-		multimesh.set_instance_transform(index, transforms[index])
-	multimesh.custom_aabb = AABB(Vector3(-320.0, -30.0, -1950.0), Vector3(640.0, 150.0, 2150.0))
-	var instance := MultiMeshInstance3D.new()
-	instance.name = node_name
-	instance.multimesh = multimesh
-	instance.material_override = material
-	_visual_root.add_child(instance)
+	_add_chunked_multimesh(node_name, mountain, transforms, material)
+
+func _add_chunked_multimesh(node_name: String, mesh: Mesh, transforms: Array[Transform3D], material: Material) -> void:
+	var buckets: Dictionary = {}
+	for transform: Transform3D in transforms:
+		var chunk_index: int = _chunk_for_origin(transform.origin)
+		var bucket: Array = buckets.get(chunk_index, [])
+		bucket.append(transform)
+		buckets[chunk_index] = bucket
+	var keys: Array = buckets.keys()
+	keys.sort()
+	for chunk_key: Variant in keys:
+		var chunk_transforms: Array = buckets[chunk_key]
+		if chunk_transforms.is_empty():
+			continue
+		var multimesh: MultiMesh = MultiMesh.new()
+		multimesh.transform_format = MultiMesh.TRANSFORM_3D
+		multimesh.mesh = mesh
+		multimesh.instance_count = chunk_transforms.size()
+		for index: int in range(chunk_transforms.size()):
+			multimesh.set_instance_transform(index, chunk_transforms[index] as Transform3D)
+		multimesh.custom_aabb = _tight_aabb(chunk_transforms, 2.0)
+		var instance: MultiMeshInstance3D = MultiMeshInstance3D.new()
+		instance.name = "%s_Chunk_%02d" % [node_name, int(chunk_key)]
+		instance.multimesh = multimesh
+		instance.material_override = material
+		instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_visual_root.add_child(instance)
+		_visual_multimesh_count += 1
+
+func _chunk_for_origin(origin: Vector3) -> int:
+	if _route.is_empty() or _route_distances.is_empty():
+		return 0
+	var best_index: int = 0
+	var best_distance: float = INF
+	for point_index: int in range(_route.size()):
+		var distance: float = origin.distance_squared_to(_route[point_index])
+		if distance < best_distance:
+			best_distance = distance
+			best_index = point_index
+	return int(floor(_route_distances[best_index] / VISUAL_CHUNK_LENGTH))
+
+func _tight_aabb(transforms: Array, margin: float) -> AABB:
+	var first: Transform3D = transforms[0] as Transform3D
+	var minimum: Vector3 = first.origin
+	var maximum: Vector3 = first.origin
+	for value: Variant in transforms:
+		var transform: Transform3D = value as Transform3D
+		var extents: Vector3 = Vector3(transform.basis.x.length(), transform.basis.y.length(), transform.basis.z.length()) * 0.7 + Vector3.ONE * 0.3
+		minimum.x = minf(minimum.x, transform.origin.x - extents.x)
+		minimum.y = minf(minimum.y, transform.origin.y - extents.y)
+		minimum.z = minf(minimum.z, transform.origin.z - extents.z)
+		maximum.x = maxf(maximum.x, transform.origin.x + extents.x)
+		maximum.y = maxf(maximum.y, transform.origin.y + extents.y)
+		maximum.z = maxf(maximum.z, transform.origin.z + extents.z)
+	var padding: Vector3 = Vector3.ONE * margin
+	return AABB(minimum - padding, maximum - minimum + padding * 2.0)
 
 func _material_from_palette(key: StringName, fallback: Color) -> Material:
 	if _palette.has(key):
