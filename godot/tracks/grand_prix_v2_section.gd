@@ -12,7 +12,7 @@ var target_elevation: float
 var obstacle_profile: StringName
 var ai_profile: StringName
 var sample_step: float
-var anchors: Array[Vector3]
+var anchors: Array[Vector3] = []
 
 func _init(
 	section_id: StringName,
@@ -22,7 +22,7 @@ func _init(
 	elevation: float,
 	obstacles: StringName,
 	ai: StringName,
-	section_anchors: Array[Vector3],
+	section_anchors: Array,
 	step: float = 10.0
 ) -> void:
 	id = section_id
@@ -32,7 +32,7 @@ func _init(
 	target_elevation = elevation
 	obstacle_profile = obstacles
 	ai_profile = ai
-	anchors = section_anchors.duplicate()
+	anchors.assign(section_anchors)
 	sample_step = clampf(step, 8.0, 15.0)
 
 func get_anchor_length() -> float:
@@ -45,7 +45,7 @@ func get_min_elevation() -> float:
 	if anchors.is_empty():
 		return 0.0
 	var result := anchors[0].y
-	for point in anchors:
+	for point: Vector3 in anchors:
 		result = minf(result, point.y)
 	return result
 
@@ -53,6 +53,6 @@ func get_max_elevation() -> float:
 	if anchors.is_empty():
 		return 0.0
 	var result := anchors[0].y
-	for point in anchors:
+	for point: Vector3 in anchors:
 		result = maxf(result, point.y)
 	return result
