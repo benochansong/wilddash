@@ -2,13 +2,11 @@ class_name WildDashTrackProductionDressing
 extends Node3D
 
 ## Visual-only RC7/RC9 production dressing for race tracks.
-## Builds readable hero arches, route beacons, continuous edge rails and
-## landmark pylons from existing route points. No CollisionObject3D is created.
-##
-## Guardrails deliberately use ordinary MeshInstance3D beams instead of a
-## course-length MultiMesh. Every adjacent route segment shares the exact same
-## edge point, so the visible rail is continuous from start to finish and cannot
-## disappear because a distant MultiMesh batch was culled.
+## V2.8: Grand Prix no longer uses this visual system at all. Round 1 now uses
+## natural terrain boundaries plus invisible safety collision. The explicit
+## early return below is a defense-in-depth guard: even if an old/stale scene
+## accidentally instantiates ProductionArtDressing, it cannot create the cyan
+## continuous rails, route beacons or landmark pylons in Grand Prix.
 
 const RAIL_SIDES: Array[float] = [-1.0, 1.0]
 const GUARDRAIL_UPPER_WIDTH: float = 0.34
@@ -32,6 +30,13 @@ func _ready() -> void:
 	call_deferred("_build_when_track_ready")
 
 func _build_when_track_ready() -> void:
+	# V2.8 HARD BLOCK. Do not let the old RC7/RC9 Grand Prix dressing create
+	# GuardrailUpper/Lower/Post, RouteBeacon or HeroLandmark visuals under any
+	# circumstance. Neon Harbor and Snowpeak keep their own production dressing.
+	if track_id == &"grand_prix":
+		print("V2.8 LEGACY PRODUCTION ART BLOCKED track=grand_prix rails=0 beacons=0 pylons=0")
+		return
+
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var track := _find_track(get_parent())
@@ -144,8 +149,6 @@ func _build_route_beacons(route: Array[Vector3], palette: Dictionary) -> void:
 		for side in RAIL_SIDES:
 			var root := Node3D.new()
 			root.name = "RouteBeacon_%02d_%s" % [index, "L" if side < 0.0 else "R"]
-			# Beacon poles share the guardrail edge line and both sides intentionally
-			# use the same accent colors for a symmetric race-course silhouette.
 			root.position = route[index] + right * rail_offset * side
 			_art_root.add_child(root)
 			_add_cylinder(root, "Pole", Vector3.UP * 1.15, 0.085, 2.3, structure)
@@ -165,10 +168,6 @@ func _build_continuous_guardrails(route: Array[Vector3], palette: Dictionary) ->
 		var edge_points: Array[Vector3] = _build_guardrail_edge_points(route, rail_offset, side)
 		if edge_points.size() != route.size():
 			continue
-
-		# Every route point gets a real support post. The same point is also used
-		# as the end of one beam and the start of the next beam, so no segment can
-		# visually stop after the opening portion of the course.
 		for index in range(edge_points.size()):
 			var support_height: float = upper_height + 0.18
 			_add_box(
