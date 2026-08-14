@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://modes/grand_prix/grand_prix_v2_mode.gd" id="1_mode"]
 [ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="2_feel"]
@@ -11,12 +11,16 @@
 [ext_resource type="Script" path="res://systems/race_combat_core_v2.gd" id="14_combat_v2"]
 [ext_resource type="Script" path="res://systems/bear_combat_v2_controller.gd" id="15_bear_combat"]
 [ext_resource type="Script" path="res://systems/terrain_movement_controller.gd" id="16_terrain"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v2_terrain_gameplay.gd" id="17_terrain_gameplay"]
 
 [node name="GrandPrix" type="Node3D"]
 script = ExtResource("1_mode")
 
 [node name="V2CourseGuidance" type="Node3D" parent="."]
 script = ExtResource("6_art")
+
+[node name="V2TerrainGameplay" type="Node3D" parent="."]
+script = ExtResource("17_terrain_gameplay")
 
 [node name="RacingActionController" type="Node" parent="."]
 script = ExtResource("10_actions")
