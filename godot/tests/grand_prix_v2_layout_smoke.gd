@@ -73,9 +73,11 @@ func _init() -> void:
 		failures.append("V2.5 road collision contract should remain section-sized")
 
 	# Geometry contract: road, shoulder and barriers share one averaged tangent.
-	# Barrier safety is measured at the visual inner face, not the beam center.
+	# Barrier safety is measured both at the collision inner-face polyline and at
+	# a conservative bound for the actual thick visual barrier body.
 	var maximum_miter_ratio: float = 0.0
 	var minimum_barrier_inner_margin: float = INF
+	var minimum_visual_inner_margin: float = INF
 	for point_index: int in range(points.size()):
 		var miter_ratio: float = WildDashGrandPrixV2Geometry.miter_ratio_at(points, point_index)
 		maximum_miter_ratio = maxf(maximum_miter_ratio, miter_ratio)
@@ -83,12 +85,19 @@ func _init() -> void:
 			failures.append("miter ratio %.3f exceeds V2.5 limit at point %d" % [miter_ratio, point_index])
 			break
 
-		var inner_clearance: float = WildDashGrandPrixV2Geometry.barrier_clearance(points, widths, section_ids, point_index)
 		var required: float = WildDashGrandPrixV2Geometry.barrier_required_clearance(widths, section_ids, point_index)
+		var inner_clearance: float = WildDashGrandPrixV2Geometry.barrier_clearance(points, widths, section_ids, point_index)
 		var inner_margin: float = inner_clearance - required
 		minimum_barrier_inner_margin = minf(minimum_barrier_inner_margin, inner_margin)
 		if inner_margin + 0.001 < WildDashGrandPrixV2Geometry.MIN_BARRIER_INNER_CLEARANCE:
-			failures.append("barrier inner face margin %.3fm is below safety minimum at point %d" % [inner_margin, point_index])
+			failures.append("barrier collision inner-face margin %.3fm is below safety minimum at point %d" % [inner_margin, point_index])
+			break
+
+		var visual_inner_clearance: float = WildDashGrandPrixV2Geometry.barrier_visual_inner_clearance_bound(points, widths, section_ids, point_index)
+		var visual_inner_margin: float = visual_inner_clearance - required
+		minimum_visual_inner_margin = minf(minimum_visual_inner_margin, visual_inner_margin)
+		if visual_inner_margin + 0.001 < WildDashGrandPrixV2Geometry.MIN_BARRIER_INNER_CLEARANCE:
+			failures.append("thick visual barrier can intrude into shoulder at point %d margin=%.3fm" % [point_index, visual_inner_margin])
 			break
 
 		var left_point: Vector3 = WildDashGrandPrixV2Geometry.barrier_point(points, widths, section_ids, point_index, -1.0)
@@ -120,11 +129,11 @@ func _init() -> void:
 			failures.append("section %s must keep <=10m sampling for tunneling safety" % String(section.id))
 
 	if failures.is_empty():
-		print("RC9 GRAND PRIX V2.5 LAYOUT PASS sections=%d points=%d segments=%d checkpoints=%d length=%.1fm elevation=%.1f..%.1f max_y_step=%.2f road_meshes=%d shoulder_meshes=%d road_collision_shapes=%d max_miter_ratio=%.3f min_barrier_inner_margin=%.3f" % [
+		print("RC9 GRAND PRIX V2.5 LAYOUT PASS sections=%d points=%d segments=%d checkpoints=%d length=%.1fm elevation=%.1f..%.1f max_y_step=%.2f road_meshes=%d shoulder_meshes=%d road_collision_shapes=%d max_miter_ratio=%.3f min_barrier_inner_margin=%.3f min_visual_inner_margin=%.3f" % [
 			sections.size(), points.size(), widths.size(), checkpoints.size(), length,
 			elevation.x, elevation.y, max_vertical_step, expected_road_meshes,
 			expected_shoulder_meshes, expected_road_collision_shapes,
-			maximum_miter_ratio, minimum_barrier_inner_margin,
+			maximum_miter_ratio, minimum_barrier_inner_margin, minimum_visual_inner_margin,
 		])
 		quit(0)
 		return
