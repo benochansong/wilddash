@@ -6,7 +6,10 @@ extends RefCounted
 ## corner cannot use one normal for the road and a different normal for rails.
 
 const MITER_LIMIT_RATIO: float = 1.18
+# Clearance from the playable shoulder edge to the *inner face* of a barrier.
+# The visible barrier center is moved farther out by its profile half-width.
 const BARRIER_MARGIN: float = 0.22
+const MIN_BARRIER_INNER_CLEARANCE: float = 0.05
 
 const SHOULDER_WIDTHS: Dictionary = {
 	&"meadow_start": 3.0,
@@ -32,11 +35,29 @@ const BARRIER_PROFILES: Dictionary = {
 	&"final_sprint": &"wood_fence",
 }
 
+# Maximum lateral half-width used by each visual barrier profile. Keeping this
+# in the shared geometry contract prevents a thick visual beam from crossing
+# back over the playable shoulder even when its centerline is technically safe.
+const BARRIER_HALF_WIDTHS: Dictionary = {
+	&"wood_fence": 0.11,
+	&"river_bank": 0.29,
+	&"rock_border": 0.27,
+	&"danger_rail": 0.14,
+	&"rope_or_wood": 0.065,
+	&"rock_wall": 0.39,
+}
+
 static func shoulder_width_for_section(section_id: StringName) -> float:
 	return float(SHOULDER_WIDTHS.get(section_id, 1.5))
 
 static func barrier_profile_for_section(section_id: StringName) -> StringName:
 	return StringName(BARRIER_PROFILES.get(section_id, &"danger_rail"))
+
+static func barrier_half_width_for_profile(profile: StringName) -> float:
+	return float(BARRIER_HALF_WIDTHS.get(profile, 0.14))
+
+static func barrier_half_width_for_section(section_id: StringName) -> float:
+	return barrier_half_width_for_profile(barrier_profile_for_section(section_id))
 
 static func point_section_id(segment_sections: Array[StringName], point_index: int) -> StringName:
 	if segment_sections.is_empty():
@@ -140,6 +161,20 @@ static func shoulder_edge_point(
 	var distance: float = point_half_width(segment_widths, point_index) + point_shoulder_width(segment_sections, point_index)
 	return route[point_index] + lateral_offset(route, point_index, distance) * side
 
+static func barrier_inner_face_point(
+	route: Array[Vector3],
+	segment_widths: Array[float],
+	segment_sections: Array[StringName],
+	point_index: int,
+	side: float
+) -> Vector3:
+	var distance: float = (
+		point_half_width(segment_widths, point_index)
+		+ point_shoulder_width(segment_sections, point_index)
+		+ BARRIER_MARGIN
+	)
+	return route[point_index] + lateral_offset(route, point_index, distance) * side
+
 static func barrier_point(
 	route: Array[Vector3],
 	segment_widths: Array[float],
@@ -147,7 +182,13 @@ static func barrier_point(
 	point_index: int,
 	side: float
 ) -> Vector3:
-	var distance: float = point_half_width(segment_widths, point_index) + point_shoulder_width(segment_sections, point_index) + BARRIER_MARGIN
+	var section_id: StringName = point_section_id(segment_sections, point_index)
+	var distance: float = (
+		point_half_width(segment_widths, point_index)
+		+ point_shoulder_width(segment_sections, point_index)
+		+ BARRIER_MARGIN
+		+ barrier_half_width_for_section(section_id)
+	)
 	return route[point_index] + lateral_offset(route, point_index, distance) * side
 
 static func barrier_clearance(
@@ -156,7 +197,8 @@ static func barrier_clearance(
 	segment_sections: Array[StringName],
 	point_index: int
 ) -> float:
-	var point: Vector3 = barrier_point(route, segment_widths, segment_sections, point_index, 1.0)
+	# Safety is measured at the visual inner face, not at the barrier centerline.
+	var point: Vector3 = barrier_inner_face_point(route, segment_widths, segment_sections, point_index, 1.0)
 	var center: Vector3 = route[point_index]
 	var delta: Vector3 = point - center
 	delta.y = 0.0
