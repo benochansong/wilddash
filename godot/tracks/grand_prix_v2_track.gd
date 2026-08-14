@@ -43,7 +43,7 @@ func _ready() -> void:
 	_build_v2_finish()
 
 	RaceManager.configure_track(get_route_points(), get_checkpoint_positions())
-	var elevation := WildDashGrandPrixV2Layout.get_elevation_range(_v2_bundle)
+	var elevation: Vector2 = WildDashGrandPrixV2Layout.get_elevation_range(_v2_bundle)
 	print("GRAND PRIX V2 READY sections=%d route_points=%d segments=%d checkpoints=%d length=%.1fm elevation=%.1f..%.1f max_vertical_step=%.2f collision_source=route_bundle" % [
 		_v2_sections.size(), _v2_route.size(), _v2_segment_widths.size(), _v2_checkpoint_positions.size(),
 		_v2_track_length, elevation.x, elevation.y, WildDashGrandPrixV2Layout.get_max_vertical_step(_v2_bundle),
@@ -127,20 +127,20 @@ func _build_v2_road_and_collision() -> void:
 	if _v2_route.size() < 2:
 		return
 	var visual_groups: Dictionary = {}
-	for segment_index in range(_v2_route.size() - 1):
-		var a := _v2_route[segment_index]
-		var b := _v2_route[segment_index + 1]
-		var width := get_v2_width_for_segment(segment_index)
-		var section_id := get_v2_section_id_for_segment(segment_index)
-		var material_key := _material_key_for_section(section_id)
+	for segment_index: int in range(_v2_route.size() - 1):
+		var a: Vector3 = _v2_route[segment_index]
+		var b: Vector3 = _v2_route[segment_index + 1]
+		var width: float = get_v2_width_for_segment(segment_index)
+		var section_id: StringName = get_v2_section_id_for_segment(segment_index)
+		var material_key: StringName = _material_key_for_section(section_id)
 		if not visual_groups.has(material_key):
 			visual_groups[material_key] = []
-		var rotation := _road_rotation(a, b)
-		var local_up := rotation.basis.y.normalized()
-		var center := (a + b) * 0.5 + local_up * (-ROAD_THICKNESS * 0.5 + ROAD_TOP_OFFSET)
+		var rotation: Transform3D = _road_rotation(a, b)
+		var local_up: Vector3 = rotation.basis.y.normalized()
+		var center: Vector3 = (a + b) * 0.5 + local_up * (-ROAD_THICKNESS * 0.5 + ROAD_TOP_OFFSET)
 		rotation.origin = center
 
-		var visual_transform := rotation
+		var visual_transform: Transform3D = rotation
 		visual_transform.basis = visual_transform.basis.scaled(Vector3(
 			width,
 			ROAD_THICKNESS,
@@ -151,7 +151,7 @@ func _build_v2_road_and_collision() -> void:
 		_add_floor_collision(rotation, width, a.distance_to(b) + COLLISION_OVERLAP, segment_index)
 		_add_edge_collision(rotation, width, a.distance_to(b) + COLLISION_OVERLAP, segment_index)
 
-	for point_index in range(1, _v2_route.size() - 1):
+	for point_index: int in range(1, _v2_route.size() - 1):
 		_add_joint_plate(point_index)
 
 	for raw_key: Variant in visual_groups.keys():
@@ -169,26 +169,26 @@ func _add_floor_collision(rotation: Transform3D, width: float, length: float, se
 	_v2_collision_body.add_child(collision)
 
 func _add_edge_collision(rotation: Transform3D, width: float, length: float, segment_index: int) -> void:
-	for side in [-1.0, 1.0]:
+	for side: float in [-1.0, 1.0]:
 		var collision := CollisionShape3D.new()
 		collision.name = "RoadEdge_%03d_%s" % [segment_index, "L" if side < 0.0 else "R"]
 		var shape := BoxShape3D.new()
 		shape.size = Vector3(EDGE_WALL_THICKNESS, EDGE_WALL_HEIGHT, length)
 		collision.shape = shape
-		var edge_transform := rotation
+		var edge_transform: Transform3D = rotation
 		edge_transform.origin += rotation.basis.x.normalized() * side * (width * 0.5 + EDGE_WALL_THICKNESS * 0.35)
 		edge_transform.origin += rotation.basis.y.normalized() * (ROAD_THICKNESS * 0.5 + EDGE_WALL_HEIGHT * 0.5 - 0.06)
 		collision.transform = edge_transform
 		_v2_collision_body.add_child(collision)
 
 func _add_joint_plate(point_index: int) -> void:
-	var previous := _v2_route[point_index - 1]
-	var point := _v2_route[point_index]
-	var following := _v2_route[point_index + 1]
-	var rotation := _road_rotation(previous, following)
-	var local_up := rotation.basis.y.normalized()
+	var previous: Vector3 = _v2_route[point_index - 1]
+	var point: Vector3 = _v2_route[point_index]
+	var following: Vector3 = _v2_route[point_index + 1]
+	var rotation: Transform3D = _road_rotation(previous, following)
+	var local_up: Vector3 = rotation.basis.y.normalized()
 	rotation.origin = point + local_up * (-ROAD_THICKNESS * 0.5 + ROAD_TOP_OFFSET)
-	var width := maxf(get_v2_width_for_segment(point_index - 1), get_v2_width_for_segment(point_index)) + 0.85
+	var width: float = maxf(get_v2_width_for_segment(point_index - 1), get_v2_width_for_segment(point_index)) + 0.85
 	var collision := CollisionShape3D.new()
 	collision.name = "JointPlate_%03d" % point_index
 	var shape := BoxShape3D.new()
@@ -203,12 +203,12 @@ func _build_v2_start_marker() -> void:
 	_add_marker_visual("V2StartStripe", _v2_route[0], _v2_route[1], get_v2_width_for_segment(0), _material_for_key(&"warning"))
 
 func _build_v2_checkpoints() -> void:
-	for checkpoint_index in range(_v2_checkpoint_positions.size()):
-		var point := _v2_checkpoint_positions[checkpoint_index]
-		var route_index := _nearest_route_index(point)
-		var next_index := mini(route_index + 1, _v2_route.size() - 1)
-		var next_point := _v2_route[next_index]
-		var width := get_v2_width_for_segment(mini(route_index, _v2_segment_widths.size() - 1))
+	for checkpoint_index: int in range(_v2_checkpoint_positions.size()):
+		var point: Vector3 = _v2_checkpoint_positions[checkpoint_index]
+		var route_index: int = _nearest_route_index(point)
+		var next_index: int = mini(route_index + 1, _v2_route.size() - 1)
+		var next_point: Vector3 = _v2_route[next_index]
+		var width: float = get_v2_width_for_segment(mini(route_index, _v2_segment_widths.size() - 1))
 
 		var area := Area3D.new()
 		area.name = "V2Checkpoint_%02d" % (checkpoint_index + 1)
@@ -228,18 +228,18 @@ func _build_v2_checkpoints() -> void:
 func _build_v2_finish() -> void:
 	if _v2_route.size() < 2:
 		return
-	var finish := _v2_route[-1]
-	var previous := _v2_route[-2]
-	var direction := finish - previous
+	var finish: Vector3 = _v2_route[-1]
+	var previous: Vector3 = _v2_route[-2]
+	var direction: Vector3 = finish - previous
 	if direction.length_squared() <= 0.001:
 		return
-	var next_point := finish + direction.normalized() * FINISH_RUNOUT_DISTANCE
-	var finish_width := get_v2_width_for_segment(_v2_segment_widths.size() - 1)
+	var next_point: Vector3 = finish + direction.normalized() * FINISH_RUNOUT_DISTANCE
+	var finish_width: float = get_v2_width_for_segment(_v2_segment_widths.size() - 1)
 
-	var rotation := _road_rotation(finish, next_point)
-	var local_up := rotation.basis.y.normalized()
+	var rotation: Transform3D = _road_rotation(finish, next_point)
+	var local_up: Vector3 = rotation.basis.y.normalized()
 	rotation.origin = (finish + next_point) * 0.5 + local_up * (-ROAD_THICKNESS * 0.5 + ROAD_TOP_OFFSET)
-	var visual_transform := rotation
+	var visual_transform: Transform3D = rotation
 	visual_transform.basis = visual_transform.basis.scaled(Vector3(finish_width, ROAD_THICKNESS, FINISH_RUNOUT_DISTANCE + COLLISION_OVERLAP))
 	_add_visual_multimesh("V2FinishRunout", [visual_transform], _material_for_key(&"asphalt"))
 	_add_floor_collision(rotation, finish_width, FINISH_RUNOUT_DISTANCE + COLLISION_OVERLAP, _v2_segment_widths.size())
@@ -278,7 +278,7 @@ func _add_visual_multimesh(node_name: String, transforms: Array, material: Mater
 	multimesh.transform_format = MultiMesh.TRANSFORM_3D
 	multimesh.mesh = cube
 	multimesh.instance_count = transforms.size()
-	for index in range(transforms.size()):
+	for index: int in range(transforms.size()):
 		multimesh.set_instance_transform(index, transforms[index])
 	multimesh.custom_aabb = AABB(Vector3(-260.0, -30.0, -1900.0), Vector3(520.0, 120.0, 2050.0))
 	var instance := MultiMeshInstance3D.new()
@@ -288,10 +288,10 @@ func _add_visual_multimesh(node_name: String, transforms: Array, material: Mater
 	_v2_decoration_root.add_child(instance)
 
 func _road_rotation(a: Vector3, b: Vector3) -> Transform3D:
-	var direction := b - a
+	var direction: Vector3 = b - a
 	if direction.length_squared() <= 0.001:
 		direction = Vector3.FORWARD
-	var midpoint := (a + b) * 0.5
+	var midpoint: Vector3 = (a + b) * 0.5
 	var transform := Transform3D(Basis.IDENTITY, midpoint)
 	return transform.looking_at(midpoint + direction.normalized(), Vector3.UP)
 
@@ -317,17 +317,17 @@ func _material_for_key(key: StringName) -> Material:
 	return fallback
 
 func _nearest_route_index(point: Vector3) -> int:
-	var best_index := 0
-	var best_distance := INF
-	for index in range(_v2_route.size()):
-		var distance := point.distance_squared_to(_v2_route[index])
+	var best_index: int = 0
+	var best_distance: float = INF
+	for index: int in range(_v2_route.size()):
+		var distance: float = point.distance_squared_to(_v2_route[index])
 		if distance < best_distance:
 			best_distance = distance
 			best_index = index
 	return best_index
 
 func _count_v2_nodes(node: Node) -> int:
-	var count := 1
-	for child in node.get_children():
+	var count: int = 1
+	for child: Node in node.get_children():
 		count += _count_v2_nodes(child)
 	return count
