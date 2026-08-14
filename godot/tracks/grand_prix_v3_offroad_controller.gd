@@ -39,8 +39,6 @@ var _hud_layer: CanvasLayer
 var _hud_label: Label
 
 func _ready() -> void:
-	# Run after player/AI movement and the existing terrain controller so the
-	# offroad cap wins over normal road acceleration for the next physics step.
 	process_priority = 126
 	_build_hud()
 	call_deferred("_bind_track_when_ready")
@@ -162,16 +160,16 @@ func _search_segment_range(position: Vector3, start_segment: int, end_segment: i
 		var b2: Vector2 = Vector2(b.x, b.z)
 		var ab: Vector2 = b2 - a2
 		var length_squared: float = ab.length_squared()
-		var t: float = 0.0
+		var segment_t: float = 0.0
 		if length_squared > 0.0001:
-			t = clampf((point2 - a2).dot(ab) / length_squared, 0.0, 1.0)
-		var closest2: Vector2 = a2 + ab * t
+			segment_t = clampf((point2 - a2).dot(ab) / length_squared, 0.0, 1.0)
+		var closest2: Vector2 = a2 + ab * segment_t
 		var distance: float = point2.distance_to(closest2)
 		if distance >= best_distance:
 			continue
 		best_distance = distance
 		best_segment = segment_index
-		best_center = a.lerp(b, t)
+		best_center = a.lerp(b, segment_t)
 
 	if best_segment < 0:
 		return {}
@@ -205,9 +203,6 @@ func _apply_offroad_penalty(racer: WildDashCharacterController, depth: float, de
 		racer.current_speed = move_toward(racer.current_speed, target_speed, deceleration * delta)
 
 	if stopped and target_speed <= 0.01:
-		# Kill residual planar velocity/boost carry once the racer has reached the
-		# deep-offroad stop zone. Vertical velocity is untouched so slopes/falls
-		# remain physical.
 		var planar_damping: float = clampf(1.0 - delta * 9.0, 0.0, 1.0)
 		racer.velocity.x *= planar_damping
 		racer.velocity.z *= planar_damping
@@ -218,20 +213,20 @@ func _speed_ratio_for_depth(depth: float) -> float:
 	if depth <= OFFROAD_ENTER_DEPTH:
 		return 1.0
 	if depth <= LIGHT_OFFROAD_DEPTH:
-		var t: float = inverse_lerp(OFFROAD_ENTER_DEPTH, LIGHT_OFFROAD_DEPTH, depth)
-		return lerpf(LIGHT_SPEED_RATIO, MEDIUM_SPEED_RATIO, t)
+		var light_t: float = inverse_lerp(OFFROAD_ENTER_DEPTH, LIGHT_OFFROAD_DEPTH, depth)
+		return lerpf(LIGHT_SPEED_RATIO, MEDIUM_SPEED_RATIO, light_t)
 	if depth <= HEAVY_OFFROAD_DEPTH:
-		var t: float = inverse_lerp(LIGHT_OFFROAD_DEPTH, HEAVY_OFFROAD_DEPTH, depth)
-		return lerpf(MEDIUM_SPEED_RATIO, HEAVY_SPEED_RATIO, t)
+		var heavy_t: float = inverse_lerp(LIGHT_OFFROAD_DEPTH, HEAVY_OFFROAD_DEPTH, depth)
+		return lerpf(MEDIUM_SPEED_RATIO, HEAVY_SPEED_RATIO, heavy_t)
 	if depth <= STOP_OFFROAD_DEPTH:
-		var t: float = inverse_lerp(HEAVY_OFFROAD_DEPTH, STOP_OFFROAD_DEPTH, depth)
-		return lerpf(HEAVY_SPEED_RATIO, DEEP_SPEED_RATIO, t)
+		var deep_t: float = inverse_lerp(HEAVY_OFFROAD_DEPTH, STOP_OFFROAD_DEPTH, depth)
+		return lerpf(HEAVY_SPEED_RATIO, DEEP_SPEED_RATIO, deep_t)
 	return 0.0
 
 func _heading_back_toward_track(racer: WildDashCharacterController, key: int) -> bool:
 	if not _center_by_racer.has(key):
 		return false
-	var center: Vector3 = _center_by_racer[key] as Vector3
+	var center: Vector3 = _center_by_racer[key]
 	var inward: Vector3 = center - racer.global_position
 	inward.y = 0.0
 	if inward.length_squared() <= 0.001:
@@ -274,8 +269,8 @@ func _update_player_hud(racer: WildDashCharacterController, depth: float) -> voi
 		else:
 			_hud_label.text = "OFF ROAD  ·  STOPPED  ·  TURN BACK TO TRACK"
 	else:
-		var ratio: int = roundi(_speed_ratio_for_depth(depth) * 100.0)
-		_hud_label.text = "OFF ROAD  ·  GRIP LOST  ·  SPEED LIMIT %d%%" % ratio
+		var ratio_percent: int = roundi(_speed_ratio_for_depth(depth) * 100.0)
+		_hud_label.text = "OFF ROAD  ·  GRIP LOST  ·  SPEED LIMIT %d%%" % ratio_percent
 	_hud_label.visible = true
 
 func _hide_hud() -> void:
