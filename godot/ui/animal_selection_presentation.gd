@@ -42,7 +42,8 @@ static func get_stat_label(stat_id: StringName) -> String:
 	return String(STAT_LABELS.get(stat_id, String(stat_id).capitalize()))
 
 static func get_stat_color(stat_id: StringName) -> Color:
-	return STAT_COLORS.get(stat_id, Color(0.45, 0.78, 1.0)) as Color
+	var color: Color = STAT_COLORS.get(stat_id, Color(0.45, 0.78, 1.0))
+	return color
 
 static func get_strengths(animal_id: StringName, count: int = 2) -> Array[StringName]:
 	return _ranked_stats(get_profile(animal_id), count, true)
