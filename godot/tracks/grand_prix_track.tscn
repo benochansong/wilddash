@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3]
 
-[ext_resource type="Script" path="res://tracks/grand_prix_v2_track.gd" id="1_track"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v2_track_runtime_safe.gd" id="1_track"]
 
 [node name="GrandPrixTrack" type="Node3D"]
 script = ExtResource("1_track")
