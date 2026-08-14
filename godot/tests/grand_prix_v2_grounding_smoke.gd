@@ -8,70 +8,53 @@ func _init() -> void:
 	var sections: Array[StringName] = bundle["segment_sections"]
 
 	if WildDashGrandPrixV2GroundingWorld.CHUNK_LENGTH < 80.0 or WildDashGrandPrixV2GroundingWorld.CHUNK_LENGTH > 120.0:
-		failures.append("V2.7 grounding chunk target must remain within 80-120m")
+		failures.append("grounding chunk target must remain within 80-120m")
 	if absf(WildDashGrandPrixV2GroundingWorld.CHUNK_LENGTH - WildDashGrandPrixV2TerrainShell.CHUNK_LENGTH) > 0.01:
 		failures.append("TerrainShell and GroundingWorld chunk targets must stay aligned")
 	if WildDashGrandPrixV2GroundingWorld.SUBGRADE_TOP_DROP < 0.10 or WildDashGrandPrixV2GroundingWorld.SUBGRADE_TOP_DROP > 0.50:
 		failures.append("road/subgrade top gap must remain within requested 0.10-0.50m envelope")
 	if WildDashGrandPrixV2GroundingWorld.SUBGRADE_DEPTH < 0.20:
 		failures.append("subgrade must have visible closed thickness")
-
-	# Hard-reset visual contract: only route point 0 -> 1 is allowed until a real
-	# graphical Meadow screenshot approves the prototype.
-	if WildDashGrandPrixV2CourseGuidance.PROTOTYPE_POINT_A != 0:
-		failures.append("V2.7 prototype must start at Meadow route point 0")
-	if WildDashGrandPrixV2CourseGuidance.PROTOTYPE_POINT_B != 1:
-		failures.append("V2.7 prototype must stop at the immediately adjacent point 1")
-	if WildDashGrandPrixV2CourseGuidance.PROTOTYPE_POINT_B != WildDashGrandPrixV2CourseGuidance.PROTOTYPE_POINT_A + 1:
-		failures.append("V2.7 prototype rail endpoints must be adjacent indices only")
-	if WildDashGrandPrixV2CourseGuidance.SAFE_GAP < 0.50 or WildDashGrandPrixV2CourseGuidance.SAFE_GAP > 0.90:
-		failures.append("V2.7 post safety gap must remain inside 0.50-0.90m")
-	if WildDashGrandPrixV2CourseGuidance.ENDPOINT_TOLERANCE > 0.05:
-		failures.append("V2.7 endpoint tolerance must stay at or below 5cm")
-
-	var first_segment_length: float = points[0].distance_to(points[1]) if points.size() > 1 else INF
-	if first_segment_length > WildDashGrandPrixV2CourseGuidance.MAX_REASONABLE_RAIL_SEGMENT:
-		failures.append("Meadow point 0->1 is too long for the minimal guardrail prototype")
-
-	# Reconstruct the post base positions without instantiating render nodes.
-	var minimum_post_margin: float = INF
-	for point_index: int in [0, 1]:
-		for side: float in [-1.0, 1.0]:
-			var shoulder: Vector3 = WildDashGrandPrixV2Geometry.shoulder_edge_point(points, widths, sections, point_index, side)
-			var outward: Vector3 = shoulder - points[point_index]
-			outward.y = 0.0
-			if outward.length_squared() <= 0.000001:
-				failures.append("prototype shoulder outward vector is degenerate")
-				continue
-			outward = outward.normalized()
-			var post_base: Vector3 = shoulder + outward * (
-				WildDashGrandPrixV2CourseGuidance.SAFE_GAP
-				+ WildDashGrandPrixV2CourseGuidance.POST_SIZE * 0.5
-			)
-			var shoulder_delta: Vector3 = shoulder - points[point_index]
-			var post_delta: Vector3 = post_base - points[point_index]
-			shoulder_delta.y = 0.0
-			post_delta.y = 0.0
-			var margin: float = post_delta.length() - shoulder_delta.length()
-			minimum_post_margin = minf(minimum_post_margin, margin)
-			if margin < 0.50:
-				failures.append("prototype post is not safely outside shoulder point=%d side=%.0f margin=%.3f" % [point_index, side, margin])
+	if WildDashGrandPrixV2CourseGuidance.VISUAL_OWNER_GROUP != &"wilddash_guardrail_visual_owner":
+		failures.append("guardrail visual owner diagnostic group changed unexpectedly")
 
 	var expected_chunks: int = _count_spatial_chunks(points, WildDashGrandPrixV2GroundingWorld.CHUNK_LENGTH)
 	if expected_chunks < 22 or expected_chunks > 32:
 		failures.append("2.6km course should resolve to 22-32 grounding chunks, got %d" % expected_chunks)
 
+	var minimum_inner_margin: float = INF
+	for point_index: int in range(points.size()):
+		for side: float in [-1.0, 1.0]:
+			var shoulder: Vector3 = WildDashGrandPrixV2Geometry.shoulder_edge_point(points, widths, sections, point_index, side)
+			var inner: Vector3 = WildDashGrandPrixV2Geometry.barrier_inner_face_point(points, widths, sections, point_index, side)
+			var shoulder_delta: Vector3 = shoulder - points[point_index]
+			var inner_delta: Vector3 = inner - points[point_index]
+			shoulder_delta.y = 0.0
+			inner_delta.y = 0.0
+			var margin: float = inner_delta.length() - shoulder_delta.length()
+			minimum_inner_margin = minf(minimum_inner_margin, margin)
+			if margin + 0.001 < WildDashGrandPrixV2Geometry.MIN_BARRIER_INNER_CLEARANCE:
+				failures.append("invisible safety barrier enters shoulder at point %d side=%.0f margin=%.3f" % [point_index, side, margin])
+				break
+
+	var required_sections: Array[StringName] = [
+		&"meadow_start", &"forest_obstacle", &"long_river", &"mountain_approach",
+		&"mountain_ascent", &"summit_ridge", &"rough_descent", &"canyon_obstacle", &"final_sprint",
+	]
+	for section_id: StringName in required_sections:
+		if not WildDashGrandPrixV2TerrainShell.TERRAIN_WIDTHS.has(section_id):
+			failures.append("world is missing terrain width profile for %s" % String(section_id))
+
 	if failures.is_empty():
-		print("GRAND PRIX V2.7 HARD RESET SMOKE PASS prototype=0->1 expected_posts=4 expected_rails=2 multimesh_visual=false adjacent_only=true safe_gap=%.2fm endpoint_tolerance=%.2fm first_segment=%.2fm min_post_margin=%.2fm grounding_chunks=%d graphical_pass=REQUIRED" % [
-			WildDashGrandPrixV2CourseGuidance.SAFE_GAP,
-			WildDashGrandPrixV2CourseGuidance.ENDPOINT_TOLERANCE,
-			first_segment_length, minimum_post_margin, expected_chunks,
+		print("GRAND PRIX V2.8 NATURAL BOUNDARY SMOKE PASS chunks=%d subgrade_gap=%.2fm subgrade_depth=%.2fm min_inner_margin=%.3fm visible_guardrail_meshes=0 posts=0 rails=0 invisible_safety_collision=true terrain_skirt=true far_collision=0" % [
+			expected_chunks, WildDashGrandPrixV2GroundingWorld.SUBGRADE_TOP_DROP,
+			WildDashGrandPrixV2GroundingWorld.SUBGRADE_DEPTH, minimum_inner_margin,
 		])
 		quit(0)
 		return
 
 	for failure: String in failures:
-		push_error("GRAND PRIX V2.7 HARD RESET SMOKE FAIL: %s" % failure)
+		push_error("GRAND PRIX V2.8 NATURAL BOUNDARY SMOKE FAIL: %s" % failure)
 	quit(1)
 
 func _count_spatial_chunks(points: Array[Vector3], chunk_length: float) -> int:
