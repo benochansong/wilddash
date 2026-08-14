@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://modes/neon_harbor_race/neon_harbor_race_mode.gd" id="1_mode"]
 [ext_resource type="Script" path="res://tracks/neon_harbor_lighting_polish.gd" id="2_lighting"]
@@ -10,6 +10,7 @@
 [ext_resource type="Script" path="res://systems/racing_action_controller.gd" id="8_actions"]
 [ext_resource type="Script" path="res://systems/elephant_trunk_lunge_controller.gd" id="9_lunge"]
 [ext_resource type="Script" path="res://systems/race_combat_core_v2.gd" id="10_combat_v2"]
+[ext_resource type="Script" path="res://systems/bear_combat_v2_controller.gd" id="11_bear_combat"]
 
 [node name="NeonHarborRace" type="Node3D"]
 script = ExtResource("1_mode")
@@ -28,6 +29,9 @@ script = ExtResource("10_combat_v2")
 
 [node name="ElephantTrunkLungeController" type="Node" parent="."]
 script = ExtResource("9_lunge")
+
+[node name="BearCombatV2Controller" type="Node" parent="."]
+script = ExtResource("11_bear_combat")
 
 [node name="NeonHarborLightingPolish" type="Node3D" parent="."]
 script = ExtResource("2_lighting")
