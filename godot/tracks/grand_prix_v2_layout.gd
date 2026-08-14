@@ -52,7 +52,7 @@ static func build_sections() -> Array[WildDashGrandPrixV2Section]:
 		WildDashGrandPrixV2Section.new(
 			&"summit_ridge", "SUMMIT RIDGE", &"summit", 17.0, 58.0, &"none", &"summit_release",
 			[
-				Vector3(79.8, 57.0, -970.0), Vector3(113.4, 58.0, -1020.4),
+				Vector3(79.8, 57.0, -970.0), Vector3(145.0, 58.0, -1010.0),
 				Vector3(71.4, 56.0, -1075.0),
 			], DEFAULT_SAMPLE_STEP
 		),
@@ -90,20 +90,20 @@ static func build_route_bundle() -> Dictionary:
 	var sections: Array[WildDashGrandPrixV2Section] = build_sections()
 
 	for section: WildDashGrandPrixV2Section in sections:
-		var section_start_segment := segment_widths.size()
+		var section_start_segment: int = segment_widths.size()
 		if points.is_empty() and not section.anchors.is_empty():
 			points.append(section.anchors[0])
-		for anchor_index in range(section.anchors.size() - 1):
+		for anchor_index: int in range(section.anchors.size() - 1):
 			var from_point: Vector3 = section.anchors[anchor_index]
 			var to_point: Vector3 = section.anchors[anchor_index + 1]
-			var distance := from_point.distance_to(to_point)
-			var sample_count := maxi(1, int(ceil(distance / section.sample_step)))
-			for sample_index in range(1, sample_count + 1):
-				var t := float(sample_index) / float(sample_count)
+			var distance: float = from_point.distance_to(to_point)
+			var sample_count: int = maxi(1, int(ceil(distance / section.sample_step)))
+			for sample_index: int in range(1, sample_count + 1):
+				var t: float = float(sample_index) / float(sample_count)
 				points.append(from_point.lerp(to_point, t))
 				segment_widths.append(section.target_width)
 				segment_sections.append(section.id)
-		var section_end_segment := maxi(section_start_segment, segment_widths.size() - 1)
+		var section_end_segment: int = maxi(section_start_segment, segment_widths.size() - 1)
 		section_ranges[section.id] = Vector2i(section_start_segment, section_end_segment)
 
 	return {
@@ -138,7 +138,7 @@ static func build_checkpoint_positions(bundle: Dictionary) -> Array[Vector3]:
 		if not ranges.has(section_id):
 			continue
 		var range_value: Vector2i = ranges[section_id]
-		var segment_index := clampi(
+		var segment_index: int = clampi(
 			roundi(lerpf(float(range_value.x), float(range_value.y), progress)),
 			0,
 			points.size() - 2
@@ -148,17 +148,26 @@ static func build_checkpoint_positions(bundle: Dictionary) -> Array[Vector3]:
 
 static func get_total_length(bundle: Dictionary) -> float:
 	var points: Array[Vector3] = bundle["points"]
-	var total := 0.0
-	for index in range(points.size() - 1):
+	var total: float = 0.0
+	for index: int in range(points.size() - 1):
 		total += points[index].distance_to(points[index + 1])
+	return total
+
+static func get_section_length(bundle: Dictionary, section_id: StringName) -> float:
+	var points: Array[Vector3] = bundle["points"]
+	var segment_sections: Array[StringName] = bundle["segment_sections"]
+	var total: float = 0.0
+	for segment_index: int in range(segment_sections.size()):
+		if segment_sections[segment_index] == section_id:
+			total += points[segment_index].distance_to(points[segment_index + 1])
 	return total
 
 static func get_elevation_range(bundle: Dictionary) -> Vector2:
 	var points: Array[Vector3] = bundle["points"]
 	if points.is_empty():
 		return Vector2.ZERO
-	var low := points[0].y
-	var high := points[0].y
+	var low: float = points[0].y
+	var high: float = points[0].y
 	for point: Vector3 in points:
 		low = minf(low, point.y)
 		high = maxf(high, point.y)
@@ -166,7 +175,7 @@ static func get_elevation_range(bundle: Dictionary) -> Vector2:
 
 static func get_max_vertical_step(bundle: Dictionary) -> float:
 	var points: Array[Vector3] = bundle["points"]
-	var result := 0.0
-	for index in range(points.size() - 1):
+	var result: float = 0.0
+	for index: int in range(points.size() - 1):
 		result = maxf(result, absf(points[index + 1].y - points[index].y))
 	return result
