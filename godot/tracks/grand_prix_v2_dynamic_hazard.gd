@@ -20,9 +20,11 @@ var impact_strength: float = 6.0
 var base_retention: float = 0.52
 
 var _base_position: Vector3 = Vector3.ZERO
+var _base_global_position: Vector3 = Vector3.ZERO
 var _elapsed: float = 0.0
 var _visual: MeshInstance3D
 var _warning_visual: MeshInstance3D
+var _warning_ground_global: Vector3 = Vector3.ZERO
 var _hit_until_by_racer: Dictionary = {}
 
 func _ready() -> void:
@@ -57,10 +59,12 @@ func configure(
 	impact_strength = maxf(0.0, strength)
 	base_retention = clampf(retention, 0.28, 0.88)
 	_base_position = position
+	_base_global_position = global_position
+	_warning_ground_global = _base_global_position + Vector3.DOWN * maxf(0.45, size.y * 0.5 - 0.08)
 
-	var collision := CollisionShape3D.new()
+	var collision: CollisionShape3D = CollisionShape3D.new()
 	collision.name = "HazardTrigger"
-	var shape := BoxShape3D.new()
+	var shape: BoxShape3D = BoxShape3D.new()
 	shape.size = size
 	collision.shape = shape
 	add_child(collision)
@@ -68,7 +72,7 @@ func configure(
 	_visual = MeshInstance3D.new()
 	_visual.name = "HazardVisual"
 	if hazard_kind == &"rolling_boulder" or hazard_kind == &"rock_fall":
-		var rock := SphereMesh.new()
+		var rock: SphereMesh = SphereMesh.new()
 		rock.radius = 0.5
 		rock.height = 1.0
 		rock.radial_segments = 8
@@ -76,7 +80,7 @@ func configure(
 		_visual.mesh = rock
 		_visual.scale = size
 	else:
-		var block := BoxMesh.new()
+		var block: BoxMesh = BoxMesh.new()
 		block.size = size
 		_visual.mesh = block
 	_visual.material_override = material
@@ -84,14 +88,13 @@ func configure(
 
 	_warning_visual = MeshInstance3D.new()
 	_warning_visual.name = "WarningMarker"
-	var warning_mesh := CylinderMesh.new()
+	var warning_mesh: CylinderMesh = CylinderMesh.new()
 	warning_mesh.top_radius = maxf(0.7, size.x * 0.45)
 	warning_mesh.bottom_radius = warning_mesh.top_radius
 	warning_mesh.height = 0.06
 	warning_mesh.radial_segments = 16
 	_warning_visual.mesh = warning_mesh
-	_warning_visual.position = Vector3(0.0, -size.y * 0.5 + 0.06, 0.0)
-	var warning_material := StandardMaterial3D.new()
+	var warning_material: StandardMaterial3D = StandardMaterial3D.new()
 	warning_material.albedo_color = Color(1.0, 0.34, 0.05, 0.82)
 	warning_material.emission_enabled = true
 	warning_material.emission = Color(1.0, 0.16, 0.03)
@@ -99,12 +102,16 @@ func configure(
 	_warning_visual.material_override = warning_material
 	_warning_visual.visible = true
 	add_child(_warning_visual)
+	_warning_visual.set_as_top_level(true)
+	_warning_visual.global_position = _warning_ground_global
 
 func _physics_process(delta: float) -> void:
 	if not RaceManager.active:
 		_elapsed = 0.0
 		monitoring = false
 		position = _base_position
+		if _warning_visual != null:
+			_warning_visual.visible = false
 		return
 
 	_elapsed += delta * speed_scale
@@ -116,6 +123,7 @@ func _physics_process(delta: float) -> void:
 	var hazard_active: bool = phase >= active_start and phase < active_end
 
 	if _warning_visual != null:
+		_warning_visual.global_position = _warning_ground_global
 		_warning_visual.visible = warning_active
 		if warning_active:
 			var pulse: float = 0.82 + 0.18 * sin(_elapsed * 9.0)
