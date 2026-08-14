@@ -8,6 +8,35 @@ const V2_ITEM_STATION_PROGRESS: Array[float] = [
 	0.07, 0.15, 0.24, 0.33, 0.42, 0.51, 0.60, 0.69, 0.78, 0.87, 0.94,
 ]
 const V2_WIDE_ITEM_STATIONS: Array[int] = [2, 5, 8]
+const V2_HUD_REFRESH_INTERVAL: float = 0.10
+
+var _v2_hud_elapsed: float = 0.0
+
+func _process(delta: float) -> void:
+	# The inherited HUD path projected every rival onto all ~288 route segments
+	# every rendered frame through RaceManager.get_rank()/get_track_progress().
+	# V2 only needs human-readable HUD updates, so cap that expensive projection
+	# path at 10 Hz while racer physics/gameplay continue at their normal rate.
+	if player == null:
+		return
+	_v2_hud_elapsed += delta
+	if _v2_hud_elapsed < V2_HUD_REFRESH_INTERVAL:
+		return
+	_v2_hud_elapsed = 0.0
+
+	var fps: int = Engine.get_frames_per_second()
+	if fps > 0:
+		_fps_sum += float(fps)
+		_fps_samples += 1
+	var rank: int = RaceManager.get_rank(player)
+	var checkpoint_progress: int = RaceManager.get_checkpoint_progress(player)
+	var checkpoint_total: int = RaceManager.get_checkpoint_count()
+	var progress_percent: float = RaceManager.get_progress_percent(player)
+	hud.set_metrics("Rank %d / %d   CP %d/%d   Progress %d%%   Speed %.1f   FPS %d" % [
+		rank, RaceManager.racers.size(), checkpoint_progress, checkpoint_total,
+		roundi(progress_percent), player.current_speed, fps,
+	])
+	hud.set_item_state(ItemSystem.get_display_name(player.get_held_item()), ItemSystem.get_status_text(player))
 
 func _build_shortcut_route(_skip_route_index: int) -> Array[Vector3]:
 	# Legacy personality code still asks for A/B shortcut routes. Until the V2
@@ -57,6 +86,6 @@ func _spawn_item_boxes() -> void:
 			add_child(box)
 			_item_boxes.append(box)
 
-	print("GRAND PRIX V2 ITEM BOXES PASS count=%d stations=%d respawn=%.1fs progress_based=true" % [
-		_item_boxes.size(), V2_ITEM_STATION_PROGRESS.size(), respawn,
+	print("GRAND PRIX V2 ITEM BOXES PASS count=%d stations=%d respawn=%.1fs progress_based=true hud_rank_projection_hz=%.0f" % [
+		_item_boxes.size(), V2_ITEM_STATION_PROGRESS.size(), respawn, 1.0 / V2_HUD_REFRESH_INTERVAL,
 	])
