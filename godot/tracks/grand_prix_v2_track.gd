@@ -9,6 +9,7 @@ extends WildDashGrandPrixTrack
 const ROAD_SURFACE_LIFT: float = 0.04
 const FINISH_RUNOUT_DISTANCE: float = 18.0
 const UV_METERS_PER_TILE: float = 8.0
+const SUN_SHADOW_MAX_DISTANCE: float = 95.0
 
 var _v2_bundle: Dictionary = {}
 var _v2_route: Array[Vector3] = []
@@ -43,10 +44,10 @@ func _ready() -> void:
 
 	RaceManager.configure_track(get_route_points(), get_checkpoint_positions())
 	var elevation: Vector2 = WildDashGrandPrixV2Layout.get_elevation_range(_v2_bundle)
-	print("GRAND PRIX V2.5 READY sections=%d route_points=%d segments=%d checkpoints=%d length=%.1fm elevation=%.1f..%.1f max_vertical_step=%.2f road_meshes=%d shoulder_meshes=%d road_collisions=%d collision_source=section_ribbon" % [
+	print("GRAND PRIX V2.5 READY sections=%d route_points=%d segments=%d checkpoints=%d length=%.1fm elevation=%.1f..%.1f max_vertical_step=%.2f road_meshes=%d shoulder_meshes=%d road_collisions=%d collision_source=section_ribbon shadow_distance=%.0fm" % [
 		_v2_sections.size(), _v2_route.size(), _v2_segment_widths.size(), _v2_checkpoint_positions.size(),
 		_v2_track_length, elevation.x, elevation.y, WildDashGrandPrixV2Layout.get_max_vertical_step(_v2_bundle),
-		_road_mesh_count, _shoulder_mesh_count, _road_collision_shape_count,
+		_road_mesh_count, _shoulder_mesh_count, _road_collision_shape_count, SUN_SHADOW_MAX_DISTANCE,
 	])
 	call_deferred("_report_performance_once")
 
@@ -152,6 +153,14 @@ func _build_v2_environment() -> void:
 	light.rotation_degrees = Vector3(-48.0, -34.0, 0.0)
 	light.light_energy = 1.15
 	light.shadow_enabled = true
+	# Two cascades are the middle ground between a single cheap orthogonal map
+	# and four expensive splits. The terrain shell turns far decoration shadows
+	# off, so a ~95m shadow range keeps near racers/trees/rocks grounded without
+	# paying for the whole 2.6km course.
+	light.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+	light.directional_shadow_max_distance = SUN_SHADOW_MAX_DISTANCE
+	light.directional_shadow_fade_start = 0.72
+	light.directional_shadow_pancake_size = 12.0
 	add_child(light)
 
 	var environment: WorldEnvironment = WorldEnvironment.new()
@@ -256,14 +265,12 @@ func _build_shoulder_ribbon_mesh(start_point: int, end_point: int) -> ArrayMesh:
 	for local_index: int in range(point_count - 1):
 		var base: int = local_index * 4
 		var next: int = base + 4
-		# Left strip: outer -> inner.
 		indices.append(base)
 		indices.append(base + 1)
 		indices.append(next)
 		indices.append(base + 1)
 		indices.append(next + 1)
 		indices.append(next)
-		# Right strip: inner -> outer.
 		indices.append(base + 2)
 		indices.append(base + 3)
 		indices.append(next + 2)
@@ -273,12 +280,7 @@ func _build_shoulder_ribbon_mesh(start_point: int, end_point: int) -> ArrayMesh:
 
 	return _array_mesh(vertices, normals, uvs, indices)
 
-func _array_mesh(
-	vertices: PackedVector3Array,
-	normals: PackedVector3Array,
-	uvs: PackedVector2Array,
-	indices: PackedInt32Array
-) -> ArrayMesh:
+func _array_mesh(vertices: PackedVector3Array, normals: PackedVector3Array, uvs: PackedVector2Array, indices: PackedInt32Array) -> ArrayMesh:
 	var mesh: ArrayMesh = ArrayMesh.new()
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
@@ -449,13 +451,21 @@ func _count_v2_nodes(node: Node) -> int:
 	return count
 
 func _report_performance_once() -> void:
-	await get_tree().create_timer(1.5).timeout
+	await get_tree().create_timer(1.8).timeout
 	var fps: float = Performance.get_monitor(Performance.TIME_FPS)
 	var node_count: float = Performance.get_monitor(Performance.OBJECT_NODE_COUNT)
 	var draw_calls: float = Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)
 	var physics_objects: float = Performance.get_monitor(Performance.PHYSICS_3D_ACTIVE_OBJECTS)
 	var guardrail_chunks: int = 0
 	var barrier_collision_shapes: int = 0
+	var terrain_chunks: int = 0
+	var visible_chunks: int = 0
+	var terrain_meshes: int = 0
+	var environment_multimeshes: int = 0
+	var environment_collision_shapes: int = 0
+	var terrain_gameplay_multimeshes: int = 0
+	var dynamic_hazards_active: int = 0
+	var dynamic_hazards_total: int = 0
 	var parent: Node = get_parent()
 	if parent != null:
 		var guidance: Node = parent.get_node_or_null("V2CourseGuidance")
@@ -464,7 +474,32 @@ func _report_performance_once() -> void:
 				guardrail_chunks = int(guidance.call("get_barrier_chunk_count"))
 			if guidance.has_method("get_barrier_collision_shape_count"):
 				barrier_collision_shapes = int(guidance.call("get_barrier_collision_shape_count"))
-	print("GRAND PRIX V2 PERF fps=%.1f road_meshes=%d shoulder_meshes=%d road_collision_shapes=%d guardrail_chunks=%d barrier_collision_shapes=%d runtime_nodes=%d monitor_nodes=%.0f draw_calls=%.0f physics_active=%.0f" % [
-		fps, _road_mesh_count, _shoulder_mesh_count, _road_collision_shape_count,
-		guardrail_chunks, barrier_collision_shapes, get_runtime_node_count(), node_count, draw_calls, physics_objects,
+		var shell: Node = parent.get_node_or_null("V2TerrainShell")
+		if shell != null:
+			if shell.has_method("get_terrain_chunk_count"):
+				terrain_chunks = int(shell.call("get_terrain_chunk_count"))
+			if shell.has_method("get_visible_chunk_count"):
+				visible_chunks = int(shell.call("get_visible_chunk_count"))
+			if shell.has_method("get_terrain_mesh_count"):
+				terrain_meshes = int(shell.call("get_terrain_mesh_count"))
+			if shell.has_method("get_environment_multimesh_count"):
+				environment_multimeshes = int(shell.call("get_environment_multimesh_count"))
+			if shell.has_method("get_environment_collision_shape_count"):
+				environment_collision_shapes = int(shell.call("get_environment_collision_shape_count"))
+		var terrain_gameplay: Node = parent.get_node_or_null("V2TerrainGameplay")
+		if terrain_gameplay != null and terrain_gameplay.has_method("get_visual_multimesh_count"):
+			terrain_gameplay_multimeshes = int(terrain_gameplay.call("get_visual_multimesh_count"))
+		var stage3: Node = parent.get_node_or_null("V2Stage3")
+		if stage3 != null:
+			if stage3.has_method("get_dynamic_hazard_active_count"):
+				dynamic_hazards_active = int(stage3.call("get_dynamic_hazard_active_count"))
+			if stage3.has_method("get_dynamic_hazard_count"):
+				dynamic_hazards_total = int(stage3.call("get_dynamic_hazard_count"))
+	var total_collision_shapes: int = _road_collision_shape_count + barrier_collision_shapes + environment_collision_shapes
+	print("GRAND PRIX V2 PERF fps=%.1f racers=%d road_meshes=%d shoulder_meshes=%d road_collision_shapes=%d terrain_chunks=%d visible_chunks=%d terrain_meshes=%d environment_multimeshes=%d terrain_gameplay_multimeshes=%d environment_collision_shapes=%d guardrail_chunks=%d barrier_collision_shapes=%d collision_shapes_total=%d dynamic_hazards_active=%d dynamic_hazards_total=%d runtime_nodes=%d monitor_nodes=%.0f draw_calls=%.0f physics_active=%.0f shadow_distance=%.0fm" % [
+		fps, RaceManager.racers.size(), _road_mesh_count, _shoulder_mesh_count, _road_collision_shape_count,
+		terrain_chunks, visible_chunks, terrain_meshes, environment_multimeshes, terrain_gameplay_multimeshes,
+		environment_collision_shapes, guardrail_chunks, barrier_collision_shapes, total_collision_shapes,
+		dynamic_hazards_active, dynamic_hazards_total, get_runtime_node_count(), node_count, draw_calls,
+		physics_objects, SUN_SHADOW_MAX_DISTANCE,
 	])
