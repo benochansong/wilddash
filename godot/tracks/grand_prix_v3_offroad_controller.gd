@@ -1,12 +1,13 @@
 class_name WildDashGrandPrixV3OffroadController
 extends Node
 
-## Grand Prix V3.3 open-edge offroad handling.
+## Grand Prix V3.5 open-edge offroad handling.
 ##
-## Racers may leave the road and shoulder. The physical near-terrain band is
-## driveable, but grip falls progressively with lateral distance. V3.3 adds a
-## dedicated overlap bridge under the road/terrain seam plus active return
-## traction so a racer that leaves the road can always steer back onto it.
+## Racers may leave the road and shoulder, but offroad penalties now respect the
+## amount of physical side terrain available in each biome. Tight mountain and
+## canyon sections stop racers before their narrow safe apron ends, while wider
+## lowland sections retain the broader offroad freedom. The V3.5 world
+## foundation is only a last-resort landmass, not the normal offroad surface.
 
 const SAMPLE_INTERVAL: float = 0.08
 const LOCAL_SEARCH_RADIUS: int = 12
@@ -15,8 +16,16 @@ const FULL_SEARCH_DISTANCE: float = 20.0
 const OFFROAD_ENTER_DEPTH: float = 0.35
 const LIGHT_OFFROAD_DEPTH: float = 1.50
 const HEAVY_OFFROAD_DEPTH: float = 4.00
-const STOP_OFFROAD_DEPTH: float = 7.00
-const STOP_HOLD_SECONDS: float = 0.55
+const DEFAULT_STOP_OFFROAD_DEPTH: float = 7.00
+const STOP_HOLD_SECONDS: float = 0.18
+
+const SECTION_STOP_DEPTHS: Dictionary = {
+	&"mountain_approach": 3.40,
+	&"mountain_ascent": 2.80,
+	&"summit_ridge": 2.50,
+	&"rough_descent": 3.00,
+	&"canyon_obstacle": 2.20,
+}
 
 const RETURN_CRAWL_SPEED: float = 2.80
 const RETURN_HEADING_DOT: float = 0.20
@@ -41,6 +50,7 @@ var _track: WildDashGrandPrixV2Track
 var _route: Array[Vector3] = []
 var _sample_elapsed: float = 0.0
 var _segment_hint: Dictionary = {}
+var _section_by_racer: Dictionary = {}
 var _depth_by_racer: Dictionary = {}
 var _center_by_racer: Dictionary = {}
 var _offroad_seconds: Dictionary = {}
@@ -69,13 +79,11 @@ func _bind_track_when_ready() -> void:
 		push_warning("GrandPrixV3OffroadController: route unavailable")
 		return
 	var bridge_ready: bool = _build_reentry_bridge()
-	print("GRAND PRIX V3.3 OFFROAD READY open_edges=true sample_hz=%.1f terrain_band=10m stop_depth=%.1fm return_crawl=%.1f reentry_bridge=%s inset=%.1fm outset=%.1fm" % [
+	print("GRAND PRIX V3.5 OFFROAD READY open_edges=true sample_hz=%.1f default_stop=%.1fm mountain_stop=2.2..3.4m return_crawl=%.1f reentry_bridge=%s world_foundation=true" % [
 		1.0 / SAMPLE_INTERVAL,
-		STOP_OFFROAD_DEPTH,
+		DEFAULT_STOP_OFFROAD_DEPTH,
 		RETURN_CRAWL_SPEED,
 		str(bridge_ready),
-		REENTRY_BRIDGE_INSET,
-		REENTRY_BRIDGE_OUTSET,
 	])
 
 func _physics_process(delta: float) -> void:
@@ -99,9 +107,10 @@ func _physics_process(delta: float) -> void:
 		var racer: WildDashCharacterController = candidate as WildDashCharacterController
 		if racer.finished:
 			continue
-		var depth: float = float(_depth_by_racer.get(racer.get_instance_id(), 0.0))
+		var key: int = racer.get_instance_id()
+		var depth: float = float(_depth_by_racer.get(key, 0.0))
 		if depth <= OFFROAD_ENTER_DEPTH:
-			_blocked_return_seconds[racer.get_instance_id()] = 0.0
+			_blocked_return_seconds[key] = 0.0
 			continue
 		_apply_offroad_penalty(racer, depth, delta)
 		if racer.is_player:
@@ -126,6 +135,7 @@ func _sample_all_racers(sample_delta: float) -> void:
 		_depth_by_racer[key] = depth
 		_center_by_racer[key] = sample["center"]
 		_segment_hint[key] = int(sample["segment"])
+		_section_by_racer[key] = sample["section"]
 
 		var offroad: bool = depth > OFFROAD_ENTER_DEPTH
 		var previous: bool = bool(_was_offroad.get(key, false))
@@ -136,9 +146,15 @@ func _sample_all_racers(sample_delta: float) -> void:
 		if offroad != previous:
 			_was_offroad[key] = offroad
 			if offroad:
-				print("GRAND PRIX V3.3 OFFROAD ENTER racer=%s depth=%.2fm segment=%d" % [racer.name, depth, int(sample["segment"])])
+				print("GRAND PRIX V3.5 OFFROAD ENTER racer=%s depth=%.2fm section=%s stop=%.2fm segment=%d" % [
+					racer.name,
+					depth,
+					String(sample["section"]),
+					_stop_depth_for_key(key),
+					int(sample["segment"]),
+				])
 			else:
-				print("GRAND PRIX V3.3 OFFROAD EXIT racer=%s" % racer.name)
+				print("GRAND PRIX V3.5 OFFROAD EXIT racer=%s" % racer.name)
 
 func _sample_route_distance(racer: WildDashCharacterController, key: int) -> Dictionary:
 	var segment_count: int = _route.size() - 1
@@ -196,6 +212,7 @@ func _search_segment_range(position: Vector3, start_segment: int, end_segment: i
 	var drivable_half_width: float = road_half_width + shoulder_width
 	return {
 		"segment": best_segment,
+		"section": _track.get_v2_section_id_for_segment(best_segment),
 		"center": best_center,
 		"center_distance": best_distance,
 		"drivable_half_width": drivable_half_width,
@@ -205,39 +222,44 @@ func _search_segment_range(position: Vector3, start_segment: int, end_segment: i
 func _apply_offroad_penalty(racer: WildDashCharacterController, depth: float, delta: float) -> void:
 	var key: int = racer.get_instance_id()
 	var offroad_seconds: float = float(_offroad_seconds.get(key, 0.0))
-	var ratio: float = _speed_ratio_for_depth(depth)
+	var stop_depth: float = _stop_depth_for_key(key)
+	var ratio: float = _speed_ratio_for_depth(depth, stop_depth)
 	var target_speed: float = racer.max_speed * ratio
-	var stopped: bool = depth >= STOP_OFFROAD_DEPTH and offroad_seconds >= STOP_HOLD_SECONDS
+	var stopped: bool = depth >= stop_depth and offroad_seconds >= STOP_HOLD_SECONDS
 	var heading_back: bool = _heading_back_toward_track(racer, key)
 
 	if stopped:
 		target_speed = RETURN_CRAWL_SPEED if heading_back else 0.0
 
-	var depth_ratio: float = clampf(depth / STOP_OFFROAD_DEPTH, 0.0, 1.0)
-	var deceleration_scale: float = lerpf(1.45, 5.60, depth_ratio)
+	var depth_ratio: float = clampf(depth / maxf(0.5, stop_depth), 0.0, 1.0)
+	var deceleration_scale: float = lerpf(1.45, 6.40, depth_ratio)
 	var deceleration: float = maxf(8.0, racer.acceleration * deceleration_scale)
 	if racer.current_speed > target_speed:
 		racer.current_speed = move_toward(racer.current_speed, target_speed, deceleration * delta)
 	elif heading_back and racer.current_speed < target_speed:
-		# V3.2 only capped speed. Once deep-offroad had reduced current_speed to
-		# zero there was no code that accelerated it back toward crawl speed.
 		var return_acceleration: float = maxf(6.0, racer.acceleration * RETURN_ACCELERATION_SCALE)
 		racer.current_speed = move_toward(racer.current_speed, target_speed, return_acceleration * delta)
 
+	# Start killing outward momentum before the physical side terrain ends. This
+	# is a soft terrain drag, not a wall: the racer can still steer back normally.
+	if depth >= stop_depth * 0.78:
+		var edge_drag: float = clampf(1.0 - delta * lerpf(3.0, 9.0, depth_ratio), 0.0, 1.0)
+		racer.velocity.x *= edge_drag
+		racer.velocity.z *= edge_drag
+
 	if heading_back:
-		_apply_return_traction(racer, key, depth, delta)
+		_apply_return_traction(racer, key, depth, stop_depth, delta)
 		_update_reentry_block_assist(racer, key, depth, delta)
 	else:
 		_blocked_return_seconds[key] = 0.0
 
 	if stopped and not heading_back:
-		var planar_damping: float = clampf(1.0 - delta * 9.0, 0.0, 1.0)
+		racer.current_speed = 0.0
+		var planar_damping: float = clampf(1.0 - delta * 12.0, 0.0, 1.0)
 		racer.velocity.x *= planar_damping
 		racer.velocity.z *= planar_damping
-		if racer.current_speed < 0.18:
-			racer.current_speed = 0.0
 
-func _apply_return_traction(racer: WildDashCharacterController, key: int, depth: float, delta: float) -> void:
+func _apply_return_traction(racer: WildDashCharacterController, key: int, depth: float, stop_depth: float, delta: float) -> void:
 	if not _center_by_racer.has(key):
 		return
 	var center: Vector3 = _center_by_racer[key]
@@ -246,7 +268,7 @@ func _apply_return_traction(racer: WildDashCharacterController, key: int, depth:
 	if inward.length_squared() <= 0.001:
 		return
 	inward = inward.normalized()
-	var desired_inward_speed: float = RETURN_TRACTION_SPEED * lerpf(0.70, 1.15, clampf(depth / STOP_OFFROAD_DEPTH, 0.0, 1.0))
+	var desired_inward_speed: float = RETURN_TRACTION_SPEED * lerpf(0.70, 1.15, clampf(depth / maxf(0.5, stop_depth), 0.0, 1.0))
 	var current_inward_speed: float = racer.get_knockback_velocity().dot(inward)
 	if current_inward_speed >= desired_inward_speed:
 		return
@@ -279,23 +301,29 @@ func _nudge_across_reentry_seam(racer: WildDashCharacterController, key: int) ->
 	inward = inward.normalized()
 	racer.global_position += inward * REENTRY_NUDGE_DISTANCE + Vector3.UP * REENTRY_NUDGE_LIFT
 	_reentry_nudge_count += 1
-	print("GRAND PRIX V3.3 REENTRY ASSIST racer=%s nudge=%d distance=%.2fm" % [
+	print("GRAND PRIX V3.5 REENTRY ASSIST racer=%s nudge=%d distance=%.2fm" % [
 		racer.name,
 		_reentry_nudge_count,
 		REENTRY_NUDGE_DISTANCE,
 	])
 
-func _speed_ratio_for_depth(depth: float) -> float:
+func _stop_depth_for_key(key: int) -> float:
+	var section_id: StringName = StringName(_section_by_racer.get(key, &""))
+	return float(SECTION_STOP_DEPTHS.get(section_id, DEFAULT_STOP_OFFROAD_DEPTH))
+
+func _speed_ratio_for_depth(depth: float, stop_depth: float) -> float:
 	if depth <= OFFROAD_ENTER_DEPTH:
 		return 1.0
-	if depth <= LIGHT_OFFROAD_DEPTH:
-		var light_t: float = inverse_lerp(OFFROAD_ENTER_DEPTH, LIGHT_OFFROAD_DEPTH, depth)
+	var light_end: float = minf(LIGHT_OFFROAD_DEPTH, maxf(0.85, stop_depth * 0.35))
+	var heavy_end: float = minf(HEAVY_OFFROAD_DEPTH, maxf(light_end + 0.35, stop_depth * 0.68))
+	if depth <= light_end:
+		var light_t: float = inverse_lerp(OFFROAD_ENTER_DEPTH, light_end, depth)
 		return lerpf(LIGHT_SPEED_RATIO, MEDIUM_SPEED_RATIO, light_t)
-	if depth <= HEAVY_OFFROAD_DEPTH:
-		var heavy_t: float = inverse_lerp(LIGHT_OFFROAD_DEPTH, HEAVY_OFFROAD_DEPTH, depth)
+	if depth <= heavy_end:
+		var heavy_t: float = inverse_lerp(light_end, heavy_end, depth)
 		return lerpf(MEDIUM_SPEED_RATIO, HEAVY_SPEED_RATIO, heavy_t)
-	if depth <= STOP_OFFROAD_DEPTH:
-		var deep_t: float = inverse_lerp(HEAVY_OFFROAD_DEPTH, STOP_OFFROAD_DEPTH, depth)
+	if depth <= stop_depth:
+		var deep_t: float = inverse_lerp(heavy_end, stop_depth, depth)
 		return lerpf(HEAVY_SPEED_RATIO, DEEP_SPEED_RATIO, deep_t)
 	return 0.0
 
@@ -326,11 +354,8 @@ func _build_reentry_bridge() -> bool:
 		var left_edge: Vector3 = _track.get_v2_shoulder_edge_point(point_index, -1.0)
 		var right_edge: Vector3 = _track.get_v2_shoulder_edge_point(point_index, 1.0)
 		var lift: Vector3 = Vector3.UP * REENTRY_BRIDGE_LIFT
-
-		# Left side: inner point overlaps the shoulder; outer point overlaps terrain.
 		vertices.append(left_edge + right * REENTRY_BRIDGE_INSET + lift)
 		vertices.append(left_edge - right * REENTRY_BRIDGE_OUTSET + lift)
-		# Right side uses the opposite inward/outward directions.
 		vertices.append(right_edge - right * REENTRY_BRIDGE_INSET + lift)
 		vertices.append(right_edge + right * REENTRY_BRIDGE_OUTSET + lift)
 
@@ -359,7 +384,7 @@ func _build_reentry_bridge() -> bool:
 		(shape as ConcavePolygonShape3D).backface_collision = true
 
 	_reentry_bridge_body = StaticBody3D.new()
-	_reentry_bridge_body.name = "V33OffroadReentryBridge"
+	_reentry_bridge_body.name = "V35OffroadReentryBridge"
 	_reentry_bridge_body.collision_layer = 1
 	_reentry_bridge_body.collision_mask = 0
 	add_child(_reentry_bridge_body)
@@ -367,7 +392,7 @@ func _build_reentry_bridge() -> bool:
 	collision.name = "OffroadReentryBridgeCollision"
 	collision.shape = shape
 	_reentry_bridge_body.add_child(collision)
-	print("GRAND PRIX V3.3 REENTRY BRIDGE READY vertices=%d triangles=%d two_sided=true" % [
+	print("GRAND PRIX V3.5 REENTRY BRIDGE READY vertices=%d triangles=%d two_sided=true" % [
 		vertices.size(),
 		indices.size() / 3,
 	])
@@ -413,18 +438,19 @@ func _update_player_hud(racer: WildDashCharacterController, depth: float) -> voi
 		return
 	var key: int = racer.get_instance_id()
 	var seconds: float = float(_offroad_seconds.get(key, 0.0))
-	var stopped: bool = depth >= STOP_OFFROAD_DEPTH and seconds >= STOP_HOLD_SECONDS
+	var stop_depth: float = _stop_depth_for_key(key)
+	var stopped: bool = depth >= stop_depth and seconds >= STOP_HOLD_SECONDS
 	var heading_back: bool = _heading_back_toward_track(racer, key)
 	if stopped:
 		if heading_back:
 			_hud_label.text = "OFF ROAD  ·  RETURN ASSIST  ·  CRAWL TO TRACK"
 		else:
-			_hud_label.text = "OFF ROAD  ·  STOPPED  ·  TURN BACK TO TRACK"
+			_hud_label.text = "OFF ROAD  ·  TERRAIN LIMIT  ·  TURN BACK"
 	elif heading_back:
-		var return_ratio_percent: int = roundi(_speed_ratio_for_depth(depth) * 100.0)
+		var return_ratio_percent: int = roundi(_speed_ratio_for_depth(depth, stop_depth) * 100.0)
 		_hud_label.text = "OFF ROAD  ·  RETURN TRACTION  ·  SPEED LIMIT %d%%" % return_ratio_percent
 	else:
-		var ratio_percent: int = roundi(_speed_ratio_for_depth(depth) * 100.0)
+		var ratio_percent: int = roundi(_speed_ratio_for_depth(depth, stop_depth) * 100.0)
 		_hud_label.text = "OFF ROAD  ·  GRIP LOST  ·  SPEED LIMIT %d%%" % ratio_percent
 	_hud_label.visible = true
 
@@ -435,6 +461,7 @@ func _hide_hud() -> void:
 func _clear_runtime_state() -> void:
 	_sample_elapsed = 0.0
 	_segment_hint.clear()
+	_section_by_racer.clear()
 	_depth_by_racer.clear()
 	_center_by_racer.clear()
 	_offroad_seconds.clear()
