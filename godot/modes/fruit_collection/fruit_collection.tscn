@@ -1,6 +1,10 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://modes/fruit_collection/fruit_collection_mode.gd" id="1_mode"]
+[ext_resource type="Script" path="res://modes/fruit_collection/fruit_frenzy_ci_bridge.gd" id="2_ci"]
 
 [node name="FruitCollection" type="Node3D"]
 script = ExtResource("1_mode")
+
+[node name="FruitFrenzyCIBridge" type="Node" parent="."]
+script = ExtResource("2_ci")
