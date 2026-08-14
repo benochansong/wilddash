@@ -2,9 +2,11 @@ class_name WildDashRaceCombatBalance
 extends RefCounted
 
 ## Shared race-contact defense model for all 12 playable animals.
-## A higher defense rating means less received knockback, launch and item disruption.
-## Feather/light racers receive an extra ring-out multiplier from very strong trunk attacks.
+## Combat Core V2 is the source of truth for Defense/Stability; these received-
+## force multipliers remain tuned separately because they express physical mass.
 
+# Compatibility snapshot for older diagnostics/tools. Runtime defense queries use
+# WildDashRaceCombatProfile so new combat systems have one source of truth.
 const DEFENSE_RATINGS: Dictionary = {
 	&"elephant": 10.0,
 	&"bear": 9.0,
@@ -51,7 +53,13 @@ const ITEM_DISRUPTION_MULTIPLIERS: Dictionary = {
 }
 
 static func get_defense_rating(animal_id: StringName) -> float:
-	return float(DEFENSE_RATINGS.get(animal_id, 5.0))
+	return WildDashRaceCombatProfile.get_defense(animal_id)
+
+static func get_stability_rating(animal_id: StringName) -> float:
+	return WildDashRaceCombatProfile.get_stability(animal_id)
+
+static func get_stability_recovery_multiplier(animal_id: StringName) -> float:
+	return WildDashRaceCombatProfile.get_stability_recovery_multiplier(animal_id)
 
 static func get_knockback_multiplier(animal_id: StringName) -> float:
 	return float(KNOCKBACK_MULTIPLIERS.get(animal_id, 1.0))
@@ -105,13 +113,15 @@ static func get_item_speed_floor_ratio(animal_id: StringName) -> float:
 
 static func get_item_recovery_seconds(animal_id: StringName) -> float:
 	var defense: float = get_defense_rating(animal_id)
+	var base_recovery: float = 1.0
 	if defense >= 10.0:
-		return 0.72
-	if defense >= 9.0:
-		return 0.82
-	if defense >= 8.0:
-		return 0.92
-	return 1.0
+		base_recovery = 0.72
+	elif defense >= 9.0:
+		base_recovery = 0.82
+	elif defense >= 8.0:
+		base_recovery = 0.92
+	var stability_scale: float = get_stability_recovery_multiplier(animal_id)
+	return base_recovery / maxf(0.75, stability_scale)
 
 static func get_trap_launch_multiplier(animal_id: StringName) -> float:
 	var defense: float = get_defense_rating(animal_id)
