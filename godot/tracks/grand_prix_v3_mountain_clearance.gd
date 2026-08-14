@@ -8,7 +8,8 @@ extends Node
 ## giant slab/roof; the matching near-terrain trimesh can also become a physical
 ## wall. V3.4 removes those wide ribbons only in the tight mountain/canyon
 ## sections and replaces them with narrow route-local side aprons that cannot
-## span across the road.
+## span across the road. Large decorative mountain/backdrop meshes that can sit
+## in the chase-camera sightline are also suppressed in those same chunks.
 
 const TERRAIN_CHUNK_LENGTH: float = 100.0
 const PROBLEM_SECTIONS: Array[StringName] = [
@@ -38,6 +39,7 @@ var _grounding_world: Node
 var _replacement_root: Node3D
 var _sanitized_chunks: Array[int] = []
 var _replacement_collision_shapes: int = 0
+var _backdrop_blockers_hidden: int = 0
 
 func _ready() -> void:
 	process_priority = 127
@@ -61,9 +63,10 @@ func _configure_when_ready() -> void:
 	var chunk_ranges: Array[Vector2i] = _build_chunk_ranges()
 	_sanitize_problem_chunks(chunk_ranges)
 	_build_safe_problem_aprons()
-	print("GRAND PRIX V3.4 MOUNTAIN CLEARANCE READY chunks=%s wide_terrain_hidden=true near_collision_disabled=true replacement_shapes=%d camera_occlusion_source_reduced=true" % [
+	print("GRAND PRIX V3.4 MOUNTAIN CLEARANCE READY chunks=%s wide_terrain_hidden=true near_collision_disabled=true replacement_shapes=%d backdrop_blockers_hidden=%d camera_occlusion_source_reduced=true" % [
 		str(_sanitized_chunks),
 		_replacement_collision_shapes,
+		_backdrop_blockers_hidden,
 	])
 
 func _build_chunk_ranges() -> Array[Vector2i]:
@@ -89,6 +92,7 @@ func _sanitize_problem_chunks(chunk_ranges: Array[Vector2i]) -> void:
 		_hide_terrain_chunk_visuals(chunk_index)
 		_disable_terrain_chunk_collision(chunk_index)
 		_hide_grounding_skirt(chunk_index)
+		_hide_large_backdrop_blockers(chunk_index)
 
 func _range_hits_problem_section(point_range: Vector2i) -> bool:
 	for section_id: StringName in PROBLEM_SECTIONS:
@@ -107,12 +111,18 @@ func _hide_terrain_chunk_visuals(chunk_index: int) -> void:
 	if chunk == null:
 		return
 	var terrain: Node = chunk.get_node_or_null("Terrain")
-	if terrain == null:
-		return
-	for visual_name: String in ["NearTerrain", "FarTerrain"]:
-		var visual: Node = terrain.get_node_or_null(visual_name)
-		if visual is VisualInstance3D:
-			(visual as VisualInstance3D).visible = false
+	if terrain != null:
+		for visual_name: String in ["NearTerrain", "FarTerrain"]:
+			var visual: Node = terrain.get_node_or_null(visual_name)
+			if visual is VisualInstance3D:
+				(visual as VisualInstance3D).visible = false
+	var detail: Node = chunk.get_node_or_null("Detail")
+	if detail != null:
+		for detail_name: String in ["FarMountains", "CanyonWalls"]:
+			var detail_visual: Node = detail.get_node_or_null(detail_name)
+			if detail_visual is VisualInstance3D:
+				(detail_visual as VisualInstance3D).visible = false
+				_backdrop_blockers_hidden += 1
 
 func _disable_terrain_chunk_collision(chunk_index: int) -> void:
 	if _terrain_shell == null:
@@ -133,6 +143,34 @@ func _hide_grounding_skirt(chunk_index: int) -> void:
 	var skirt: Node = chunk.get_node_or_null("GroundMass/TerrainSkirt")
 	if skirt is VisualInstance3D:
 		(skirt as VisualInstance3D).visible = false
+
+func _hide_large_backdrop_blockers(chunk_index: int) -> void:
+	if _grounding_world == null:
+		return
+	var chunk: Node = _grounding_world.get_node_or_null("V2GroundingChunk_%02d" % chunk_index)
+	if chunk == null:
+		return
+	var backdrop: Node = chunk.get_node_or_null("Backdrop")
+	if backdrop == null:
+		return
+	_hide_backdrop_recursive(backdrop)
+
+func _hide_backdrop_recursive(root: Node) -> void:
+	for child: Node in root.get_children():
+		var node_name: String = String(child.name)
+		var blocker: bool = (
+			node_name.begins_with("MountainApproachMass")
+			or node_name.begins_with("MountainAscentMass")
+			or node_name.begins_with("DescentMass")
+			or node_name.begins_with("CanyonHeroWall_")
+			or node_name.begins_with("SummitBeam")
+			or node_name.begins_with("SummitPost_")
+		)
+		if blocker and child is VisualInstance3D:
+			(child as VisualInstance3D).visible = false
+			_backdrop_blockers_hidden += 1
+			continue
+		_hide_backdrop_recursive(child)
 
 func _build_safe_problem_aprons() -> void:
 	_replacement_root = Node3D.new()
