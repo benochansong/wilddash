@@ -1,24 +1,34 @@
 extends "res://modes/grand_prix/grand_prix_rc5_mode.gd"
 
-## V2 adapter for systems that used legacy 29-point magic indices.
-## V2.8 also carries an unmistakable runtime stamp and a defensive purge for
-## the old RC7/RC9 ProductionArtDressing. The old dressing is not part of the
-## current Grand Prix scene, but if a stale/duplicate runtime node creates its
-## cyan continuous rails anyway, it is removed before visual validation.
+## V2/V3 adapter for systems that used legacy 29-point magic indices.
+## V3.0 adds a direct-scene round-context bootstrap so F6 tests use the same
+## round index/audio lifecycle as a normal campaign run instead of finishing
+## with current_round_index == -1 and accidentally loading Round 1 again.
 
 const V2_ITEM_STATION_PROGRESS: Array[float] = [
 	0.07, 0.15, 0.24, 0.33, 0.42, 0.51, 0.60, 0.69, 0.78, 0.87, 0.94,
 ]
 const V2_WIDE_ITEM_STATIONS: Array[int] = [2, 5, 8]
 const V2_HUD_REFRESH_INTERVAL: float = 0.10
-const V2_RUNTIME_STAMP: String = "V2.8 RAILS-OFF DIAG 2026-08-14 18:47 KST"
+const V2_RUNTIME_STAMP: String = "V3.0 FLOW+AUDIO STABLE 2026-08-14"
 const LEGACY_PURGE_FRAMES: Array[int] = [1, 3, 8, 16]
+const GRAND_PRIX_THEME_ID: String = "race_grand_prix"
+const GRAND_PRIX_THEME_PATH: String = "res://audio/music/wild_dash_race_theme.ogg"
 
 var _v2_hud_elapsed: float = 0.0
 var _runtime_stamp_label: Label
+var _v30_direct_bootstrap := false
+var _v30_session_id := 0
+var _v30_begin_count := 0
+var _v30_completion_count := 0
 
 func _ready() -> void:
+	_bootstrap_round_context_if_needed()
+	_v30_session_id = Time.get_ticks_msec()
+	_v30_begin_count += 1
 	await super._ready()
+	_log_round_flow_start()
+	_log_round_audio_state()
 	if DisplayServer.get_name() == "headless":
 		return
 	_install_runtime_stamp()
@@ -29,11 +39,81 @@ func _ready() -> void:
 	])
 	call_deferred("_purge_legacy_art_over_frames")
 
+func finish_mode(success: bool, score: int, details: Dictionary = {}) -> void:
+	if mode_finished:
+		print("ROUND FLOW DUPLICATE COMPLETE IGNORED session=%d round_id=grand_prix completion_count=%d" % [
+			_v30_session_id,
+			_v30_completion_count,
+		])
+		return
+	_v30_completion_count += 1
+	var next_index: int = GameManager.current_round_index + 1
+	var next_round: StringName = &"result"
+	if next_index >= 0 and next_index < GameManager.ROUND_IDS.size():
+		next_round = GameManager.ROUND_IDS[next_index]
+	print("ROUND FLOW COMPLETE session=%d round_id=grand_prix player_rank=%d next_round=%s completion_count=%d" % [
+		_v30_session_id,
+		score,
+		String(next_round),
+		_v30_completion_count,
+	])
+	super.finish_mode(success, score, details)
+
+func _bootstrap_round_context_if_needed() -> void:
+	if GameManager.current_round_index >= 0:
+		return
+	var resolved_index: int = GameManager.ROUND_IDS.find(&"grand_prix")
+	if resolved_index < 0:
+		push_error("ROUND FLOW ERROR grand_prix is missing from GameManager.ROUND_IDS")
+		return
+	ResultManager.reset_campaign()
+	GameManager.current_round_index = resolved_index
+	GameManager.campaign_running = true
+	_v30_direct_bootstrap = true
+	print("ROUND FLOW DIRECT BOOTSTRAP round_index=%d round_id=grand_prix reason=F6_or_direct_scene" % [resolved_index + 1])
+
+func _log_round_flow_start() -> void:
+	var scene_path := "<none>"
+	if get_tree().current_scene != null:
+		scene_path = get_tree().current_scene.scene_file_path
+	print("ROUND FLOW START session=%d round_index=%d round_id=grand_prix scene=%s begin_count=%d direct_bootstrap=%s" % [
+		_v30_session_id,
+		GameManager.current_round_index + 1,
+		scene_path,
+		_v30_begin_count,
+		str(_v30_direct_bootstrap),
+	])
+	if _v30_begin_count != 1:
+		push_error("ROUND FLOW ERROR duplicate_begin session=%d begin_count=%d" % [_v30_session_id, _v30_begin_count])
+
+func _log_round_audio_state() -> void:
+	var audio: Node = get_node_or_null("/root/AudioManager")
+	var music_player: AudioStreamPlayer = null
+	if audio != null:
+		music_player = audio.get_node_or_null("MusicPlayer") as AudioStreamPlayer
+	var loaded: bool = ResourceLoader.exists(GRAND_PRIX_THEME_PATH)
+	var ready: bool = audio != null and music_player != null
+	var current_theme := "<none>"
+	if audio != null:
+		current_theme = String(audio.get("_current_theme"))
+	var playing: bool = music_player != null and music_player.playing
+	print("ROUND AUDIO REQUEST session=%d round=grand_prix track=%s loaded=%s audio_manager_ready=%s" % [
+		_v30_session_id,
+		GRAND_PRIX_THEME_PATH,
+		str(loaded),
+		str(ready),
+	])
+	print("ROUND AUDIO PLAY round=grand_prix theme=%s first_scene_load=%s playing=%s" % [
+		current_theme,
+		str(_v30_direct_bootstrap),
+		str(playing),
+	])
+	if ready and (current_theme != GRAND_PRIX_THEME_ID or not playing):
+		push_warning("ROUND AUDIO VERIFY expected=%s actual=%s playing=%s" % [GRAND_PRIX_THEME_ID, current_theme, str(playing)])
+
 func _process(delta: float) -> void:
-	# The inherited HUD path projected every rival onto all ~288 route segments
-	# every rendered frame through RaceManager.get_rank()/get_track_progress().
-	# V2 only needs human-readable HUD updates, so cap that expensive projection
-	# path at 10 Hz while racer physics/gameplay continue at their normal rate.
+	# HUD is intentionally capped at 10 Hz. RaceManager progress/rank reads are
+	# cached, while racer physics and checkpoint/finish safety remain 60 Hz.
 	if player == null:
 		return
 	_v2_hud_elapsed += delta
@@ -57,7 +137,7 @@ func _process(delta: float) -> void:
 
 func _install_runtime_stamp() -> void:
 	_runtime_stamp_label = Label.new()
-	_runtime_stamp_label.name = "V28RuntimeStamp"
+	_runtime_stamp_label.name = "V30RuntimeStamp"
 	_runtime_stamp_label.position = Vector2(24.0, 286.0)
 	_runtime_stamp_label.z_index = 1000
 	_runtime_stamp_label.add_theme_font_size_override("font_size", 22)
@@ -65,7 +145,7 @@ func _install_runtime_stamp() -> void:
 	_runtime_stamp_label.add_theme_color_override("font_shadow_color", Color(1.0, 1.0, 1.0, 1.0))
 	_runtime_stamp_label.add_theme_constant_override("shadow_offset_x", 2)
 	_runtime_stamp_label.add_theme_constant_override("shadow_offset_y", 2)
-	_runtime_stamp_label.text = "LATEST V2.8 ACTIVE | RAILS OFF | 18:47"
+	_runtime_stamp_label.text = "LATEST V3.0 ACTIVE | FLOW+BGM | RAILS OFF"
 	add_child(_runtime_stamp_label)
 
 func _purge_legacy_art_over_frames() -> void:
@@ -76,12 +156,12 @@ func _purge_legacy_art_over_frames() -> void:
 			frame_index += 1
 		var removed: int = _purge_legacy_production_art(self)
 		if removed > 0:
-			print("V2.8 LEGACY ART PURGE frame=%d removed_roots=%d" % [target_frame, removed])
+			print("V3.0 LEGACY ART PURGE frame=%d removed_roots=%d" % [target_frame, removed])
 	var survivors: Array[String] = []
 	_collect_legacy_visual_survivors(self, survivors)
-	print("V2.8 LEGACY ART VERIFY survivors=%d names=%s" % [survivors.size(), ",".join(survivors)])
+	print("V3.0 LEGACY ART VERIFY survivors=%d names=%s" % [survivors.size(), ",".join(survivors)])
 	if not survivors.is_empty():
-		push_error("V2.8 legacy Grand Prix rail/pylon visuals survived purge")
+		push_error("V3.0 legacy Grand Prix rail/pylon visuals survived purge")
 
 func _purge_legacy_production_art(root: Node) -> int:
 	if root == null:
