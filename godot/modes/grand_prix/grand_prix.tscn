@@ -1,22 +1,16 @@
-[gd_scene load_steps=18 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://modes/grand_prix/grand_prix_rc5_mode.gd" id="1_mode"]
 [ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="2_feel"]
-[ext_resource type="Script" path="res://systems/race_environment_collision_controller.gd" id="3_collision"]
 [ext_resource type="Script" path="res://items/item_combat_expansion_controller.gd" id="4_items"]
-[ext_resource type="Script" path="res://tracks/race_obstacle_expansion_controller.gd" id="5_obstacles"]
 [ext_resource type="Script" path="res://tracks/track_production_dressing.gd" id="6_art"]
 [ext_resource type="Script" path="res://modes/grand_prix/grand_prix_rival_pressure.gd" id="7_rival"]
-[ext_resource type="Script" path="res://tracks/grand_prix_tunnel_failsafe.gd" id="8_tunnel"]
 [ext_resource type="Script" path="res://network/network_race_sync.gd" id="9_network"]
 [ext_resource type="Script" path="res://systems/racing_action_controller.gd" id="10_actions"]
-[ext_resource type="Script" path="res://tracks/grand_prix_route_safety.gd" id="11_route_safety"]
-[ext_resource type="Script" path="res://tracks/grand_prix_descent_continuity.gd" id="12_descent"]
 [ext_resource type="Script" path="res://systems/elephant_trunk_lunge_controller.gd" id="13_lunge"]
 [ext_resource type="Script" path="res://systems/race_combat_core_v2.gd" id="14_combat_v2"]
 [ext_resource type="Script" path="res://systems/bear_combat_v2_controller.gd" id="15_bear_combat"]
 [ext_resource type="Script" path="res://systems/terrain_movement_controller.gd" id="16_terrain"]
-[ext_resource type="Script" path="res://tracks/grand_prix_river_crossing.gd" id="17_river"]
 
 [node name="GrandPrix" type="Node3D"]
 script = ExtResource("1_mode")
@@ -42,9 +36,6 @@ script = ExtResource("15_bear_combat")
 [node name="TerrainMovementController" type="Node" parent="."]
 script = ExtResource("16_terrain")
 
-[node name="GrandPrixRiverCrossing" type="Node3D" parent="."]
-script = ExtResource("17_river")
-
 [node name="RacingFeelController" type="Node" parent="."]
 script = ExtResource("2_feel")
 fov_gain = 6.0
@@ -52,26 +43,11 @@ boost_fov_bonus = 2.2
 slip_strength = 0.078
 boost_slip_multiplier = 1.16
 
-[node name="RaceEnvironmentCollisionController" type="Node" parent="."]
-script = ExtResource("3_collision")
-
-[node name="GrandPrixTunnelFailsafe" type="Node" parent="."]
-script = ExtResource("8_tunnel")
-
-[node name="GrandPrixRouteSafety" type="Node" parent="."]
-script = ExtResource("11_route_safety")
-
-[node name="GrandPrixDescentContinuity" type="Node3D" parent="."]
-script = ExtResource("12_descent")
-
 [node name="GrandPrixRivalPressure" type="Node" parent="."]
 script = ExtResource("7_rival")
 
 [node name="ItemCombatExpansionController" type="Node" parent="."]
 script = ExtResource("4_items")
-
-[node name="RaceObstacleExpansionController" type="Node3D" parent="."]
-script = ExtResource("5_obstacles")
 
 [node name="NetworkRaceSync" type="Node" parent="."]
 script = ExtResource("9_network")
