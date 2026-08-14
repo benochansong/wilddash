@@ -42,9 +42,10 @@ func _build_when_ready() -> void:
 	for section: WildDashGrandPrixV2Section in _track.get_v2_sections():
 		_build_section_barrier(section.id)
 
-	print("GRAND PRIX V2.5 BARRIERS READY sections=%d chunks=%d collision_shapes=%d shared_edge_geometry=true symmetric_color=true endpoint_shared=true" % [
+	print("GRAND PRIX V2.5 BARRIERS READY sections=%d chunks=%d collision_shapes=%d shared_edge_geometry=true symmetric_color=true endpoint_shared=true inner_face_collision=true" % [
 		_track.get_v2_sections().size(), _barrier_chunk_count, _barrier_collision_shape_count,
 	])
+	call_deferred("_report_performance_once")
 
 func get_barrier_collision_shape_count() -> int:
 	return _barrier_collision_shape_count
@@ -122,8 +123,14 @@ func _add_section_barrier_collision(
 	var indices: PackedInt32Array = PackedInt32Array()
 	for side: float in [-1.0, 1.0]:
 		for point_index: int in range(start_point, end_point):
-			var p0: Vector3 = _track.get_v2_barrier_point(point_index, side)
-			var p1: Vector3 = _track.get_v2_barrier_point(point_index + 1, side)
+			# Gameplay collision sits on the visual barrier's inner face, so a thick
+			# river bank or rock wall cannot visually occupy playable shoulder space.
+			var p0: Vector3 = WildDashGrandPrixV2Geometry.barrier_inner_face_point(
+				_route, _track._v2_segment_widths, _track._v2_segment_sections, point_index, side
+			)
+			var p1: Vector3 = WildDashGrandPrixV2Geometry.barrier_inner_face_point(
+				_route, _track._v2_segment_widths, _track._v2_segment_sections, point_index + 1, side
+			)
 			var base_index: int = vertices.size()
 			vertices.append(p0 + Vector3.UP * 0.05)
 			vertices.append(p1 + Vector3.UP * 0.05)
@@ -260,6 +267,16 @@ func _find_v2_track(node: Node) -> WildDashGrandPrixV2Track:
 		if found != null:
 			return found
 	return null
+
+func _report_performance_once() -> void:
+	await get_tree().create_timer(1.5).timeout
+	var fps: float = Performance.get_monitor(Performance.TIME_FPS)
+	var node_count: float = Performance.get_monitor(Performance.OBJECT_NODE_COUNT)
+	var draw_calls: float = Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)
+	var physics_objects: float = Performance.get_monitor(Performance.PHYSICS_3D_ACTIVE_OBJECTS)
+	print("GRAND PRIX V2 BARRIER PERF fps=%.1f guardrail_chunks=%d barrier_collision_shapes=%d monitor_nodes=%.0f draw_calls=%.0f physics_active=%.0f" % [
+		fps, _barrier_chunk_count, _barrier_collision_shape_count, node_count, draw_calls, physics_objects,
+	])
 
 func _make_material(color: Color, roughness: float, metallic: float) -> StandardMaterial3D:
 	var material: StandardMaterial3D = StandardMaterial3D.new()
