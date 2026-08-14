@@ -113,7 +113,8 @@ static func choose_lane_for(
 
 	var best_name: String = "CENTER"
 	var best_score: float = float(scores[best_name])
-	for lane_name: String in ["LEFT", "CENTER", "RIGHT"]:
+	var lane_names: Array[String] = ["LEFT", "CENTER", "RIGHT"]
+	for lane_name: String in lane_names:
 		var candidate: float = float(scores[lane_name])
 		if candidate > best_score:
 			best_name = lane_name
@@ -144,7 +145,7 @@ static func _base_lane_score(animal_id: StringName, section_id: StringName, lane
 		&"long_river":
 			if lane_name == "CENTER": return swim * 0.90 + rough * 0.10
 			if lane_name == "LEFT": return (10.0 - swim) * 0.56 + agility * 0.36 + 2.0
-			return swim * 0.42 + rough * 0.34 + 3.4
+			return 3.2 + (10.0 - swim) * 0.18 + rough * 0.18
 		&"mountain_ascent":
 			if lane_name == "LEFT": return climb * 0.56 + agility * 0.44
 			if lane_name == "CENTER": return climb * 0.62 + power * 0.30
