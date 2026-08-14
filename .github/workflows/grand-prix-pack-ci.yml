@@ -27,6 +27,15 @@ jobs:
       - name: Import project
         run: /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --editor --path godot --quit
 
+      - name: Verify RaceManager Progress Cache V2
+        run: |
+          set -o pipefail
+          export WILDDASH_PROGRESS_CACHE=1
+          /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot --script res://tests/race_progress_cache_v2_smoke.gd \
+            | tee /tmp/progress-cache-v2.log
+          grep -q "RACE PROGRESS CACHE V2 PASS" /tmp/progress-cache-v2.log
+
       # This workflow validates Round 1 only. It deliberately runs the isolated
       # Grand Prix probe instead of booting the full campaign, so adding later
       # rounds cannot create unrelated timeouts here.
