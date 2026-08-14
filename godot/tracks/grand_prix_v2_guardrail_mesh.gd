@@ -34,8 +34,6 @@ static func build_swept_beam(
 		)
 		for index: int in range(cross_sections.size() - 1):
 			_add_prism_segment(surface, cross_sections[index], cross_sections[index + 1], bottom_height, top_height)
-	if surface.get_vertex_count() == 0:
-		return mesh
 	surface.generate_normals()
 	return surface.commit()
 
