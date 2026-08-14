@@ -2,12 +2,10 @@ class_name WildDashGrandPrixV2Track
 extends WildDashGrandPrixTrack
 
 ## Round 1 Adventure V2.
-## Unlike the legacy track, route geometry, collision, AI path and checkpoints
-## all consume one sampled layout bundle. Legacy recovery decks are not needed
-## to construct this road surface.
+## Route geometry, collision, AI path and checkpoints all consume one sampled
+## layout bundle. The legacy track remains in source control as a fallback, but
+## the V2 runtime does not depend on its index-specific recovery decks.
 
-const CHECKPOINT_SCRIPT: Script = preload("res://tracks/checkpoint.gd")
-const FINISH_SCRIPT: Script = preload("res://tracks/finish_line.gd")
 const ROAD_THICKNESS := 0.82
 const ROAD_TOP_OFFSET := 0.04
 const COLLISION_OVERLAP := 1.10
@@ -82,7 +80,8 @@ func get_v2_sections() -> Array[WildDashGrandPrixV2Section]:
 	return _v2_sections.duplicate()
 
 func get_v2_section_ranges() -> Dictionary:
-	return (_v2_bundle.get("section_ranges", {}) as Dictionary).duplicate(true)
+	var ranges: Dictionary = _v2_bundle.get("section_ranges", {})
+	return ranges.duplicate(true)
 
 func get_v2_section_id_for_segment(segment_index: int) -> StringName:
 	if segment_index < 0 or segment_index >= _v2_segment_sections.size():
@@ -237,7 +236,6 @@ func _build_v2_finish() -> void:
 	var next_point := finish + direction.normalized() * FINISH_RUNOUT_DISTANCE
 	var finish_width := get_v2_width_for_segment(_v2_segment_widths.size() - 1)
 
-	# The finish runout is generated from the final route tangent, not a hardcoded world position.
 	var rotation := _road_rotation(finish, next_point)
 	var local_up := rotation.basis.y.normalized()
 	rotation.origin = (finish + next_point) * 0.5 + local_up * (-ROAD_THICKNESS * 0.5 + ROAD_TOP_OFFSET)
@@ -293,8 +291,9 @@ func _road_rotation(a: Vector3, b: Vector3) -> Transform3D:
 	var direction := b - a
 	if direction.length_squared() <= 0.001:
 		direction = Vector3.FORWARD
-	var transform := Transform3D(Basis.IDENTITY, (a + b) * 0.5)
-	return transform.looking_at((a + b) * 0.5 + direction.normalized(), Vector3.UP)
+	var midpoint := (a + b) * 0.5
+	var transform := Transform3D(Basis.IDENTITY, midpoint)
+	return transform.looking_at(midpoint + direction.normalized(), Vector3.UP)
 
 func _material_key_for_section(section_id: StringName) -> StringName:
 	match section_id:
