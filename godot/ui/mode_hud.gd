@@ -16,6 +16,7 @@ var _skill_label: Label
 var _skill_status_label: Label
 var _bound_character: WildDashCharacterController
 var _racing_actions: WildDashRacingActionController
+var _bear_combat: WildDashBearCombatV2Controller
 
 func _ready() -> void:
 	_title_label = Label.new()
@@ -137,12 +138,13 @@ func set_skill_state(icon_text: String, skill_name: String, status: String) -> v
 	_skill_status_label.text = status
 
 func _resolve_racing_actions() -> void:
-	if _racing_actions != null and is_instance_valid(_racing_actions):
-		return
 	var parent: Node = get_parent()
 	if parent == null:
 		return
-	_racing_actions = parent.get_node_or_null("RacingActionController") as WildDashRacingActionController
+	if _racing_actions == null or not is_instance_valid(_racing_actions):
+		_racing_actions = parent.get_node_or_null("RacingActionController") as WildDashRacingActionController
+	if _bear_combat == null or not is_instance_valid(_bear_combat):
+		_bear_combat = parent.get_node_or_null("BearCombatV2Controller") as WildDashBearCombatV2Controller
 
 func _update_racing_action_status() -> void:
 	_resolve_racing_actions()
@@ -157,6 +159,13 @@ func _update_racing_action_status() -> void:
 	for index: int in range(10):
 		meter += "■" if index < blocks else "□"
 	_boost_label.text = "BOOST ENERGY  [%s] %3d%%  ·  %s" % [meter, percent, _racing_actions.get_boost_status_text()]
+
+	if _bound_character != null and _bound_character.animal_id == &"bear" and _bear_combat != null:
+		_body_check_label.text = "%s  ·  %s" % [
+			_bear_combat.get_action_name(),
+			_bear_combat.get_status_text(),
+		]
+		return
 
 	var power: float = _racing_actions.get_current_body_check_power()
 	_body_check_label.text = "%s  POWER %.1f  ·  %s" % [
