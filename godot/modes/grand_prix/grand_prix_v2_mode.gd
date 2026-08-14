@@ -1,16 +1,33 @@
 extends "res://modes/grand_prix/grand_prix_rc5_mode.gd"
 
 ## V2 adapter for systems that used legacy 29-point magic indices.
-## Stage 1 deliberately sends every AI through the full shared Adventure route;
-## terrain-aware branch choice is added in later Terrain Adventure stages.
+## V2.8 also carries an unmistakable runtime stamp and a defensive purge for
+## the old RC7/RC9 ProductionArtDressing. The old dressing is not part of the
+## current Grand Prix scene, but if a stale/duplicate runtime node creates its
+## cyan continuous rails anyway, it is removed before visual validation.
 
 const V2_ITEM_STATION_PROGRESS: Array[float] = [
 	0.07, 0.15, 0.24, 0.33, 0.42, 0.51, 0.60, 0.69, 0.78, 0.87, 0.94,
 ]
 const V2_WIDE_ITEM_STATIONS: Array[int] = [2, 5, 8]
 const V2_HUD_REFRESH_INTERVAL: float = 0.10
+const V2_RUNTIME_STAMP: String = "V2.8 RAILS-OFF DIAG 2026-08-14 18:47 KST"
+const LEGACY_PURGE_FRAMES: Array[int] = [1, 3, 8, 16]
 
 var _v2_hud_elapsed: float = 0.0
+var _runtime_stamp_label: Label
+
+func _ready() -> void:
+	await super._ready()
+	if DisplayServer.get_name() == "headless":
+		return
+	_install_runtime_stamp()
+	print("WILD DASH RUNTIME STAMP %s project=%s scene=%s" % [
+		V2_RUNTIME_STAMP,
+		ProjectSettings.globalize_path("res://"),
+		get_tree().current_scene.scene_file_path if get_tree().current_scene != null else "<none>",
+	])
+	call_deferred("_purge_legacy_art_over_frames")
 
 func _process(delta: float) -> void:
 	# The inherited HUD path projected every rival onto all ~288 route segments
@@ -37,6 +54,63 @@ func _process(delta: float) -> void:
 		roundi(progress_percent), player.current_speed, fps,
 	])
 	hud.set_item_state(ItemSystem.get_display_name(player.get_held_item()), ItemSystem.get_status_text(player))
+
+func _install_runtime_stamp() -> void:
+	_runtime_stamp_label = Label.new()
+	_runtime_stamp_label.name = "V28RuntimeStamp"
+	_runtime_stamp_label.position = Vector2(24.0, 286.0)
+	_runtime_stamp_label.z_index = 1000
+	_runtime_stamp_label.add_theme_font_size_override("font_size", 22)
+	_runtime_stamp_label.add_theme_color_override("font_color", Color(1.0, 0.12, 0.12, 1.0))
+	_runtime_stamp_label.add_theme_color_override("font_shadow_color", Color(1.0, 1.0, 1.0, 1.0))
+	_runtime_stamp_label.add_theme_constant_override("shadow_offset_x", 2)
+	_runtime_stamp_label.add_theme_constant_override("shadow_offset_y", 2)
+	_runtime_stamp_label.text = "LATEST V2.8 ACTIVE | RAILS OFF | 18:47"
+	add_child(_runtime_stamp_label)
+
+func _purge_legacy_art_over_frames() -> void:
+	var frame_index: int = 0
+	for target_frame: int in LEGACY_PURGE_FRAMES:
+		while frame_index < target_frame:
+			await get_tree().process_frame
+			frame_index += 1
+		var removed: int = _purge_legacy_production_art(self)
+		if removed > 0:
+			print("V2.8 LEGACY ART PURGE frame=%d removed_roots=%d" % [target_frame, removed])
+	var survivors: Array[String] = []
+	_collect_legacy_visual_survivors(self, survivors)
+	print("V2.8 LEGACY ART VERIFY survivors=%d names=%s" % [survivors.size(), ",".join(survivors)])
+	if not survivors.is_empty():
+		push_error("V2.8 legacy Grand Prix rail/pylon visuals survived purge")
+
+func _purge_legacy_production_art(root: Node) -> int:
+	if root == null:
+		return 0
+	var removed: int = 0
+	for child: Node in root.get_children():
+		var child_name: String = String(child.name)
+		if child_name == "ProductionArtDressing" or child_name.begins_with("ProductionArt_grand_prix"):
+			child.queue_free()
+			removed += 1
+			continue
+		removed += _purge_legacy_production_art(child)
+	return removed
+
+func _collect_legacy_visual_survivors(root: Node, output: Array[String]) -> void:
+	if root == null:
+		return
+	for child: Node in root.get_children():
+		var child_name: String = String(child.name)
+		if (
+			child_name.begins_with("GuardrailUpper_")
+			or child_name.begins_with("GuardrailLower_")
+			or child_name.begins_with("GuardrailPost_")
+			or child_name.begins_with("RouteBeacon_")
+			or child_name.begins_with("HeroLandmark_")
+		):
+			if output.size() < 24:
+				output.append(String(child.get_path()))
+		_collect_legacy_visual_survivors(child, output)
 
 func _build_shortcut_route(_skip_route_index: int) -> Array[Vector3]:
 	# Legacy personality code still asks for A/B shortcut routes. Until the V2
