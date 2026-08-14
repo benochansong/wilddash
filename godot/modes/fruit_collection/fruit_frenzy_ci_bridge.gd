@@ -2,7 +2,8 @@ extends Node
 
 ## Compatibility telemetry for the existing five-round Godot campaign smoke.
 ## It prints the legacy marker only after a real AI has actually acquired
-## carried fruit in Harvest Heist.
+## carried fruit in Harvest Heist. This node intentionally does not modify
+## gameplay state, AI decisions, scoring, or Round 1 systems.
 
 var _logged_ai_pickup := false
 
