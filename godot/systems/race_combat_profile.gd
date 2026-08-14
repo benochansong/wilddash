@@ -40,23 +40,32 @@ static func get_profile(animal_id: StringName) -> Dictionary:
 	var profile: Dictionary = PROFILES.get(animal_id, DEFAULT_PROFILE)
 	return profile.duplicate(true)
 
+static func _profile(animal_id: StringName) -> Dictionary:
+	return PROFILES.get(animal_id, DEFAULT_PROFILE)
+
 static func get_attack_power(animal_id: StringName) -> float:
-	return float(PROFILES.get(animal_id, DEFAULT_PROFILE).get("attack_power", 5.0))
+	var profile: Dictionary = _profile(animal_id)
+	return float(profile.get("attack_power", 5.0))
 
 static func get_defense(animal_id: StringName) -> float:
-	return float(PROFILES.get(animal_id, DEFAULT_PROFILE).get("defense", 5.0))
+	var profile: Dictionary = _profile(animal_id)
+	return float(profile.get("defense", 5.0))
 
 static func get_stability(animal_id: StringName) -> float:
-	return float(PROFILES.get(animal_id, DEFAULT_PROFILE).get("stability", 5.0))
+	var profile: Dictionary = _profile(animal_id)
+	return float(profile.get("stability", 5.0))
 
 static func get_cooldown(animal_id: StringName) -> float:
-	return float(PROFILES.get(animal_id, DEFAULT_PROFILE).get("cooldown", 2.0))
+	var profile: Dictionary = _profile(animal_id)
+	return float(profile.get("cooldown", 2.0))
 
 static func get_range(animal_id: StringName) -> float:
-	return float(PROFILES.get(animal_id, DEFAULT_PROFILE).get("range", 4.0))
+	var profile: Dictionary = _profile(animal_id)
+	return float(profile.get("range", 4.0))
 
 static func get_launch(animal_id: StringName) -> float:
-	return float(PROFILES.get(animal_id, DEFAULT_PROFILE).get("launch", 4.0))
+	var profile: Dictionary = _profile(animal_id)
+	return float(profile.get("launch", 4.0))
 
 static func get_stability_recovery_multiplier(animal_id: StringName) -> float:
 	# High stability means a quicker recovery from a hit without reducing the
