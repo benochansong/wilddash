@@ -1,15 +1,17 @@
 class_name WildDashGrandPrixV2CourseGuidance
 extends Node3D
 
-## V2.6 continuous guardrail system.
-## Upper/lower rails are route-swept ArrayMeshes whose INNER FACE is the
-## authoritative safety polyline. Thickness only grows away from the shoulder.
-## Posts remain cheap chunked MultiMeshes, but their inside face is also shifted
-## outward from the same authoritative line.
+## V2.6 guardrail recovery.
+## Visual rails are now intentionally simple: one post at every sampled route
+## point and one BoxMesh rail ONLY between adjacent posts N -> N+1. The previous
+## swept ArrayMesh/miter/bevel path is removed because it could generate long
+## cross-course faces. Collision still comes from the same authoritative barrier
+## inner-face polyline.
 
-const SUPPORT_STEP: int = 2
+const SUPPORT_STEP: int = 1
 const VISUAL_CHUNK_LENGTH: float = 100.0
 const MAX_REASONABLE_CHUNK_AABB: float = 190.0
+const MAX_REASONABLE_RAIL_SEGMENT: float = 18.0
 
 var _track: WildDashGrandPrixV2Track
 var _route: Array[Vector3] = []
@@ -17,8 +19,10 @@ var _ranges: Dictionary = {}
 var _barrier_collision_body: StaticBody3D
 var _barrier_collision_shape_count: int = 0
 var _barrier_chunk_count: int = 0
-var _barrier_mesh_count: int = 0
-var _bevel_point_count: int = 0
+var _barrier_multimesh_count: int = 0
+var _rail_segment_count: int = 0
+var _post_count: int = 0
+var _max_rail_segment_length: float = 0.0
 
 func _ready() -> void:
 	if DisplayServer.get_name() == "headless":
@@ -46,9 +50,10 @@ func _build_when_ready() -> void:
 	for section: WildDashGrandPrixV2Section in _track.get_v2_sections():
 		_build_section_barrier(section.id)
 
-	print("GRAND PRIX V2.6 BARRIERS READY sections=%d chunks=%d rail_meshes=%d chunk_target=%.0fm collision_shapes=%d bevel_points=%d box_beam_rails=false inner_face_authority=true visual_collision_shared_source=true tight_aabb=true" % [
-		_track.get_v2_sections().size(), _barrier_chunk_count, _barrier_mesh_count,
-		VISUAL_CHUNK_LENGTH, _barrier_collision_shape_count, _bevel_point_count,
+	print("GRAND PRIX V2.6 POST-TO-POST BARRIERS READY sections=%d chunks=%d multimeshes=%d rail_segments=%d posts=%d max_segment=%.2fm collision_shapes=%d support_step=%d adjacent_only=true swept_mesh=false miter=false bevel=false" % [
+		_track.get_v2_sections().size(), _barrier_chunk_count, _barrier_multimesh_count,
+		_rail_segment_count, _post_count, _max_rail_segment_length,
+		_barrier_collision_shape_count, SUPPORT_STEP,
 	])
 	call_deferred("_report_performance_once")
 
@@ -59,10 +64,16 @@ func get_barrier_chunk_count() -> int:
 	return _barrier_chunk_count
 
 func get_barrier_mesh_count() -> int:
-	return _barrier_mesh_count
+	return _barrier_multimesh_count
 
-func get_bevel_point_count() -> int:
-	return _bevel_point_count
+func get_rail_segment_count() -> int:
+	return _rail_segment_count
+
+func get_post_count() -> int:
+	return _post_count
+
+func get_max_rail_segment_length() -> float:
+	return _max_rail_segment_length
 
 func _build_section_barrier(section_id: StringName) -> void:
 	if not _ranges.has(section_id):
@@ -75,7 +86,6 @@ func _build_section_barrier(section_id: StringName) -> void:
 	var chunks: Array[Vector2i] = _visual_chunk_ranges(start_point, end_point)
 	for point_range: Vector2i in chunks:
 		_build_visual_chunk(section_id, profile, style, point_range.x, point_range.y, _barrier_chunk_count)
-		_bevel_point_count += WildDashGrandPrixV2GuardrailMesh.count_bevel_points(_route, point_range.x, point_range.y)
 		_barrier_chunk_count += 1
 	_add_section_barrier_collision(section_id, profile, start_point, end_point, float(style.get("collision_height", 0.9)))
 
@@ -101,44 +111,59 @@ func _build_visual_chunk(
 	end_point: int,
 	chunk_index: int
 ) -> void:
+	var upper_transforms: Array[Transform3D] = []
+	var lower_transforms: Array[Transform3D] = []
+	var post_transforms: Array[Transform3D] = []
+	var upper_height: float = float(style.get("upper_height", 0.0))
+	var upper_depth: float = float(style.get("upper_width", 0.0))
+	var upper_thickness: float = float(style.get("upper_thickness", 0.0))
+	var lower_height: float = float(style.get("lower_height", 0.0))
+	var lower_depth: float = float(style.get("lower_width", 0.0))
+	var lower_thickness: float = float(style.get("lower_thickness", 0.0))
+	var support_height: float = float(style.get("support_height", 1.0))
+	var support_size: float = float(style.get("support_size", 0.22))
+
+	for side: float in [-1.0, 1.0]:
+		# Rails: adjacent route point only. There is no code path that can connect
+		# point N to N+2, another side, another chunk, or another section.
+		for point_index: int in range(start_point, end_point):
+			if upper_height > 0.0 and upper_depth > 0.0 and upper_thickness > 0.0:
+				upper_transforms.append(WildDashGrandPrixV2GuardrailMesh.rail_segment_transform(
+					_track, _route, point_index, point_index + 1, side,
+					upper_depth, upper_height, upper_thickness
+				))
+				_record_segment_length(point_index, side, upper_depth, upper_height)
+			if lower_height > 0.0 and lower_depth > 0.0 and lower_thickness > 0.0:
+				lower_transforms.append(WildDashGrandPrixV2GuardrailMesh.rail_segment_transform(
+					_track, _route, point_index, point_index + 1, side,
+					lower_depth, lower_height, lower_thickness
+				))
+				_record_segment_length(point_index, side, lower_depth, lower_height)
+
+		if bool(style.get("supports", true)):
+			for point_index: int in range(start_point, end_point + 1, SUPPORT_STEP):
+				post_transforms.append(WildDashGrandPrixV2GuardrailMesh.support_transform(
+					_track, _route, point_index, side, support_size, support_height
+				))
+				_post_count += 1
+
 	var prefix: String = "V2GuardrailChunk_%02d_%s" % [chunk_index, String(section_id)]
 	var primary_material: Material = _material_for_profile(profile, true)
 	var structure_material: Material = _material_for_profile(profile, false)
+	_add_box_multimesh(prefix + "_UpperRail", upper_transforms, primary_material)
+	_add_box_multimesh(prefix + "_LowerRail", lower_transforms, structure_material)
+	_add_box_multimesh(prefix + "_Posts", post_transforms, structure_material)
 
-	var upper_height: float = float(style.get("upper_height", 0.0))
-	var upper_width: float = float(style.get("upper_width", 0.0))
-	var upper_thickness: float = float(style.get("upper_thickness", 0.0))
-	if upper_height > 0.0 and upper_width > 0.0 and upper_thickness > 0.0:
-		var upper_mesh: ArrayMesh = WildDashGrandPrixV2GuardrailMesh.build_swept_beam(
-			_track, _route, start_point, end_point,
-			upper_height - upper_thickness * 0.5,
-			upper_height + upper_thickness * 0.5,
-			upper_width
-		)
-		_add_guardrail_mesh(prefix + "_UpperRail", upper_mesh, primary_material)
-
-	var lower_height: float = float(style.get("lower_height", 0.0))
-	var lower_width: float = float(style.get("lower_width", 0.0))
-	var lower_thickness: float = float(style.get("lower_thickness", 0.0))
-	if lower_height > 0.0 and lower_width > 0.0 and lower_thickness > 0.0:
-		var lower_mesh: ArrayMesh = WildDashGrandPrixV2GuardrailMesh.build_swept_beam(
-			_track, _route, start_point, end_point,
-			lower_height - lower_thickness * 0.5,
-			lower_height + lower_thickness * 0.5,
-			lower_width
-		)
-		_add_guardrail_mesh(prefix + "_LowerRail", lower_mesh, structure_material)
-
-	if bool(style.get("supports", true)):
-		var support_transforms: Array[Transform3D] = []
-		var support_height: float = float(style.get("support_height", 1.0))
-		var support_size: float = float(style.get("support_size", 0.22))
-		for side: float in [-1.0, 1.0]:
-			for point_index: int in range(start_point, end_point + 1, SUPPORT_STEP):
-				support_transforms.append(WildDashGrandPrixV2GuardrailMesh.support_transform(
-					_track, _route, point_index, side, support_size, support_height
-				))
-		_add_posts_multimesh(prefix + "_Posts", support_transforms, structure_material)
+func _record_segment_length(point_index: int, side: float, depth: float, height: float) -> void:
+	var length: float = WildDashGrandPrixV2GuardrailMesh.rail_segment_length(
+		_track, _route, point_index, point_index + 1, side, depth, height
+	)
+	_rail_segment_count += 1
+	_max_rail_segment_length = maxf(_max_rail_segment_length, length)
+	if length > MAX_REASONABLE_RAIL_SEGMENT:
+		push_warning("V2.6 long adjacent guardrail segment point=%d->%d length=%.2fm" % [
+			point_index, point_index + 1, length,
+		])
 
 func _add_section_barrier_collision(section_id: StringName, profile: StringName, start_point: int, end_point: int, height: float) -> void:
 	if height <= 0.0:
@@ -159,19 +184,7 @@ func _add_section_barrier_collision(section_id: StringName, profile: StringName,
 	_barrier_collision_body.add_child(collision)
 	_barrier_collision_shape_count += 1
 
-func _add_guardrail_mesh(node_name: String, mesh: ArrayMesh, material: Material) -> void:
-	if mesh.get_surface_count() == 0:
-		return
-	_validate_mesh_aabb(node_name, mesh.get_aabb())
-	var instance: MeshInstance3D = MeshInstance3D.new()
-	instance.name = node_name
-	instance.mesh = mesh
-	instance.material_override = material
-	instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(instance)
-	_barrier_mesh_count += 1
-
-func _add_posts_multimesh(node_name: String, transforms: Array[Transform3D], material: Material) -> void:
+func _add_box_multimesh(node_name: String, transforms: Array[Transform3D], material: Material) -> void:
 	if transforms.is_empty():
 		return
 	var mesh: BoxMesh = BoxMesh.new()
@@ -190,6 +203,7 @@ func _add_posts_multimesh(node_name: String, transforms: Array[Transform3D], mat
 	instance.material_override = material
 	instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(instance)
+	_barrier_multimesh_count += 1
 
 func _validate_mesh_aabb(node_name: String, bounds: AABB) -> void:
 	if bounds.size.x > MAX_REASONABLE_CHUNK_AABB or bounds.size.z > MAX_REASONABLE_CHUNK_AABB:
@@ -251,9 +265,10 @@ func _report_performance_once() -> void:
 	var node_count: float = Performance.get_monitor(Performance.OBJECT_NODE_COUNT)
 	var draw_calls: float = Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)
 	var physics_objects: float = Performance.get_monitor(Performance.PHYSICS_3D_ACTIVE_OBJECTS)
-	print("GRAND PRIX V2.6 BARRIER PERF fps=%.1f guardrail_chunks=%d rail_meshes=%d barrier_collision_shapes=%d bevel_points=%d monitor_nodes=%.0f draw_calls=%.0f physics_active=%.0f" % [
-		fps, _barrier_chunk_count, _barrier_mesh_count, _barrier_collision_shape_count,
-		_bevel_point_count, node_count, draw_calls, physics_objects,
+	print("GRAND PRIX V2.6 POST-TO-POST BARRIER PERF fps=%.1f chunks=%d multimeshes=%d rail_segments=%d posts=%d max_segment=%.2fm collision_shapes=%d monitor_nodes=%.0f draw_calls=%.0f physics_active=%.0f" % [
+		fps, _barrier_chunk_count, _barrier_multimesh_count, _rail_segment_count,
+		_post_count, _max_rail_segment_length, _barrier_collision_shape_count,
+		node_count, draw_calls, physics_objects,
 	])
 
 func _make_material(color: Color, roughness: float, metallic: float) -> StandardMaterial3D:
