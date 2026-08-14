@@ -56,25 +56,18 @@ func _init() -> void:
 	if final_range.y != widths.size() - 1:
 		failures.append("final_sprint must own the last route segment before finish runout")
 
-	# V2.5 keeps one visible road ribbon per section plus one finish runout, and
-	# one playable shoulder ribbon per section. These are architecture budgets,
-	# not one MeshInstance per sampled route segment.
+	# Road/shoulder architecture budgets.
 	var expected_road_meshes: int = sections.size() + 1
 	var expected_shoulder_meshes: int = sections.size()
 	if expected_road_meshes > 24:
 		failures.append("V2.5 road mesh contract exceeds section-sized budget")
 	if expected_shoulder_meshes > 18:
 		failures.append("V2.5 shoulder mesh contract exceeds section-sized budget")
-
-	# V2.5 replaces ~1,151 BoxShape/edge/joint shapes with one static trimesh
-	# collision per section plus one finish runout collision.
 	var expected_road_collision_shapes: int = sections.size() + 1
 	if expected_road_collision_shapes > 18:
 		failures.append("V2.5 road collision contract should remain section-sized")
 
 	# Geometry contract: road, shoulder and barriers share one averaged tangent.
-	# Barrier safety is measured both at the collision inner-face polyline and at
-	# a conservative bound for the actual thick visual barrier body.
 	var maximum_miter_ratio: float = 0.0
 	var minimum_barrier_inner_margin: float = INF
 	var minimum_visual_inner_margin: float = INF
@@ -102,17 +95,13 @@ func _init() -> void:
 
 		var left_point: Vector3 = WildDashGrandPrixV2Geometry.barrier_point(points, widths, section_ids, point_index, -1.0)
 		var right_point: Vector3 = WildDashGrandPrixV2Geometry.barrier_point(points, widths, section_ids, point_index, 1.0)
-		var left_distance: float = (left_point - points[point_index]).length()
-		var right_distance: float = (right_point - points[point_index]).length()
-		if absf(left_distance - right_distance) > 0.01:
+		if absf((left_point - points[point_index]).length() - (right_point - points[point_index]).length()) > 0.01:
 			failures.append("left/right barrier center geometry must remain symmetric at point %d" % point_index)
 			break
 
 		var left_inner: Vector3 = WildDashGrandPrixV2Geometry.barrier_inner_face_point(points, widths, section_ids, point_index, -1.0)
 		var right_inner: Vector3 = WildDashGrandPrixV2Geometry.barrier_inner_face_point(points, widths, section_ids, point_index, 1.0)
-		var left_inner_distance: float = (left_inner - points[point_index]).length()
-		var right_inner_distance: float = (right_inner - points[point_index]).length()
-		if absf(left_inner_distance - right_inner_distance) > 0.01:
+		if absf((left_inner - points[point_index]).length() - (right_inner - points[point_index]).length()) > 0.01:
 			failures.append("left/right barrier inner faces must remain symmetric at point %d" % point_index)
 			break
 
@@ -128,11 +117,50 @@ func _init() -> void:
 		if (section.id == &"mountain_ascent" or section.id == &"rough_descent") and section.sample_step > 10.0:
 			failures.append("section %s must keep <=10m sampling for tunneling safety" % String(section.id))
 
+	# Grounded-world / performance architecture contract.
+	if WildDashGrandPrixV2TerrainShell.CHUNK_LENGTH < 80.0 or WildDashGrandPrixV2TerrainShell.CHUNK_LENGTH > 120.0:
+		failures.append("terrain spatial chunk target must remain within 80-120m")
+	if WildDashGrandPrixV2TerrainShell.NEAR_COLLISION_WIDTH < 8.0 or WildDashGrandPrixV2TerrainShell.NEAR_COLLISION_WIDTH > 12.0:
+		failures.append("near terrain collision band must remain within 8-12m")
+	if WildDashGrandPrixV2Track.SUN_SHADOW_MAX_DISTANCE > 140.0:
+		failures.append("V2 sun shadow distance should not cover distant course environment")
+
+	var terrain_width_limits: Dictionary = {
+		&"meadow_start": Vector4(15.0, 20.0, 40.0, 70.0),
+		&"forest_obstacle": Vector4(12.0, 18.0, 30.0, 55.0),
+		&"long_river": Vector4(10.0, 18.0, 25.0, 40.0),
+		&"mountain_approach": Vector4(10.0, 15.0, 30.0, 50.0),
+		&"mountain_ascent": Vector4(8.0, 15.0, 25.0, 60.0),
+		&"summit_ridge": Vector4(10.0, 15.0, 25.0, 40.0),
+		&"rough_descent": Vector4(10.0, 15.0, 25.0, 50.0),
+		&"canyon_obstacle": Vector4(6.0, 10.0, 15.0, 24.0),
+		&"final_sprint": Vector4(15.0, 20.0, 40.0, 70.0),
+	}
+	for section_id: StringName in expected_ids:
+		if not WildDashGrandPrixV2TerrainShell.TERRAIN_WIDTHS.has(section_id):
+			failures.append("terrain shell missing width profile for %s" % String(section_id))
+			continue
+		var terrain_width: Vector2 = WildDashGrandPrixV2TerrainShell.TERRAIN_WIDTHS[section_id]
+		var limit: Vector4 = terrain_width_limits[section_id]
+		if terrain_width.x < limit.x or terrain_width.x > limit.y:
+			failures.append("%s near terrain width %.1fm outside requested range" % [String(section_id), terrain_width.x])
+		if terrain_width.y < limit.z or terrain_width.y > limit.w:
+			failures.append("%s far terrain width %.1fm outside requested range" % [String(section_id), terrain_width.y])
+
+	var expected_terrain_chunks: int = _count_spatial_chunks(points, WildDashGrandPrixV2TerrainShell.CHUNK_LENGTH)
+	if expected_terrain_chunks < 22 or expected_terrain_chunks > 32:
+		failures.append("2.6km V2 course should resolve to roughly 22-32 spatial chunks, got %d" % expected_terrain_chunks)
+	var max_visible_detail_chunks: int = WildDashGrandPrixV2TerrainShell.DETAIL_ACTIVE_RADIUS * 2 + 1
+	if max_visible_detail_chunks > 9:
+		failures.append("detail chunk active radius is too broad for the V2 performance budget")
+
 	if failures.is_empty():
-		print("RC9 GRAND PRIX V2.5 LAYOUT PASS sections=%d points=%d segments=%d checkpoints=%d length=%.1fm elevation=%.1f..%.1f max_y_step=%.2f road_meshes=%d shoulder_meshes=%d road_collision_shapes=%d max_miter_ratio=%.3f min_barrier_inner_margin=%.3f min_visual_inner_margin=%.3f" % [
+		print("RC9 GRAND PRIX V2.5 LAYOUT PASS sections=%d points=%d segments=%d checkpoints=%d length=%.1fm elevation=%.1f..%.1f max_y_step=%.2f road_meshes=%d shoulder_meshes=%d road_collision_shapes=%d terrain_chunks=%d chunk_target=%.0fm near_collision_width=%.0fm max_detail_chunks=%d shadow_distance=%.0fm max_miter_ratio=%.3f min_barrier_inner_margin=%.3f min_visual_inner_margin=%.3f" % [
 			sections.size(), points.size(), widths.size(), checkpoints.size(), length,
 			elevation.x, elevation.y, max_vertical_step, expected_road_meshes,
-			expected_shoulder_meshes, expected_road_collision_shapes,
+			expected_shoulder_meshes, expected_road_collision_shapes, expected_terrain_chunks,
+			WildDashGrandPrixV2TerrainShell.CHUNK_LENGTH, WildDashGrandPrixV2TerrainShell.NEAR_COLLISION_WIDTH,
+			max_visible_detail_chunks, WildDashGrandPrixV2Track.SUN_SHADOW_MAX_DISTANCE,
 			maximum_miter_ratio, minimum_barrier_inner_margin, minimum_visual_inner_margin,
 		])
 		quit(0)
@@ -141,6 +169,20 @@ func _init() -> void:
 	for failure: String in failures:
 		push_error("RC9 GRAND PRIX V2.5 LAYOUT FAIL: %s" % failure)
 	quit(1)
+
+func _count_spatial_chunks(points: Array[Vector3], chunk_length: float) -> int:
+	if points.size() < 2:
+		return 0
+	var count: int = 0
+	var distance: float = 0.0
+	for segment_index: int in range(points.size() - 1):
+		distance += points[segment_index].distance_to(points[segment_index + 1])
+		if distance >= chunk_length and segment_index + 1 < points.size() - 1:
+			count += 1
+			distance = 0.0
+	if distance > 0.0:
+		count += 1
+	return count
 
 func _nearest_index(points: Array[Vector3], point: Vector3) -> int:
 	var best_index: int = 0
