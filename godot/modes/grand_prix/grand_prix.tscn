@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=15 format=3]
 
 [ext_resource type="Script" path="res://modes/grand_prix/grand_prix_rc5_mode.gd" id="1_mode"]
 [ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="2_feel"]
@@ -13,6 +13,7 @@
 [ext_resource type="Script" path="res://tracks/grand_prix_route_safety.gd" id="11_route_safety"]
 [ext_resource type="Script" path="res://tracks/grand_prix_descent_continuity.gd" id="12_descent"]
 [ext_resource type="Script" path="res://systems/elephant_trunk_lunge_controller.gd" id="13_lunge"]
+[ext_resource type="Script" path="res://systems/race_combat_core_v2.gd" id="14_combat_v2"]
 
 [node name="GrandPrix" type="Node3D"]
 script = ExtResource("1_mode")
@@ -25,6 +26,9 @@ beacon_offset = 8.8
 
 [node name="RacingActionController" type="Node" parent="."]
 script = ExtResource("10_actions")
+
+[node name="RaceCombatCoreV2" type="Node" parent="."]
+script = ExtResource("14_combat_v2")
 
 [node name="ElephantTrunkLungeController" type="Node" parent="."]
 script = ExtResource("13_lunge")
