@@ -87,9 +87,9 @@ static func build_route_bundle() -> Dictionary:
 	var segment_widths: Array[float] = []
 	var segment_sections: Array[StringName] = []
 	var section_ranges: Dictionary = {}
-	var sections := build_sections()
+	var sections: Array[WildDashGrandPrixV2Section] = build_sections()
 
-	for section in sections:
+	for section: WildDashGrandPrixV2Section in sections:
 		var section_start_segment := segment_widths.size()
 		if points.is_empty() and not section.anchors.is_empty():
 			points.append(section.anchors[0])
@@ -132,7 +132,7 @@ static func build_checkpoint_positions(bundle: Dictionary) -> Array[Vector3]:
 		[&"final_sprint", 0.18],
 		[&"final_sprint", 0.82],
 	]
-	for spec in checkpoint_specs:
+	for spec: Array in checkpoint_specs:
 		var section_id: StringName = spec[0]
 		var progress: float = spec[1]
 		if not ranges.has(section_id):
@@ -159,7 +159,7 @@ static func get_elevation_range(bundle: Dictionary) -> Vector2:
 		return Vector2.ZERO
 	var low := points[0].y
 	var high := points[0].y
-	for point in points:
+	for point: Vector3 in points:
 		low = minf(low, point.y)
 		high = maxf(high, point.y)
 	return Vector2(low, high)
