@@ -61,7 +61,8 @@ func _enforce_soft_stop(racer: WildDashCharacterController) -> void:
 	var sample: Dictionary = _sample_route(racer, key)
 	if sample.is_empty():
 		return
-	var stop_depth: float = _stop_depth_for_section(sample["section"] as StringName)
+	var section_id: StringName = StringName(sample["section"])
+	var stop_depth: float = _stop_depth_for_section(section_id)
 	var depth: float = float(sample["depth"])
 	if depth <= stop_depth + SOFT_STOP_SLOP:
 		return
@@ -83,7 +84,7 @@ func _enforce_soft_stop(racer: WildDashCharacterController) -> void:
 	if racer.is_player and (_clamp_count <= 3 or _clamp_count % 60 == 0):
 		print("GRAND PRIX V3.6 OFFROAD SOFT STOP HOLD racer=%s section=%s depth=%.2f stop=%.2f count=%d" % [
 			racer.name,
-			String(sample["section"]),
+			String(section_id),
 			depth,
 			stop_depth,
 			_clamp_count,
