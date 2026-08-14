@@ -125,12 +125,8 @@ func _add_section_barrier_collision(
 		for point_index: int in range(start_point, end_point):
 			# Gameplay collision sits on the visual barrier's inner face, so a thick
 			# river bank or rock wall cannot visually occupy playable shoulder space.
-			var p0: Vector3 = WildDashGrandPrixV2Geometry.barrier_inner_face_point(
-				_route, _track._v2_segment_widths, _track._v2_segment_sections, point_index, side
-			)
-			var p1: Vector3 = WildDashGrandPrixV2Geometry.barrier_inner_face_point(
-				_route, _track._v2_segment_widths, _track._v2_segment_sections, point_index + 1, side
-			)
+			var p0: Vector3 = _track.get_v2_barrier_inner_face_point(point_index, side)
+			var p1: Vector3 = _track.get_v2_barrier_inner_face_point(point_index + 1, side)
 			var base_index: int = vertices.size()
 			vertices.append(p0 + Vector3.UP * 0.05)
 			vertices.append(p1 + Vector3.UP * 0.05)
