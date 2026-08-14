@@ -14,7 +14,7 @@ extends RefCounted
 
 const PROFILES: Dictionary = {
 	&"elephant": {"attack_power": 10.0, "defense": 10.0, "stability": 10.0, "cooldown": 1.90, "range": 8.50, "launch": 10.0},
-	&"bear":     {"attack_power": 9.0,  "defense": 9.0,  "stability": 8.5,  "cooldown": 2.20, "range": 4.20, "launch": 7.5},
+	&"bear":     {"attack_power": 9.5,  "defense": 9.0,  "stability": 9.0, "cooldown": 1.75, "range": 5.20, "launch": 8.2},
 	&"boar":     {"attack_power": 9.0,  "defense": 8.5,  "stability": 7.5,  "cooldown": 2.15, "range": 4.80, "launch": 6.8},
 	&"panda":    {"attack_power": 7.5,  "defense": 8.0,  "stability": 8.5,  "cooldown": 2.35, "range": 3.80, "launch": 5.2},
 	&"wolf":     {"attack_power": 7.5,  "defense": 6.5,  "stability": 7.0,  "cooldown": 1.70, "range": 5.20, "launch": 4.8},
