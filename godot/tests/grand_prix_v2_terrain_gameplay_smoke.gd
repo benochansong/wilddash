@@ -3,16 +3,18 @@ extends SceneTree
 func _init() -> void:
 	var failures: Array[String] = []
 	var bundle: Dictionary = WildDashGrandPrixV2Layout.build_route_bundle()
-	var river_length: float = _section_length(bundle, &"long_river")
-	var mountain_length: float = _section_length(bundle, &"mountain_ascent")
-	var summit_length: float = _section_length(bundle, &"summit_ridge")
-	var rough_length: float = _section_length(bundle, &"rough_descent")
+	var river_length: float = WildDashGrandPrixV2Layout.get_section_length(bundle, &"long_river")
+	var mountain_length: float = WildDashGrandPrixV2Layout.get_section_length(bundle, &"mountain_ascent")
+	var summit_length: float = WildDashGrandPrixV2Layout.get_section_length(bundle, &"summit_ridge")
+	var rough_length: float = WildDashGrandPrixV2Layout.get_section_length(bundle, &"rough_descent")
 	var elevation: Vector2 = WildDashGrandPrixV2Layout.get_elevation_range(bundle)
 
 	if river_length < 280.0 or river_length > 350.0:
 		failures.append("long_river must stay within 280-350m, got %.1fm" % river_length)
 	if mountain_length < 350.0 or mountain_length > 450.0:
 		failures.append("mountain_ascent must stay within 350-450m, got %.1fm" % mountain_length)
+	if summit_length < 150.0 or summit_length > 200.0:
+		failures.append("summit_ridge must stay within 150-200m, got %.1fm" % summit_length)
 	if rough_length < 300.0 or rough_length > 390.0:
 		failures.append("rough_descent must stay within 300-390m, got %.1fm" % rough_length)
 	if elevation.y < 50.0:
@@ -56,12 +58,3 @@ func _init() -> void:
 	for failure: String in failures:
 		push_error("GRAND PRIX V2 TERRAIN SMOKE FAIL: %s" % failure)
 	quit(1)
-
-func _section_length(bundle: Dictionary, section_id: StringName) -> float:
-	var points: Array[Vector3] = bundle["points"]
-	var segment_sections: Array[StringName] = bundle["segment_sections"]
-	var total: float = 0.0
-	for segment_index: int in range(segment_sections.size()):
-		if segment_sections[segment_index] == section_id:
-			total += points[segment_index].distance_to(points[segment_index + 1])
-	return total
