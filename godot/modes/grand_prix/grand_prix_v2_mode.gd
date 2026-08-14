@@ -10,7 +10,7 @@ const V2_ITEM_STATION_PROGRESS: Array[float] = [
 ]
 const V2_WIDE_ITEM_STATIONS: Array[int] = [2, 5, 8]
 const V2_HUD_REFRESH_INTERVAL: float = 0.10
-const V2_RUNTIME_STAMP: String = "V3.4 MOUNTAIN CLEARANCE + CAMERA VISIBILITY 2026-08-14"
+const V2_RUNTIME_STAMP: String = "V3.7 OFFROAD RETURN + SINGLE LAND COLLISION 2026-08-14"
 const LEGACY_PURGE_FRAMES: Array[int] = [1, 3, 8, 16]
 const GRAND_PRIX_THEME_ID: String = "race_grand_prix"
 const GRAND_PRIX_THEME_PATH: String = "res://audio/music/wild_dash_race_theme.ogg"
@@ -137,7 +137,7 @@ func _process(delta: float) -> void:
 
 func _install_runtime_stamp() -> void:
 	_runtime_stamp_label = Label.new()
-	_runtime_stamp_label.name = "V34RuntimeStamp"
+	_runtime_stamp_label.name = "V37RuntimeStamp"
 	_runtime_stamp_label.position = Vector2(24.0, 286.0)
 	_runtime_stamp_label.z_index = 1000
 	_runtime_stamp_label.add_theme_font_size_override("font_size", 22)
@@ -145,7 +145,7 @@ func _install_runtime_stamp() -> void:
 	_runtime_stamp_label.add_theme_color_override("font_shadow_color", Color(1.0, 1.0, 1.0, 1.0))
 	_runtime_stamp_label.add_theme_constant_override("shadow_offset_x", 2)
 	_runtime_stamp_label.add_theme_constant_override("shadow_offset_y", 2)
-	_runtime_stamp_label.text = "LATEST V3.4 ACTIVE | OPEN EDGE | MOUNTAIN CLEAR | CAMERA VIS"
+	_runtime_stamp_label.text = "LATEST V3.7 ACTIVE | OFFROAD RETURN | SINGLE LAND COLLISION"
 	add_child(_runtime_stamp_label)
 
 func _purge_legacy_art_over_frames() -> void:
@@ -156,12 +156,12 @@ func _purge_legacy_art_over_frames() -> void:
 			frame_index += 1
 		var removed: int = _purge_legacy_production_art(self)
 		if removed > 0:
-			print("V3.4 LEGACY ART PURGE frame=%d removed_roots=%d" % [target_frame, removed])
+			print("V3.7 LEGACY ART PURGE frame=%d removed_roots=%d" % [target_frame, removed])
 	var survivors: Array[String] = []
 	_collect_legacy_visual_survivors(self, survivors)
-	print("V3.4 LEGACY ART VERIFY survivors=%d names=%s" % [survivors.size(), ",".join(survivors)])
+	print("V3.7 LEGACY ART VERIFY survivors=%d names=%s" % [survivors.size(), ",".join(survivors)])
 	if not survivors.is_empty():
-		push_error("V3.4 legacy Grand Prix rail/pylon visuals survived purge")
+		push_error("V3.7 legacy Grand Prix rail/pylon visuals survived purge")
 
 func _purge_legacy_production_art(root: Node) -> int:
 	if root == null:
