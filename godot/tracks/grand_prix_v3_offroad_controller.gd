@@ -1,0 +1,302 @@
+class_name WildDashGrandPrixV3OffroadController
+extends Node
+
+## Grand Prix V3.2 open-edge offroad handling.
+##
+## Racers may leave the road and shoulder. The physical near-terrain band is
+## intentionally driveable, but grip falls progressively with lateral distance.
+## Deep offroad eventually stops the racer before the edge of the ~10m terrain
+## collision band. A stopped racer can crawl again once facing back toward the
+## route, so leaving the road is a penalty rather than a soft-lock.
+
+const SAMPLE_INTERVAL: float = 0.08
+const LOCAL_SEARCH_RADIUS: int = 12
+const FULL_SEARCH_DISTANCE: float = 20.0
+
+const OFFROAD_ENTER_DEPTH: float = 0.35
+const LIGHT_OFFROAD_DEPTH: float = 1.50
+const HEAVY_OFFROAD_DEPTH: float = 4.00
+const STOP_OFFROAD_DEPTH: float = 7.00
+const STOP_HOLD_SECONDS: float = 0.55
+const RETURN_CRAWL_SPEED: float = 2.20
+const RETURN_HEADING_DOT: float = 0.28
+
+const LIGHT_SPEED_RATIO: float = 0.78
+const MEDIUM_SPEED_RATIO: float = 0.56
+const HEAVY_SPEED_RATIO: float = 0.28
+const DEEP_SPEED_RATIO: float = 0.06
+
+var _track: WildDashGrandPrixV2Track
+var _route: Array[Vector3] = []
+var _sample_elapsed: float = 0.0
+var _segment_hint: Dictionary = {}
+var _depth_by_racer: Dictionary = {}
+var _center_by_racer: Dictionary = {}
+var _offroad_seconds: Dictionary = {}
+var _was_offroad: Dictionary = {}
+
+var _hud_layer: CanvasLayer
+var _hud_label: Label
+
+func _ready() -> void:
+	# Run after player/AI movement and the existing terrain controller so the
+	# offroad cap wins over normal road acceleration for the next physics step.
+	process_priority = 126
+	_build_hud()
+	call_deferred("_bind_track_when_ready")
+
+func _bind_track_when_ready() -> void:
+	for _frame: int in range(8):
+		await get_tree().process_frame
+	_track = _find_v2_track(get_parent())
+	if _track == null:
+		push_warning("GrandPrixV3OffroadController: V2 track unavailable")
+		return
+	_route = _track.get_route_points()
+	if _route.size() < 2:
+		push_warning("GrandPrixV3OffroadController: route unavailable")
+		return
+	print("GRAND PRIX V3.2 OFFROAD READY open_edges=true sample_hz=%.1f terrain_band=10m stop_depth=%.1fm stop_hold=%.2fs return_crawl=%.1f" % [
+		1.0 / SAMPLE_INTERVAL,
+		STOP_OFFROAD_DEPTH,
+		STOP_HOLD_SECONDS,
+		RETURN_CRAWL_SPEED,
+	])
+
+func _physics_process(delta: float) -> void:
+	if _track == null or _route.size() < 2:
+		return
+	if not RaceManager.active:
+		_clear_runtime_state()
+		_hide_hud()
+		return
+
+	_sample_elapsed += delta
+	if _sample_elapsed >= SAMPLE_INTERVAL:
+		var sample_delta: float = _sample_elapsed
+		_sample_elapsed = fmod(_sample_elapsed, SAMPLE_INTERVAL)
+		_sample_all_racers(sample_delta)
+
+	var player_offroad: bool = false
+	for candidate in RaceManager.racers:
+		if not candidate is WildDashCharacterController:
+			continue
+		var racer: WildDashCharacterController = candidate as WildDashCharacterController
+		if racer.finished:
+			continue
+		var depth: float = float(_depth_by_racer.get(racer.get_instance_id(), 0.0))
+		if depth <= OFFROAD_ENTER_DEPTH:
+			continue
+		_apply_offroad_penalty(racer, depth, delta)
+		if racer.is_player:
+			player_offroad = true
+			_update_player_hud(racer, depth)
+
+	if not player_offroad:
+		_hide_hud()
+
+func _sample_all_racers(sample_delta: float) -> void:
+	for candidate in RaceManager.racers:
+		if not candidate is WildDashCharacterController:
+			continue
+		var racer: WildDashCharacterController = candidate as WildDashCharacterController
+		if racer.finished:
+			continue
+		var key: int = racer.get_instance_id()
+		var sample: Dictionary = _sample_route_distance(racer, key)
+		if sample.is_empty():
+			continue
+		var depth: float = float(sample["depth"])
+		_depth_by_racer[key] = depth
+		_center_by_racer[key] = sample["center"]
+		_segment_hint[key] = int(sample["segment"])
+
+		var offroad: bool = depth > OFFROAD_ENTER_DEPTH
+		var previous: bool = bool(_was_offroad.get(key, false))
+		if offroad:
+			_offroad_seconds[key] = float(_offroad_seconds.get(key, 0.0)) + sample_delta
+		else:
+			_offroad_seconds[key] = 0.0
+		if offroad != previous:
+			_was_offroad[key] = offroad
+			if offroad:
+				print("GRAND PRIX V3.2 OFFROAD ENTER racer=%s depth=%.2fm segment=%d" % [racer.name, depth, int(sample["segment"])])
+			else:
+				print("GRAND PRIX V3.2 OFFROAD EXIT racer=%s" % racer.name)
+
+func _sample_route_distance(racer: WildDashCharacterController, key: int) -> Dictionary:
+	var segment_count: int = _route.size() - 1
+	if segment_count <= 0:
+		return {}
+
+	var hint: int = int(_segment_hint.get(key, -1))
+	if hint < 0:
+		var track_length: float = maxf(1.0, _track.get_track_length())
+		var progress: float = RaceManager.get_track_progress(racer)
+		hint = clampi(roundi((progress / track_length) * float(segment_count - 1)), 0, segment_count - 1)
+
+	var best: Dictionary = _search_segment_range(
+		racer.global_position,
+		maxi(0, hint - LOCAL_SEARCH_RADIUS),
+		mini(segment_count - 1, hint + LOCAL_SEARCH_RADIUS)
+	)
+	if best.is_empty():
+		return {}
+
+	if float(best["center_distance"]) > FULL_SEARCH_DISTANCE:
+		best = _search_segment_range(racer.global_position, 0, segment_count - 1)
+	return best
+
+func _search_segment_range(position: Vector3, start_segment: int, end_segment: int) -> Dictionary:
+	var point2: Vector2 = Vector2(position.x, position.z)
+	var best_distance: float = INF
+	var best_segment: int = -1
+	var best_center: Vector3 = Vector3.ZERO
+
+	for segment_index: int in range(start_segment, end_segment + 1):
+		if segment_index < 0 or segment_index + 1 >= _route.size():
+			continue
+		var a: Vector3 = _route[segment_index]
+		var b: Vector3 = _route[segment_index + 1]
+		var a2: Vector2 = Vector2(a.x, a.z)
+		var b2: Vector2 = Vector2(b.x, b.z)
+		var ab: Vector2 = b2 - a2
+		var length_squared: float = ab.length_squared()
+		var t: float = 0.0
+		if length_squared > 0.0001:
+			t = clampf((point2 - a2).dot(ab) / length_squared, 0.0, 1.0)
+		var closest2: Vector2 = a2 + ab * t
+		var distance: float = point2.distance_to(closest2)
+		if distance >= best_distance:
+			continue
+		best_distance = distance
+		best_segment = segment_index
+		best_center = a.lerp(b, t)
+
+	if best_segment < 0:
+		return {}
+	var road_half_width: float = _track.get_v2_width_for_segment(best_segment) * 0.5
+	var shoulder_width: float = _track.get_v2_shoulder_width_for_segment(best_segment)
+	var drivable_half_width: float = road_half_width + shoulder_width
+	return {
+		"segment": best_segment,
+		"center": best_center,
+		"center_distance": best_distance,
+		"drivable_half_width": drivable_half_width,
+		"depth": maxf(0.0, best_distance - drivable_half_width),
+	}
+
+func _apply_offroad_penalty(racer: WildDashCharacterController, depth: float, delta: float) -> void:
+	var key: int = racer.get_instance_id()
+	var offroad_seconds: float = float(_offroad_seconds.get(key, 0.0))
+	var ratio: float = _speed_ratio_for_depth(depth)
+	var target_speed: float = racer.max_speed * ratio
+	var stopped: bool = depth >= STOP_OFFROAD_DEPTH and offroad_seconds >= STOP_HOLD_SECONDS
+
+	if stopped:
+		target_speed = 0.0
+		if _heading_back_toward_track(racer, key):
+			target_speed = RETURN_CRAWL_SPEED
+
+	var depth_ratio: float = clampf(depth / STOP_OFFROAD_DEPTH, 0.0, 1.0)
+	var deceleration_scale: float = lerpf(1.45, 5.60, depth_ratio)
+	var deceleration: float = maxf(8.0, racer.acceleration * deceleration_scale)
+	if racer.current_speed > target_speed:
+		racer.current_speed = move_toward(racer.current_speed, target_speed, deceleration * delta)
+
+	if stopped and target_speed <= 0.01:
+		# Kill residual planar velocity/boost carry once the racer has reached the
+		# deep-offroad stop zone. Vertical velocity is untouched so slopes/falls
+		# remain physical.
+		var planar_damping: float = clampf(1.0 - delta * 9.0, 0.0, 1.0)
+		racer.velocity.x *= planar_damping
+		racer.velocity.z *= planar_damping
+		if racer.current_speed < 0.18:
+			racer.current_speed = 0.0
+
+func _speed_ratio_for_depth(depth: float) -> float:
+	if depth <= OFFROAD_ENTER_DEPTH:
+		return 1.0
+	if depth <= LIGHT_OFFROAD_DEPTH:
+		var t: float = inverse_lerp(OFFROAD_ENTER_DEPTH, LIGHT_OFFROAD_DEPTH, depth)
+		return lerpf(LIGHT_SPEED_RATIO, MEDIUM_SPEED_RATIO, t)
+	if depth <= HEAVY_OFFROAD_DEPTH:
+		var t: float = inverse_lerp(LIGHT_OFFROAD_DEPTH, HEAVY_OFFROAD_DEPTH, depth)
+		return lerpf(MEDIUM_SPEED_RATIO, HEAVY_SPEED_RATIO, t)
+	if depth <= STOP_OFFROAD_DEPTH:
+		var t: float = inverse_lerp(HEAVY_OFFROAD_DEPTH, STOP_OFFROAD_DEPTH, depth)
+		return lerpf(HEAVY_SPEED_RATIO, DEEP_SPEED_RATIO, t)
+	return 0.0
+
+func _heading_back_toward_track(racer: WildDashCharacterController, key: int) -> bool:
+	if not _center_by_racer.has(key):
+		return false
+	var center: Vector3 = _center_by_racer[key] as Vector3
+	var inward: Vector3 = center - racer.global_position
+	inward.y = 0.0
+	if inward.length_squared() <= 0.001:
+		return true
+	inward = inward.normalized()
+	var forward: Vector3 = -racer.global_transform.basis.z.normalized()
+	forward.y = 0.0
+	if forward.length_squared() <= 0.001:
+		return false
+	return forward.normalized().dot(inward) >= RETURN_HEADING_DOT
+
+func _build_hud() -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	_hud_layer = CanvasLayer.new()
+	_hud_layer.name = "OffroadFeedbackLayer"
+	_hud_layer.layer = 42
+	add_child(_hud_layer)
+	_hud_label = Label.new()
+	_hud_label.name = "OffroadFeedback"
+	_hud_label.position = Vector2(560.0, 122.0)
+	_hud_label.size = Vector2(480.0, 50.0)
+	_hud_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_hud_label.add_theme_font_size_override("font_size", 22)
+	_hud_label.add_theme_color_override("font_color", Color(1.0, 0.82, 0.28))
+	_hud_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.9))
+	_hud_label.add_theme_constant_override("shadow_offset_x", 2)
+	_hud_label.add_theme_constant_override("shadow_offset_y", 2)
+	_hud_label.visible = false
+	_hud_layer.add_child(_hud_label)
+
+func _update_player_hud(racer: WildDashCharacterController, depth: float) -> void:
+	if _hud_label == null:
+		return
+	var seconds: float = float(_offroad_seconds.get(racer.get_instance_id(), 0.0))
+	var stopped: bool = depth >= STOP_OFFROAD_DEPTH and seconds >= STOP_HOLD_SECONDS
+	if stopped:
+		if _heading_back_toward_track(racer, racer.get_instance_id()):
+			_hud_label.text = "OFF ROAD  ·  TURNING BACK  ·  CRAWL MODE"
+		else:
+			_hud_label.text = "OFF ROAD  ·  STOPPED  ·  TURN BACK TO TRACK"
+	else:
+		var ratio: int = roundi(_speed_ratio_for_depth(depth) * 100.0)
+		_hud_label.text = "OFF ROAD  ·  GRIP LOST  ·  SPEED LIMIT %d%%" % ratio
+	_hud_label.visible = true
+
+func _hide_hud() -> void:
+	if _hud_label != null:
+		_hud_label.visible = false
+
+func _clear_runtime_state() -> void:
+	_sample_elapsed = 0.0
+	_segment_hint.clear()
+	_depth_by_racer.clear()
+	_center_by_racer.clear()
+	_offroad_seconds.clear()
+	_was_offroad.clear()
+
+func _find_v2_track(root: Node) -> WildDashGrandPrixV2Track:
+	if root == null:
+		return null
+	if root is WildDashGrandPrixV2Track:
+		return root as WildDashGrandPrixV2Track
+	for child: Node in root.get_children():
+		var found: WildDashGrandPrixV2Track = _find_v2_track(child)
+		if found != null:
+			return found
+	return null
