@@ -1,51 +1,6 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=2 format=3]
 
-[ext_resource type="Script" path="res://tracks/grand_prix_track.gd" id="1_track"]
-[ext_resource type="Script" path="res://tracks/route_containment_guidance.gd" id="2_containment"]
-
-[sub_resource type="StandardMaterial3D" id="RunoffMaterial"]
-albedo_color = Color(0.105, 0.145, 0.2, 1)
-roughness = 0.95
+[ext_resource type="Script" path="res://tracks/grand_prix_v2_track.gd" id="1_track"]
 
 [node name="GrandPrixTrack" type="Node3D"]
 script = ExtResource("1_track")
-
-[node name="RouteContainmentGuidance" type="Node3D" parent="."]
-script = ExtResource("2_containment")
-
-[node name="JumpRampCollision" type="CSGBox3D" parent="."]
-visible = false
-position = Vector3(-31.9, 6.3, -228.8)
-rotation = Vector3(0.16, -0.745, 0)
-size = Vector3(7, 0.5, 8)
-use_collision = true
-
-[node name="FinishRunoffVisual" type="CSGBox3D" parent="."]
-position = Vector3(10.3208, -0.22, -1866.542)
-rotation = Vector3(0, 0.247812, 0)
-size = Vector3(20, 0.5, 30)
-use_collision = false
-material = SubResource("RunoffMaterial")
-
-[node name="FinishRunoffCollision" type="CSGBox3D" parent="."]
-visible = false
-position = Vector3(10.3208, -0.22, -1866.542)
-rotation = Vector3(0, 0.247812, 0)
-size = Vector3(20, 0.5, 30)
-use_collision = true
-
-[node name="RiverApproachSafetyCollision" type="Node3D" parent="."]
-
-[node name="LeftRail" type="CSGBox3D" parent="RiverApproachSafetyCollision"]
-visible = false
-position = Vector3(-27.5854, -21.85, -875.1141)
-rotation = Vector3(-0.03884, 0.63832, 0)
-size = Vector3(0.35, 1.35, 77.2593)
-use_collision = true
-
-[node name="RightRail" type="CSGBox3D" parent="RiverApproachSafetyCollision"]
-visible = false
-position = Vector3(-14.4146, -21.85, -884.8859)
-rotation = Vector3(-0.03884, 0.63832, 0)
-size = Vector3(0.35, 1.35, 77.2593)
-use_collision = true
