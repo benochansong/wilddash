@@ -70,8 +70,8 @@ func _spawn_bank_burst(origin: Vector3, gained: int) -> void:
 		material.emission = material.albedo_color * 0.45
 		sphere.material = material
 		fruit.mesh = sphere
-		fruit.global_position = origin
 		_mode.add_child(fruit)
+		fruit.global_position = origin
 
 		var angle: float = TAU * float(i) / float(BANK_BURST_COUNT)
 		var distance: float = 1.6 + float(i % 3) * 0.45
@@ -80,7 +80,7 @@ func _spawn_bank_burst(origin: Vector3, gained: int) -> void:
 		tween.set_parallel(true)
 		tween.tween_property(fruit, "global_position", target, 0.42)
 		tween.tween_property(fruit, "scale", Vector3.ONE * 0.15, 0.52)
-		tween.chain().tween_callback(fruit.queue_free)
+		tween.chain().tween_callback(Callable(fruit, "queue_free"))
 
 	print("FRUIT FRENZY BANK BURST gained=%d cosmetic=%d" % [gained, BANK_BURST_COUNT])
 
