@@ -15,18 +15,18 @@ func _init() -> void:
 		failures.append("road/subgrade top gap must remain within requested 0.10-0.50m envelope")
 	if WildDashGrandPrixV2GroundingWorld.SUBGRADE_DEPTH < 0.20:
 		failures.append("subgrade must have visible closed thickness")
-	if WildDashGrandPrixV2GuardrailMesh.BEVEL_MITER_THRESHOLD < 1.05 or WildDashGrandPrixV2GuardrailMesh.BEVEL_MITER_THRESHOLD > 1.15:
-		failures.append("sharp-corner bevel threshold should remain inside 1.05-1.15")
+	if WildDashGrandPrixV2CourseGuidance.SUPPORT_STEP != 1:
+		failures.append("V2.6 recovery requires a guardrail post at every sampled route point")
+	if WildDashGrandPrixV2GuardrailMesh.OUTWARD_CLEARANCE < 0.0 or WildDashGrandPrixV2GuardrailMesh.OUTWARD_CLEARANCE > 0.08:
+		failures.append("post-to-post rail outward clearance must stay small and positive")
 
 	var expected_chunks: int = _count_spatial_chunks(points, WildDashGrandPrixV2GroundingWorld.CHUNK_LENGTH)
 	if expected_chunks < 22 or expected_chunks > 32:
 		failures.append("2.6km course should resolve to 22-32 V2.6 grounding chunks, got %d" % expected_chunks)
 
 	var minimum_inner_margin: float = INF
-	var bevel_candidates: int = 0
+	var maximum_adjacent_segment: float = 0.0
 	for point_index: int in range(points.size()):
-		if WildDashGrandPrixV2Geometry.miter_ratio_at(points, point_index) > WildDashGrandPrixV2GuardrailMesh.BEVEL_MITER_THRESHOLD:
-			bevel_candidates += 1
 		for side: float in [-1.0, 1.0]:
 			var shoulder: Vector3 = WildDashGrandPrixV2Geometry.shoulder_edge_point(points, widths, sections, point_index, side)
 			var inner: Vector3 = WildDashGrandPrixV2Geometry.barrier_inner_face_point(points, widths, sections, point_index, side)
@@ -39,6 +39,14 @@ func _init() -> void:
 			if margin + 0.001 < WildDashGrandPrixV2Geometry.MIN_BARRIER_INNER_CLEARANCE:
 				failures.append("authoritative guardrail inner face enters shoulder at point %d side=%.0f margin=%.3f" % [point_index, side, margin])
 				break
+		if point_index + 1 < points.size():
+			var segment_length: float = points[point_index].distance_to(points[point_index + 1])
+			maximum_adjacent_segment = maxf(maximum_adjacent_segment, segment_length)
+			if segment_length > WildDashGrandPrixV2CourseGuidance.MAX_REASONABLE_RAIL_SEGMENT:
+				failures.append("sampled route segment %d->%d is %.2fm, too long for strict post-to-post rail" % [
+					point_index, point_index + 1, segment_length,
+				])
+				break
 
 	var required_sections: Array[StringName] = [
 		&"meadow_start", &"forest_obstacle", &"long_river", &"mountain_approach",
@@ -49,11 +57,12 @@ func _init() -> void:
 			failures.append("V2.6 world is missing terrain width profile for %s" % String(section_id))
 
 	if failures.is_empty():
-		print("GRAND PRIX V2.6 GROUNDING SMOKE PASS chunks=%d subgrade_gap=%.2fm subgrade_depth=%.2fm bevel_threshold=%.2f bevel_candidates=%d min_inner_margin=%.3fm terrain_skirt=true far_collision=0" % [
+		print("GRAND PRIX V2.6 GROUNDING SMOKE PASS chunks=%d subgrade_gap=%.2fm subgrade_depth=%.2fm support_step=%d outward_clearance=%.2fm max_adjacent_segment=%.2fm min_inner_margin=%.3fm post_to_post=true adjacent_only=true swept_mesh=false terrain_skirt=true far_collision=0" % [
 			expected_chunks, WildDashGrandPrixV2GroundingWorld.SUBGRADE_TOP_DROP,
 			WildDashGrandPrixV2GroundingWorld.SUBGRADE_DEPTH,
-			WildDashGrandPrixV2GuardrailMesh.BEVEL_MITER_THRESHOLD,
-			bevel_candidates, minimum_inner_margin,
+			WildDashGrandPrixV2CourseGuidance.SUPPORT_STEP,
+			WildDashGrandPrixV2GuardrailMesh.OUTWARD_CLEARANCE,
+			maximum_adjacent_segment, minimum_inner_margin,
 		])
 		quit(0)
 		return
