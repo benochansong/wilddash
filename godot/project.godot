@@ -20,6 +20,7 @@ ItemSystem="*res://systems/item_system.gd"
 SkillSystem="*res://systems/skill_system.gd"
 PerformanceManager="*res://scripts/performance_manager.gd"
 PauseManager="*res://scripts/pause_manager.gd"
+GrandPrixVisualGuardrailKiller="*res://scripts/grand_prix_visual_guardrail_killer.gd"
 
 [display]
 window/size/viewport_width=1600
