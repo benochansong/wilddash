@@ -2,11 +2,13 @@ class_name WildDashGrandPrixV2DynamicHazard
 extends Area3D
 
 ## Reusable Stage 3 hazard with a readable warning phase.
-## Uses an Area3D impact instead of moving rigid-body physics so 15-18 racers
-## cannot become permanently wedged in a dynamic obstacle.
+## Distant hazards keep their visual presence but skip full physics animation and
+## monitoring until a racer enters the activation radius.
 
 const HIT_PROTECTION_MSEC: int = 850
 const MIN_WARNING_SECONDS: float = 1.05
+const ACTIVATION_CHECK_INTERVAL: float = 0.25
+const ACTIVATION_DISTANCE: float = 220.0
 
 var hazard_id: StringName = &"dynamic_hazard"
 var hazard_kind: StringName = &"moving_gate"
@@ -22,6 +24,8 @@ var base_retention: float = 0.52
 var _base_position: Vector3 = Vector3.ZERO
 var _base_global_position: Vector3 = Vector3.ZERO
 var _elapsed: float = 0.0
+var _activation_elapsed: float = ACTIVATION_CHECK_INTERVAL
+var _runtime_near_racer: bool = true
 var _visual: MeshInstance3D
 var _warning_visual: MeshInstance3D
 var _warning_ground_global: Vector3 = Vector3.ZERO
@@ -84,6 +88,7 @@ func configure(
 		block.size = size
 		_visual.mesh = block
 	_visual.material_override = material
+	_visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	add_child(_visual)
 
 	_warning_visual = MeshInstance3D.new()
@@ -100,16 +105,31 @@ func configure(
 	warning_material.emission = Color(1.0, 0.16, 0.03)
 	warning_material.emission_energy_multiplier = 1.8
 	_warning_visual.material_override = warning_material
+	_warning_visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_warning_visual.visible = true
 	add_child(_warning_visual)
 	_warning_visual.set_as_top_level(true)
 	_warning_visual.global_position = _warning_ground_global
+
+func is_runtime_active() -> bool:
+	return _runtime_near_racer and RaceManager.active
 
 func _physics_process(delta: float) -> void:
 	if not RaceManager.active:
 		_elapsed = 0.0
 		monitoring = false
 		position = _base_position
+		_runtime_near_racer = false
+		if _warning_visual != null:
+			_warning_visual.visible = false
+		return
+
+	_activation_elapsed += delta
+	if _activation_elapsed >= ACTIVATION_CHECK_INTERVAL:
+		_activation_elapsed = 0.0
+		_runtime_near_racer = _has_near_racer()
+	if not _runtime_near_racer:
+		monitoring = false
 		if _warning_visual != null:
 			_warning_visual.visible = false
 		return
@@ -151,6 +171,18 @@ func _physics_process(delta: float) -> void:
 			position = _base_position + Vector3.UP * lerpf(10.0, 0.0, fall_t)
 		_:
 			position = _base_position
+
+func _has_near_racer() -> bool:
+	var max_distance_squared: float = ACTIVATION_DISTANCE * ACTIVATION_DISTANCE
+	for candidate: Node3D in RaceManager.racers:
+		if not candidate is WildDashCharacterController:
+			continue
+		var racer: WildDashCharacterController = candidate as WildDashCharacterController
+		if racer.finished:
+			continue
+		if racer.global_position.distance_squared_to(_base_global_position) <= max_distance_squared:
+			return true
+	return false
 
 func _inactive_position() -> Vector3:
 	match hazard_kind:
