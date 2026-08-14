@@ -1,15 +1,14 @@
 class_name WildDashGrandPrixV3WorldFoundation
 extends Node3D
 
-## Grand Prix V3.6 continuous land mantle.
+## Grand Prix V3.7 continuous land mantle.
 ##
-## V3.5 used one broad low slab below the whole course. That prevented a void
-## fall, but it still let racers drop down to a visibly separate lower floor.
-## Round 1 is not a floating track, so V3.6 removes that stacked-floor model and
-## builds actual route-height land directly outside both shoulders for the whole
-## course. The mantle follows the sampled road elevation and always extends well
-## beyond the offroad stop depth. Tight mountain/canyon widths stay conservative
-## so the mantle does not bridge over nearby switchbacks at another elevation.
+## V3.6 replaced the old lower-floor safety slab with route-height land outside
+## both shoulders. V3.7 also makes this mantle the AUTHORITATIVE offroad physics
+## surface. The older V2 near-terrain collision used a different height profile;
+## keeping both active could create overlapping floors/steps that trapped racers
+## when they tried to return to the road. Visual terrain may remain, but its old
+## side collision is disabled after the continuous mantle is ready.
 
 const SHOULDER_OVERLAP: float = 0.35
 const OUTER_DROP: float = 0.14
@@ -32,6 +31,7 @@ var _route: Array[Vector3] = []
 var _mantle_root: Node3D
 var _mantle_body: StaticBody3D
 var _mantle_visual: MeshInstance3D
+var _legacy_collision_shapes_disabled: int = 0
 
 func _ready() -> void:
 	process_priority = 124
@@ -55,7 +55,7 @@ func _build_when_ready() -> void:
 		return
 
 	_mantle_root = Node3D.new()
-	_mantle_root.name = "V36ContinuousLandMantle"
+	_mantle_root.name = "V37ContinuousLandMantle"
 	add_child(_mantle_root)
 
 	_mantle_visual = MeshInstance3D.new()
@@ -77,7 +77,7 @@ func _build_when_ready() -> void:
 		(shape as ConcavePolygonShape3D).backface_collision = true
 
 	_mantle_body = StaticBody3D.new()
-	_mantle_body.name = "V36ContinuousLandCollision"
+	_mantle_body.name = "V37ContinuousLandCollision"
 	_mantle_body.collision_layer = 1
 	_mantle_body.collision_mask = 0
 	_mantle_root.add_child(_mantle_body)
@@ -86,9 +86,16 @@ func _build_when_ready() -> void:
 	collision.shape = shape
 	_mantle_body.add_child(collision)
 
-	print("GRAND PRIX V3.6 CONTINUOUS LAND READY route_points=%d segments=%d low_floor=false stacked_floor=false two_sided=true meadow_width=18.0m mountain_width=6.5..8.0m canyon_width=5.5m" % [
+	# The legacy V2 near terrain is useful visually, but its collision follows a
+	# separate procedural height profile. Two overlapping side-ground colliders
+	# can form hidden ledges/steps. Keep the road collision, disable only the old
+	# side-terrain collision once the V3.7 mantle exists.
+	_legacy_collision_shapes_disabled = _disable_legacy_near_terrain_collision()
+
+	print("GRAND PRIX V3.7 CONTINUOUS LAND READY route_points=%d segments=%d low_floor=false stacked_floor=false two_sided=true authoritative_offroad_collision=true legacy_side_shapes_disabled=%d meadow_width=18.0m mountain_width=6.5..8.0m canyon_width=5.5m" % [
 		_route.size(),
 		_route.size() - 1,
+		_legacy_collision_shapes_disabled,
 	])
 
 func _build_land_mantle_mesh() -> ArrayMesh:
@@ -148,6 +155,26 @@ func _build_land_mantle_mesh() -> ArrayMesh:
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	return mesh
 
+func _disable_legacy_near_terrain_collision() -> int:
+	var terrain_shell: Node = _find_named_recursive(get_parent(), "V2TerrainShell")
+	if terrain_shell == null:
+		return 0
+	var collision_root: Node = terrain_shell.get_node_or_null("V2NearTerrainCollision")
+	if collision_root == null:
+		return 0
+	return _disable_collision_shapes_recursive(collision_root)
+
+func _disable_collision_shapes_recursive(root: Node) -> int:
+	var disabled: int = 0
+	for child: Node in root.get_children():
+		if child is CollisionShape3D:
+			var shape_node: CollisionShape3D = child as CollisionShape3D
+			shape_node.set_deferred("disabled", true)
+			disabled += 1
+		else:
+			disabled += _disable_collision_shapes_recursive(child)
+	return disabled
+
 func _right_at(point_index: int) -> Vector3:
 	if _route.size() < 2:
 		return Vector3.RIGHT
@@ -166,6 +193,17 @@ func _right_at(point_index: int) -> Vector3:
 
 func get_land_width_for_section(section_id: StringName) -> float:
 	return float(SECTION_LAND_WIDTHS.get(section_id, 12.0))
+
+func _find_named_recursive(root: Node, target_name: String) -> Node:
+	if root == null:
+		return null
+	if String(root.name) == target_name:
+		return root
+	for child: Node in root.get_children():
+		var found: Node = _find_named_recursive(child, target_name)
+		if found != null:
+			return found
+	return null
 
 func _find_v2_track(root: Node) -> WildDashGrandPrixV2Track:
 	if root == null:
