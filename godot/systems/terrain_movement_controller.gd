@@ -2,13 +2,22 @@ class_name WildDashTerrainMovementController
 extends Node
 
 ## Applies terrain affinity to every registered race character.
-## Runs after ordinary movement so terrain becomes the final pace rule for both
-## the player and AI racers. Stage 2 also gives the player compact zone feedback.
+## Terrain effects still apply every physics frame, but expensive zone discovery
+## runs at 10Hz through a spatial grid instead of scanning the whole zone group
+## once per racer on every physics tick.
 
 const WATER_CURRENT_MAX_SPEED: float = 3.0
 const TERRAIN_HUD_SECONDS: float = 1.5
+const ZONE_QUERY_INTERVAL: float = 0.10
+const ZONE_CACHE_REFRESH_INTERVAL: float = 1.0
+const ZONE_GRID_SIZE: float = 64.0
 
 var _last_zone_by_racer: Dictionary = {}
+var _zone_by_racer: Dictionary = {}
+var _zone_grid: Dictionary = {}
+var _zone_query_elapsed: float = 0.0
+var _zone_cache_elapsed: float = ZONE_CACHE_REFRESH_INTERVAL
+var _cached_zone_count: int = -1
 var _terrain_hud_panel: PanelContainer
 var _terrain_hud_label: Label
 var _hud_hide_at_msec: int = 0
@@ -19,9 +28,21 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	_update_terrain_hud_visibility()
+	_zone_cache_elapsed += delta
+	if _zone_cache_elapsed >= ZONE_CACHE_REFRESH_INTERVAL or _zone_grid.is_empty():
+		_zone_cache_elapsed = 0.0
+		_refresh_zone_grid()
+
 	if not RaceManager.active:
 		_last_zone_by_racer.clear()
+		_zone_by_racer.clear()
+		_zone_query_elapsed = 0.0
 		return
+
+	_zone_query_elapsed += delta
+	var resolve_zones: bool = _zone_query_elapsed >= ZONE_QUERY_INTERVAL
+	if resolve_zones:
+		_zone_query_elapsed = 0.0
 
 	for candidate: Node3D in RaceManager.racers:
 		if not candidate is WildDashCharacterController:
@@ -29,8 +50,12 @@ func _physics_process(delta: float) -> void:
 		var racer: WildDashCharacterController = candidate as WildDashCharacterController
 		if racer.finished:
 			continue
-		var zone: WildDashTerrainZone = _find_zone_for_point(racer.global_position)
-		_report_transition(racer, zone)
+		var racer_key: int = racer.get_instance_id()
+		var zone: WildDashTerrainZone = _zone_by_racer.get(racer_key, null) as WildDashTerrainZone
+		if resolve_zones:
+			zone = _find_zone_for_point(racer.global_position, zone)
+			_zone_by_racer[racer_key] = zone
+			_report_transition(racer, zone)
 		if zone == null:
 			continue
 		match zone.get_terrain_type():
@@ -43,12 +68,42 @@ func _physics_process(delta: float) -> void:
 			&"summit":
 				pass
 
-func _find_zone_for_point(point: Vector3) -> WildDashTerrainZone:
-	for node: Node in get_tree().get_nodes_in_group("wilddash_terrain_zone"):
-		if node is WildDashTerrainZone:
-			var zone: WildDashTerrainZone = node as WildDashTerrainZone
-			if zone.contains_global_point(point):
-				return zone
+func _refresh_zone_grid() -> void:
+	var next_grid: Dictionary = {}
+	var zones: Array[Node] = get_tree().get_nodes_in_group("wilddash_terrain_zone")
+	var valid_count: int = 0
+	for node: Node in zones:
+		if not node is WildDashTerrainZone:
+			continue
+		var zone: WildDashTerrainZone = node as WildDashTerrainZone
+		valid_count += 1
+		var radius: float = maxf(zone.half_length, zone.half_width) + 4.0
+		var min_x: int = floori((zone.center.x - radius) / ZONE_GRID_SIZE)
+		var max_x: int = floori((zone.center.x + radius) / ZONE_GRID_SIZE)
+		var min_z: int = floori((zone.center.z - radius) / ZONE_GRID_SIZE)
+		var max_z: int = floori((zone.center.z + radius) / ZONE_GRID_SIZE)
+		for cell_x: int in range(min_x, max_x + 1):
+			for cell_z: int in range(min_z, max_z + 1):
+				var key: Vector2i = Vector2i(cell_x, cell_z)
+				var bucket: Array = next_grid.get(key, [])
+				bucket.append(zone)
+				next_grid[key] = bucket
+	_zone_grid = next_grid
+	if valid_count != _cached_zone_count:
+		_cached_zone_count = valid_count
+		print("GRAND PRIX TERRAIN LOOKUP CACHE zones=%d buckets=%d query_hz=%.1f grid=%.0fm" % [
+			valid_count, _zone_grid.size(), 1.0 / ZONE_QUERY_INTERVAL, ZONE_GRID_SIZE,
+		])
+
+func _find_zone_for_point(point: Vector3, previous: WildDashTerrainZone) -> WildDashTerrainZone:
+	if previous != null and previous.contains_global_point(point):
+		return previous
+	var key: Vector2i = Vector2i(floori(point.x / ZONE_GRID_SIZE), floori(point.z / ZONE_GRID_SIZE))
+	var bucket: Array = _zone_grid.get(key, [])
+	for value: Variant in bucket:
+		var zone: WildDashTerrainZone = value as WildDashTerrainZone
+		if zone != null and zone.contains_global_point(point):
+			return zone
 	return null
 
 func _apply_water(racer: WildDashCharacterController, zone: WildDashTerrainZone, delta: float) -> void:
@@ -58,9 +113,6 @@ func _apply_water(racer: WildDashCharacterController, zone: WildDashTerrainZone,
 	var target_speed: float = racer.max_speed * speed_ratio * skill_scale
 	if racer.is_player and InputManager.get_throttle_axis() < -0.05:
 		target_speed *= 0.35
-
-	# Strong swimmers retain pace and rebuild it quickly after a collision. Weak
-	# swimmers still remain fully playable, but the 320m river makes the gap visible.
 	var water_acceleration: float = racer.acceleration * acceleration_scale * 1.15
 	racer.current_speed = move_toward(racer.current_speed, maxf(0.0, target_speed), water_acceleration * delta)
 
@@ -68,10 +120,7 @@ func _apply_water(racer: WildDashCharacterController, zone: WildDashTerrainZone,
 	if current_direction.length_squared() <= 0.001 or zone.get_current_strength() <= 0.0:
 		return
 	var susceptibility: float = WildDashRaceTerrainProfile.get_river_current_susceptibility(racer.animal_id)
-	var desired_current_speed: float = minf(
-		WATER_CURRENT_MAX_SPEED,
-		zone.get_current_strength() * susceptibility
-	)
+	var desired_current_speed: float = minf(WATER_CURRENT_MAX_SPEED, zone.get_current_strength() * susceptibility)
 	var current_velocity: Vector3 = racer.get_knockback_velocity()
 	var existing_current: float = maxf(0.0, current_velocity.dot(current_direction))
 	if existing_current < desired_current_speed:
@@ -83,7 +132,6 @@ func _apply_climb(racer: WildDashCharacterController, delta: float) -> void:
 	if racer.current_speed > target_speed:
 		racer.current_speed = move_toward(racer.current_speed, target_speed, racer.acceleration * 1.55 * delta)
 	elif ratio >= 0.96:
-		# Elite climbers recover momentum on the ascent instead of merely avoiding a cap.
 		racer.current_speed = move_toward(racer.current_speed, target_speed, racer.acceleration * 0.32 * delta)
 
 func _apply_rough(racer: WildDashCharacterController, delta: float) -> void:
@@ -92,7 +140,6 @@ func _apply_rough(racer: WildDashCharacterController, delta: float) -> void:
 	if racer.current_speed > target_speed:
 		racer.current_speed = move_toward(racer.current_speed, target_speed, racer.acceleration * 1.40 * delta)
 	elif ratio >= 0.95:
-		# Rough specialists regain speed faster after mud/rock contact.
 		racer.current_speed = move_toward(racer.current_speed, target_speed, racer.acceleration * 0.24 * delta)
 
 func _report_transition(racer: WildDashCharacterController, zone: WildDashTerrainZone) -> void:
@@ -128,7 +175,6 @@ func _build_terrain_hud() -> void:
 	canvas.name = "TerrainFeedbackLayer"
 	canvas.layer = 35
 	add_child(canvas)
-
 	_terrain_hud_panel = PanelContainer.new()
 	_terrain_hud_panel.name = "TerrainFeedback"
 	_terrain_hud_panel.position = Vector2(34.0, 148.0)
@@ -144,7 +190,6 @@ func _build_terrain_hud() -> void:
 	panel_style.corner_radius_bottom_right = 12
 	_terrain_hud_panel.add_theme_stylebox_override("panel", panel_style)
 	canvas.add_child(_terrain_hud_panel)
-
 	_terrain_hud_label = Label.new()
 	_terrain_hud_label.name = "TerrainFeedbackText"
 	_terrain_hud_label.text = "TERRAIN"
