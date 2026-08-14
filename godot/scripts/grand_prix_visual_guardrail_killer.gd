@@ -11,25 +11,29 @@ extends Node
 const SWEEP_INTERVAL: float = 0.10
 const STARTUP_SWEEPS: int = 80
 
-const ROOT_NAMES: PackedStringArray = PackedStringArray([
+# These collections are runtime script members, not constants. Godot 4.7.1
+# requires const initializers to be compile-time constant expressions; building
+# PackedStringArray values with a constructor here caused the autoload to fail
+# parsing before the project could leave the splash screen.
+var _root_names: Array[String] = [
 	"ProductionArtDressing",
 	"ProductionArt_grand_prix",
 	"RouteContainmentGuidance",
-])
+]
 
-const VISUAL_EXACT_NAMES: PackedStringArray = PackedStringArray([
+var _visual_exact_names: Array[String] = [
 	"GuardrailPosts",
 	"V2GuardrailVisuals",
-])
+]
 
-const VISUAL_PREFIXES: PackedStringArray = PackedStringArray([
+var _visual_prefixes: Array[String] = [
 	"GuardrailUpper_",
 	"GuardrailLower_",
 	"GuardrailPost_",
 	"V2GuardrailChunk_",
 	"RouteBeacon_",
 	"HeroLandmark_",
-])
+]
 
 var _elapsed: float = 0.0
 var _startup_sweeps_left: int = STARTUP_SWEEPS
@@ -104,13 +108,13 @@ func _should_remove_visual_node(node: Node) -> bool:
 			return false
 
 	var node_name: String = String(node.name)
-	if ROOT_NAMES.has(node_name):
+	if _root_names.has(node_name):
 		return true
 	if node_name.begins_with("ProductionArt_grand_prix"):
 		return true
-	if VISUAL_EXACT_NAMES.has(node_name):
+	if _visual_exact_names.has(node_name):
 		return node is VisualInstance3D or node is Node3D
-	for prefix: String in VISUAL_PREFIXES:
+	for prefix: String in _visual_prefixes:
 		if node_name.begins_with(prefix):
 			return node is VisualInstance3D or node is Node3D
 
