@@ -2,18 +2,12 @@ class_name WildDashGrandPrixV2Stage3Controller
 extends Node3D
 
 ## Final Round 1 representative-map pass.
-## Adds distributed obstacle families, difficulty-scaled warned hazards and a
-## lightweight MultiMesh environment while keeping the V2 route authoritative.
+## Stage3 now owns gameplay obstacles/hazards only; V2TerrainShell owns the
+## chunked decorative world so environment art is not rendered twice.
 
 const OBSTACLE_KINDS: Array[StringName] = [
-	&"small_rock",
-	&"large_boulder",
-	&"fallen_log",
-	&"rotating_log",
-	&"moving_gate",
-	&"mud_patch",
-	&"rolling_boulder",
-	&"rock_fall",
+	&"small_rock", &"large_boulder", &"fallen_log", &"rotating_log",
+	&"moving_gate", &"mud_patch", &"rolling_boulder", &"rock_fall",
 ]
 
 var _track: WildDashGrandPrixV2Track
@@ -46,13 +40,27 @@ func _build_when_ready() -> void:
 	_build_forest_obstacles()
 	_build_descent_obstacles()
 	_build_canyon_obstacles()
-	_build_environment()
+	# Decorative forest/river/mountain/canyon dressing is now generated once by
+	# V2TerrainShell in ~100m chunks. Keep only the small finish gate here.
+	_build_final_environment()
 
 	var profile: Dictionary = get_difficulty_profile(GameManager.difficulty)
-	print("GRAND PRIX V2 STAGE3 READY obstacle_kinds=%d static=%d dynamic=%d mud=%d hazard_speed=%.2f extra_hazards=%s" % [
+	print("GRAND PRIX V2 STAGE3 READY obstacle_kinds=%d static=%d dynamic=%d mud=%d hazard_speed=%.2f extra_hazards=%s decorative_world=terrain_shell" % [
 		OBSTACLE_KINDS.size(), _static_obstacle_count, _dynamic_hazard_count, _mud_patch_count,
 		float(profile["hazard_speed"]), str(bool(profile["extra_hazards"])),
 	])
+
+func get_dynamic_hazard_count() -> int:
+	return _dynamic_hazard_count
+
+func get_dynamic_hazard_active_count() -> int:
+	if _root_dynamic == null:
+		return 0
+	var active_count: int = 0
+	for child: Node in _root_dynamic.get_children():
+		if child is WildDashGrandPrixV2DynamicHazard and (child as WildDashGrandPrixV2DynamicHazard).is_runtime_active():
+			active_count += 1
+	return active_count
 
 func _build_roots() -> void:
 	_root_static = Node3D.new()
@@ -66,7 +74,6 @@ func _build_roots() -> void:
 	add_child(_root_environment)
 
 func _build_forest_obstacles() -> void:
-	# LEFT: agility line, CENTER: power/combat line, RIGHT: safer longer-feeling line.
 	_spawn_light(&"forest_obstacle", 0.18, -4.0, &"forest_small_rock_left", Vector3(2.2, 1.35, 2.2), 3.6, 0.66, true, &"rock")
 	_spawn_light(&"forest_obstacle", 0.33, 0.2, &"forest_fallen_log_center", Vector3(5.6, 0.72, 1.15), 4.1, 0.60, true, &"log")
 	_spawn_mud_patch(&"forest_obstacle", 0.48, 3.8, 4.4, 11.0)
@@ -88,17 +95,7 @@ func _build_canyon_obstacles() -> void:
 	if bool(get_difficulty_profile(GameManager.difficulty)["extra_hazards"]):
 		_spawn_dynamic(&"canyon_obstacle", 0.86, 2.7, &"canyon_rock_fall_hard", &"rock_fall", Vector3(2.5, 2.5, 2.5), Vector3.ZERO, 0.0, 5.1, 1.7, 1.18, 6.0, 0.49)
 
-func _spawn_light(
-	section_id: StringName,
-	progress: float,
-	lateral: float,
-	obstacle_id: StringName,
-	size: Vector3,
-	impact: float,
-	retention: float,
-	breakable: bool,
-	shape_kind: StringName
-) -> void:
+func _spawn_light(section_id: StringName, progress: float, lateral: float, obstacle_id: StringName, size: Vector3, impact: float, retention: float, breakable: bool, shape_kind: StringName) -> void:
 	var pose: Dictionary = _sample_section_pose(section_id, progress, lateral)
 	if pose.is_empty():
 		return
@@ -126,33 +123,19 @@ func _spawn_mud_patch(section_id: StringName, progress: float, lateral: float, w
 	zone.name = "Stage3Mud_%02d" % _mud_patch_count
 	_root_static.add_child(zone)
 	zone.configure_route_box(StringName("stage3_mud_%02d" % _mud_patch_count), &"rough", from_point, to_point, width, 5.0)
-
 	var patch: MeshInstance3D = MeshInstance3D.new()
 	patch.name = "MudVisual"
 	var mesh: BoxMesh = BoxMesh.new()
 	mesh.size = Vector3(width, 0.05, length)
 	patch.mesh = mesh
 	patch.material_override = _mud_material()
+	patch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	patch.global_position = center + Vector3.UP * 0.08
 	patch.look_at(patch.global_position + forward, Vector3.UP)
 	_root_static.add_child(patch)
 	_mud_patch_count += 1
 
-func _spawn_dynamic(
-	section_id: StringName,
-	progress: float,
-	lateral: float,
-	hazard_id: StringName,
-	kind: StringName,
-	size: Vector3,
-	axis_local: Vector3,
-	travel: float,
-	cycle: float,
-	active: float,
-	warning: float,
-	impact: float,
-	retention: float
-) -> void:
+func _spawn_dynamic(section_id: StringName, progress: float, lateral: float, hazard_id: StringName, kind: StringName, size: Vector3, axis_local: Vector3, travel: float, cycle: float, active: float, warning: float, impact: float, retention: float) -> void:
 	var pose: Dictionary = _sample_section_pose(section_id, progress, lateral)
 	if pose.is_empty():
 		return
@@ -176,12 +159,11 @@ func _spawn_dynamic(
 	if kind == &"rotating_log" or kind == &"moving_gate":
 		hazard.look_at(hazard.global_position + forward, Vector3.UP)
 	var difficulty: Dictionary = get_difficulty_profile(GameManager.difficulty)
-	hazard.configure(
-		hazard_id, kind, size, _rock_material() if kind == &"rolling_boulder" or kind == &"rock_fall" else _wood_material(),
-		world_axis, travel, cycle, active, warning, float(difficulty["hazard_speed"]), impact, retention
-	)
+	hazard.configure(hazard_id, kind, size, _rock_material() if kind == &"rolling_boulder" or kind == &"rock_fall" else _wood_material(), world_axis, travel, cycle, active, warning, float(difficulty["hazard_speed"]), impact, retention)
 	_dynamic_hazard_count += 1
 
+# Legacy environment builders remain for reference/fallback, but are no longer
+# called in V2.5 because V2TerrainShell owns chunked world dressing.
 func _build_environment() -> void:
 	_build_forest_environment()
 	_build_river_environment()
@@ -299,21 +281,13 @@ func _sample_section_pose(section_id: StringName, progress: float, lateral: floa
 	var b: Vector3 = _route[segment_index + 1]
 	var forward: Vector3 = _planar_forward(a, b)
 	var right: Vector3 = Vector3(-forward.z, 0.0, forward.x)
-	return {
-		"position": a.lerp(b, 0.5) + right * lateral,
-		"forward": forward,
-		"right": right,
-		"segment_index": segment_index,
-	}
+	return {"position": a.lerp(b, 0.5) + right * lateral, "forward": forward, "right": right, "segment_index": segment_index}
 
 static func get_difficulty_profile(difficulty: StringName) -> Dictionary:
 	match difficulty:
-		&"wild":
-			return {"hazard_speed": 0.78, "current_scale": 0.82, "extra_hazards": false, "ai_risk_scale": 0.86}
-		&"nightmare":
-			return {"hazard_speed": 1.18, "current_scale": 1.18, "extra_hazards": true, "ai_risk_scale": 1.12}
-		_:
-			return {"hazard_speed": 1.0, "current_scale": 1.0, "extra_hazards": false, "ai_risk_scale": 1.0}
+		&"wild": return {"hazard_speed": 0.78, "current_scale": 0.82, "extra_hazards": false, "ai_risk_scale": 0.86}
+		&"nightmare": return {"hazard_speed": 1.18, "current_scale": 1.18, "extra_hazards": true, "ai_risk_scale": 1.12}
+		_: return {"hazard_speed": 1.0, "current_scale": 1.0, "extra_hazards": false, "ai_risk_scale": 1.0}
 
 func _get_range(section_id: StringName) -> Vector2i:
 	if not _ranges.has(section_id):
@@ -339,12 +313,9 @@ func _add_multimesh(node_name: String, mesh: Mesh, transforms: Array[Transform3D
 		return
 	if mesh is CylinderMesh:
 		var cylinder: CylinderMesh = mesh as CylinderMesh
-		if cylinder.height <= 0.0:
-			cylinder.height = 1.0
-		if cylinder.top_radius <= 0.0:
-			cylinder.top_radius = 0.55
-		if cylinder.bottom_radius <= 0.0:
-			cylinder.bottom_radius = 0.75
+		if cylinder.height <= 0.0: cylinder.height = 1.0
+		if cylinder.top_radius <= 0.0: cylinder.top_radius = 0.55
+		if cylinder.bottom_radius <= 0.0: cylinder.bottom_radius = 0.75
 		cylinder.radial_segments = maxi(6, cylinder.radial_segments)
 	elif mesh is SphereMesh:
 		var sphere: SphereMesh = mesh as SphereMesh
@@ -360,12 +331,27 @@ func _add_multimesh(node_name: String, mesh: Mesh, transforms: Array[Transform3D
 	multimesh.instance_count = transforms.size()
 	for index: int in range(transforms.size()):
 		multimesh.set_instance_transform(index, transforms[index])
-	multimesh.custom_aabb = AABB(Vector3(-360.0, -40.0, -1990.0), Vector3(720.0, 170.0, 2250.0))
+	multimesh.custom_aabb = _tight_aabb(transforms, 2.0)
 	var instance: MultiMeshInstance3D = MultiMeshInstance3D.new()
 	instance.name = node_name
 	instance.multimesh = multimesh
 	instance.material_override = material
+	instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_root_environment.add_child(instance)
+
+func _tight_aabb(transforms: Array[Transform3D], margin: float) -> AABB:
+	var minimum: Vector3 = transforms[0].origin
+	var maximum: Vector3 = transforms[0].origin
+	for transform: Transform3D in transforms:
+		var extents: Vector3 = Vector3(transform.basis.x.length(), transform.basis.y.length(), transform.basis.z.length()) * 0.7 + Vector3.ONE * 0.3
+		minimum.x = minf(minimum.x, transform.origin.x - extents.x)
+		minimum.y = minf(minimum.y, transform.origin.y - extents.y)
+		minimum.z = minf(minimum.z, transform.origin.z - extents.z)
+		maximum.x = maxf(maximum.x, transform.origin.x + extents.x)
+		maximum.y = maxf(maximum.y, transform.origin.y + extents.y)
+		maximum.z = maxf(maximum.z, transform.origin.z + extents.z)
+	var padding: Vector3 = Vector3.ONE * margin
+	return AABB(minimum - padding, maximum - minimum + padding * 2.0)
 
 func _material_from_palette(key: StringName, fallback: Color) -> Material:
 	if _palette.has(key):
@@ -377,22 +363,16 @@ func _material_from_palette(key: StringName, fallback: Color) -> Material:
 
 func _rock_material() -> Material:
 	return _material_from_palette(&"rock", Color(0.31, 0.33, 0.34))
-
 func _wood_material() -> Material:
 	return _material_from_palette(&"wood", Color(0.34, 0.20, 0.09))
-
 func _leaf_material() -> Material:
 	return _material_from_palette(&"grass", Color(0.12, 0.34, 0.16))
-
 func _bush_material() -> Material:
 	return _material_from_palette(&"grass", Color(0.09, 0.42, 0.18))
-
 func _reeds_material() -> Material:
 	return _material_from_palette(&"grass", Color(0.30, 0.48, 0.16))
-
 func _mud_material() -> Material:
 	return _material_from_palette(&"dirt", Color(0.20, 0.11, 0.06))
-
 func _canyon_material() -> Material:
 	return _material_from_palette(&"rock", Color(0.40, 0.25, 0.16))
 
