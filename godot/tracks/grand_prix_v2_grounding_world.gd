@@ -1,10 +1,11 @@
 class_name WildDashGrandPrixV2GroundingWorld
 extends Node3D
 
-## V2.6 recovery layer for the visual failures that a side-only terrain ribbon
-## could not solve. Every ~100m chunk gets a CLOSED road subgrade under the full
-## road+shoulder width plus sloped terrain skirts at the far terrain edge. Hero
-## landmarks are kept in a wider backdrop radius than small TerrainShell detail.
+## V2.6 grounded-world recovery layer.
+## Adds closed road subgrade below the full road+shoulder width, sloped far-edge
+## skirts to hide blue void, and one readable hero landmark per biome. Ground
+## mass stays visible; only backdrop landmark roots use a wider distance chunk
+## window than TerrainShell's near-detail window.
 
 const CHUNK_LENGTH: float = 100.0
 const SUBGRADE_TOP_DROP: float = 0.14
@@ -20,7 +21,6 @@ var _segment_widths: Array[float] = []
 var _segment_sections: Array[StringName] = []
 var _section_ranges: Dictionary = {}
 var _chunk_ranges: Array[Vector2i] = []
-var _chunk_roots: Array[Node3D] = []
 var _backdrop_roots: Array[Node3D] = []
 var _subgrade_mesh_count: int = 0
 var _skirt_mesh_count: int = 0
@@ -107,11 +107,9 @@ func _build_chunk(chunk_index: int, point_range: Vector2i) -> void:
 	var root: Node3D = Node3D.new()
 	root.name = "V2GroundingChunk_%02d" % chunk_index
 	add_child(root)
-	_chunk_roots.append(root)
-
-	var base_root: Node3D = Node3D.new()
-	base_root.name = "GroundMass"
-	root.add_child(base_root)
+	var ground_root: Node3D = Node3D.new()
+	ground_root.name = "GroundMass"
+	root.add_child(ground_root)
 	var backdrop_root: Node3D = Node3D.new()
 	backdrop_root.name = "Backdrop"
 	root.add_child(backdrop_root)
@@ -120,13 +118,11 @@ func _build_chunk(chunk_index: int, point_range: Vector2i) -> void:
 	var middle_point: int = clampi((point_range.x + point_range.y) / 2, 0, _route.size() - 1)
 	var section_id: StringName = WildDashGrandPrixV2Geometry.point_section_id(_segment_sections, middle_point)
 	var subgrade: ArrayMesh = _build_subgrade_mesh(point_range.x, point_range.y)
-	_add_mesh_instance(base_root, "RoadSubgrade", subgrade, _subgrade_material(section_id), false)
-	if subgrade.get_surface_count() > 0:
-		_subgrade_mesh_count += 1
+	_add_mesh_instance(ground_root, "RoadSubgrade", subgrade, _subgrade_material(section_id), false)
+	_subgrade_mesh_count += 1
 	var skirt: ArrayMesh = _build_terrain_skirt_mesh(point_range.x, point_range.y)
-	_add_mesh_instance(base_root, "TerrainSkirt", skirt, _skirt_material(section_id), false)
-	if skirt.get_surface_count() > 0:
-		_skirt_mesh_count += 1
+	_add_mesh_instance(ground_root, "TerrainSkirt", skirt, _skirt_material(section_id), false)
+	_skirt_mesh_count += 1
 
 func _build_subgrade_mesh(start_point: int, end_point: int) -> ArrayMesh:
 	var surface: SurfaceTool = SurfaceTool.new()
@@ -134,10 +130,11 @@ func _build_subgrade_mesh(start_point: int, end_point: int) -> ArrayMesh:
 	for point_index: int in range(start_point, end_point):
 		var normal0: Vector3 = WildDashGrandPrixV2Geometry.road_normal_at(_route, point_index)
 		var normal1: Vector3 = WildDashGrandPrixV2Geometry.road_normal_at(_route, point_index + 1)
-		var l0_top: Vector3 = _track.get_v2_shoulder_edge_point(point_index, -1.0) + normal0 * (WildDashGrandPrixV2Track.ROAD_SURFACE_LIFT - SUBGRADE_TOP_DROP)
-		var r0_top: Vector3 = _track.get_v2_shoulder_edge_point(point_index, 1.0) + normal0 * (WildDashGrandPrixV2Track.ROAD_SURFACE_LIFT - SUBGRADE_TOP_DROP)
-		var l1_top: Vector3 = _track.get_v2_shoulder_edge_point(point_index + 1, -1.0) + normal1 * (WildDashGrandPrixV2Track.ROAD_SURFACE_LIFT - SUBGRADE_TOP_DROP)
-		var r1_top: Vector3 = _track.get_v2_shoulder_edge_point(point_index + 1, 1.0) + normal1 * (WildDashGrandPrixV2Track.ROAD_SURFACE_LIFT - SUBGRADE_TOP_DROP)
+		var lift: float = WildDashGrandPrixV2Track.ROAD_SURFACE_LIFT - SUBGRADE_TOP_DROP
+		var l0_top: Vector3 = _track.get_v2_shoulder_edge_point(point_index, -1.0) + normal0 * lift
+		var r0_top: Vector3 = _track.get_v2_shoulder_edge_point(point_index, 1.0) + normal0 * lift
+		var l1_top: Vector3 = _track.get_v2_shoulder_edge_point(point_index + 1, -1.0) + normal1 * lift
+		var r1_top: Vector3 = _track.get_v2_shoulder_edge_point(point_index + 1, 1.0) + normal1 * lift
 		var l0_bottom: Vector3 = l0_top - Vector3.UP * SUBGRADE_DEPTH
 		var r0_bottom: Vector3 = r0_top - Vector3.UP * SUBGRADE_DEPTH
 		var l1_bottom: Vector3 = l1_top - Vector3.UP * SUBGRADE_DEPTH
@@ -146,8 +143,6 @@ func _build_subgrade_mesh(start_point: int, end_point: int) -> ArrayMesh:
 		_add_quad(surface, l0_bottom, l1_bottom, r0_bottom, r1_bottom)
 		_add_quad(surface, l0_top, l1_top, l0_bottom, l1_bottom)
 		_add_quad(surface, r0_top, r0_bottom, r1_top, r1_bottom)
-	if surface.get_vertex_count() == 0:
-		return ArrayMesh.new()
 	surface.generate_normals()
 	return surface.commit()
 
@@ -169,8 +164,6 @@ func _build_terrain_skirt_mesh(start_point: int, end_point: int) -> ArrayMesh:
 			var bottom0: Vector3 = top0 + outward0 * TERRAIN_SKIRT_OUTSET - Vector3.UP * _skirt_drop(section0)
 			var bottom1: Vector3 = top1 + outward1 * TERRAIN_SKIRT_OUTSET - Vector3.UP * _skirt_drop(section1)
 			_add_quad(surface, top0, bottom0, top1, bottom1)
-	if surface.get_vertex_count() == 0:
-		return ArrayMesh.new()
 	surface.generate_normals()
 	return surface.commit()
 
@@ -186,7 +179,8 @@ func _far_terrain_point(point_index: int, side: float, section_id: StringName) -
 	return point
 
 func _build_hero_landmarks() -> void:
-	for section_id: StringName in _section_ranges.keys():
+	for section_variant: Variant in _section_ranges.keys():
+		var section_id: StringName = StringName(section_variant)
 		var section_range: Vector2i = _section_ranges[section_id] as Vector2i
 		var point_index: int = clampi((section_range.x + section_range.y + 1) / 2, 0, _route.size() - 1)
 		var chunk_index: int = _chunk_index_for_route_point(point_index)
@@ -195,55 +189,49 @@ func _build_hero_landmarks() -> void:
 		var parent: Node3D = _backdrop_roots[chunk_index]
 		var tangent: Vector3 = WildDashGrandPrixV2Geometry.planar_tangent_at(_route, point_index)
 		var right: Vector3 = Vector3(-tangent.z, 0.0, tangent.x)
-		var shoulder_distance: float = (
-			WildDashGrandPrixV2Geometry.point_half_width(_segment_widths, point_index)
-			+ WildDashGrandPrixV2Geometry.point_shoulder_width(_segment_sections, point_index)
-		)
+		var edge: float = WildDashGrandPrixV2Geometry.point_half_width(_segment_widths, point_index) + WildDashGrandPrixV2Geometry.point_shoulder_width(_segment_sections, point_index)
 		match section_id:
 			&"meadow_start":
-				_add_farm_landmark(parent, _route[point_index] + right * (shoulder_distance + 25.0), tangent, "MeadowFarm")
+				_add_farm(parent, _route[point_index] + right * (edge + 25.0), tangent, "MeadowFarm")
 			&"forest_obstacle":
-				_add_forest_gate(parent, _route[point_index], right, shoulder_distance + 12.0)
+				_add_tree(parent, _route[point_index] - right * (edge + 13.0), 10.5, "ForestHeroLeft")
+				_add_tree(parent, _route[point_index] + right * (edge + 13.0), 10.5, "ForestHeroRight")
 			&"long_river":
-				_add_tree_landmark(parent, _route[point_index] + right * (shoulder_distance + 18.0), 9.0, "RiverTree")
-			&"mountain_approach", &"mountain_ascent":
-				_add_mountain_landmark(parent, _route[point_index] - right * (shoulder_distance + 34.0), 30.0 if section_id == &"mountain_ascent" else 22.0, String(section_id))
+				_add_tree(parent, _route[point_index] + right * (edge + 20.0), 9.0, "RiverTreeLineHero")
+			&"mountain_approach":
+				_add_mountain(parent, _route[point_index] - right * (edge + 32.0), 22.0, "MountainApproachMass")
+			&"mountain_ascent":
+				_add_mountain(parent, _route[point_index] - right * (edge + 36.0), 31.0, "MountainAscentMass")
 			&"summit_ridge":
-				_add_summit_marker(parent, _route[point_index], right, shoulder_distance + 2.5)
+				_add_summit_marker(parent, _route[point_index], right, edge + 2.5)
 			&"rough_descent":
-				_add_mountain_landmark(parent, _route[point_index] - right * (shoulder_distance + 28.0), 20.0, "DescentMass")
+				_add_mountain(parent, _route[point_index] - right * (edge + 28.0), 20.0, "DescentMass")
 			&"canyon_obstacle":
-				_add_canyon_landmark(parent, _route[point_index], right, shoulder_distance + 10.0)
+				_add_canyon_walls(parent, _route[point_index], right, edge + 10.0)
 			&"final_sprint":
-				_add_farm_landmark(parent, _route[point_index] - right * (shoulder_distance + 24.0), tangent, "FinalBarn")
+				_add_farm(parent, _route[point_index] - right * (edge + 24.0), tangent, "FinalBarn")
 
-func _add_farm_landmark(parent: Node3D, ground: Vector3, forward: Vector3, prefix: String) -> void:
+func _add_farm(parent: Node3D, ground: Vector3, forward: Vector3, prefix: String) -> void:
 	var basis: Basis = Basis.looking_at(forward, Vector3.UP)
 	_add_box(parent, prefix + "_Body", Transform3D(basis.scaled(Vector3(8.0, 4.6, 6.0)), ground + Vector3.UP * 2.3), _farm_material(), false)
 	var roof_basis: Basis = basis * Basis(Vector3.UP, PI * 0.25)
 	_add_cone(parent, prefix + "_Roof", Transform3D(roof_basis.scaled(Vector3(5.2, 2.6, 5.2)), ground + Vector3.UP * 5.4), _roof_material(), false, 4)
 
-func _add_forest_gate(parent: Node3D, center: Vector3, right: Vector3, distance: float) -> void:
-	for side: float in [-1.0, 1.0]:
-		var ground: Vector3 = center + right * side * distance
-		_add_tree_landmark(parent, ground, 10.5, "ForestHero_%s" % str(side))
-
-func _add_tree_landmark(parent: Node3D, ground: Vector3, height: float, prefix: String) -> void:
+func _add_tree(parent: Node3D, ground: Vector3, height: float, prefix: String) -> void:
 	_add_cylinder(parent, prefix + "_Trunk", Transform3D(Basis.IDENTITY.scaled(Vector3(0.75, height * 0.48, 0.75)), ground + Vector3.UP * height * 0.24), _wood_material(), true, 7)
 	_add_cone(parent, prefix + "_Canopy", Transform3D(Basis.IDENTITY.scaled(Vector3(3.6, height * 0.64, 3.6)), ground + Vector3.UP * height * 0.70), _leaf_material(), true, 8)
 
-func _add_mountain_landmark(parent: Node3D, ground: Vector3, height: float, prefix: String) -> void:
-	_add_cone(parent, prefix + "_MountainMass", Transform3D(Basis.IDENTITY.scaled(Vector3(16.0, height, 16.0)), ground + Vector3.UP * (height * 0.42 - 2.0)), _rock_material(), false, 8)
+func _add_mountain(parent: Node3D, ground: Vector3, height: float, prefix: String) -> void:
+	_add_cone(parent, prefix, Transform3D(Basis.IDENTITY.scaled(Vector3(16.0, height, 16.0)), ground + Vector3.UP * (height * 0.42 - 2.0)), _rock_material(), false, 8)
 
 func _add_summit_marker(parent: Node3D, center: Vector3, right: Vector3, distance: float) -> void:
 	for side: float in [-1.0, 1.0]:
 		_add_box(parent, "SummitPost_%s" % str(side), Transform3D(Basis.IDENTITY.scaled(Vector3(0.55, 5.0, 0.55)), center + right * side * distance + Vector3.UP * 2.5), _wood_material(), true)
 	_add_box(parent, "SummitBeam", Transform3D(Basis.IDENTITY.scaled(Vector3(distance * 2.0, 0.45, 0.45)), center + Vector3.UP * 4.7), _wood_material(), true)
 
-func _add_canyon_landmark(parent: Node3D, center: Vector3, right: Vector3, distance: float) -> void:
+func _add_canyon_walls(parent: Node3D, center: Vector3, right: Vector3, distance: float) -> void:
 	for side: float in [-1.0, 1.0]:
-		var ground: Vector3 = center + right * side * distance
-		_add_box(parent, "CanyonHeroWall_%s" % str(side), Transform3D(Basis.IDENTITY.scaled(Vector3(8.0, 16.0, 12.0)), ground + Vector3.UP * 6.5), _canyon_material(), true)
+		_add_box(parent, "CanyonHeroWall_%s" % str(side), Transform3D(Basis.IDENTITY.scaled(Vector3(8.0, 16.0, 12.0)), center + right * side * distance + Vector3.UP * 6.5), _canyon_material(), true)
 
 func _add_box(parent: Node3D, node_name: String, transform: Transform3D, material: Material, cast_shadow: bool) -> void:
 	var mesh: BoxMesh = BoxMesh.new()
@@ -279,8 +267,6 @@ func _add_primitive(parent: Node3D, node_name: String, mesh: Mesh, transform: Tr
 	_landmark_mesh_count += 1
 
 func _add_mesh_instance(parent: Node3D, node_name: String, mesh: ArrayMesh, material: Material, cast_shadow: bool) -> void:
-	if mesh.get_surface_count() == 0:
-		return
 	_validate_chunk_aabb(node_name, mesh.get_aabb())
 	var instance: MeshInstance3D = MeshInstance3D.new()
 	instance.name = node_name
@@ -291,9 +277,7 @@ func _add_mesh_instance(parent: Node3D, node_name: String, mesh: ArrayMesh, mate
 
 func _validate_chunk_aabb(node_name: String, bounds: AABB) -> void:
 	if bounds.size.x > MAX_REASONABLE_CHUNK_AABB or bounds.size.z > MAX_REASONABLE_CHUNK_AABB:
-		push_warning("V2.6 oversized grounding chunk AABB %s size=(%.1f, %.1f, %.1f)" % [
-			node_name, bounds.size.x, bounds.size.y, bounds.size.z,
-		])
+		push_warning("V2.6 oversized grounding chunk AABB %s size=(%.1f, %.1f, %.1f)" % [node_name, bounds.size.x, bounds.size.y, bounds.size.z])
 
 func _add_quad(surface: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> void:
 	surface.add_vertex(a)
@@ -311,7 +295,7 @@ func _update_backdrop_focus(focus_chunk: int) -> void:
 		if visible_now:
 			_visible_backdrop_chunks += 1
 	if _debug_label != null:
-		_debug_label.text = "V2.6 WORLD ACTIVE\nGrounding %d / %d" % [_visible_backdrop_chunks, _chunk_ranges.size()]
+		_debug_label.text = "V2.6 WORLD ACTIVE\nBackdrop %d / %d" % [_visible_backdrop_chunks, _chunk_ranges.size()]
 
 func _report_world_activation() -> void:
 	await get_tree().create_timer(1.2).timeout
@@ -408,7 +392,7 @@ func _material(color: Color, roughness: float) -> StandardMaterial3D:
 	return material
 
 func _wood_material() -> Material:
-	return _material(Color(0.34, 0.20, 0.09), 0.9)
+	return _material(Color(0.34, 0.20, 0.09), 0.90)
 
 func _leaf_material() -> Material:
 	return _material(Color(0.12, 0.36, 0.15), 0.94)
