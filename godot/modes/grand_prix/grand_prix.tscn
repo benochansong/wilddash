@@ -1,4 +1,4 @@
-[gd_scene load_steps=18 format=3]
+[gd_scene load_steps=19 format=3]
 
 [ext_resource type="Script" path="res://modes/grand_prix/grand_prix_v2_mode.gd" id="1_mode"]
 [ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="2_feel"]
@@ -17,6 +17,7 @@
 [ext_resource type="Script" path="res://tracks/grand_prix_v2_difficulty_controller.gd" id="20_difficulty"]
 [ext_resource type="Script" path="res://tracks/grand_prix_v2_terrain_shell.gd" id="21_terrain_shell"]
 [ext_resource type="Script" path="res://tracks/grand_prix_v2_grounding_world.gd" id="22_grounding_world"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v2_hard_reset_controller.gd" id="23_hard_reset"]
 
 [node name="GrandPrix" type="Node3D"]
 script = ExtResource("1_mode")
@@ -35,6 +36,9 @@ script = ExtResource("17_terrain_gameplay")
 
 [node name="V2Stage3" type="Node3D" parent="."]
 script = ExtResource("18_stage3")
+
+[node name="V2HardResetController" type="Node" parent="."]
+script = ExtResource("23_hard_reset")
 
 [node name="V2AITerrainStrategy" type="Node" parent="."]
 script = ExtResource("19_ai_terrain")
