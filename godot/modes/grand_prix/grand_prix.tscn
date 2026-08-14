@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=3]
+[gd_scene load_steps=18 format=3]
 
 [ext_resource type="Script" path="res://modes/grand_prix/grand_prix_rc5_mode.gd" id="1_mode"]
 [ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="2_feel"]
@@ -15,6 +15,8 @@
 [ext_resource type="Script" path="res://systems/elephant_trunk_lunge_controller.gd" id="13_lunge"]
 [ext_resource type="Script" path="res://systems/race_combat_core_v2.gd" id="14_combat_v2"]
 [ext_resource type="Script" path="res://systems/bear_combat_v2_controller.gd" id="15_bear_combat"]
+[ext_resource type="Script" path="res://systems/terrain_movement_controller.gd" id="16_terrain"]
+[ext_resource type="Script" path="res://tracks/grand_prix_river_crossing.gd" id="17_river"]
 
 [node name="GrandPrix" type="Node3D"]
 script = ExtResource("1_mode")
@@ -36,6 +38,12 @@ script = ExtResource("13_lunge")
 
 [node name="BearCombatV2Controller" type="Node" parent="."]
 script = ExtResource("15_bear_combat")
+
+[node name="TerrainMovementController" type="Node" parent="."]
+script = ExtResource("16_terrain")
+
+[node name="GrandPrixRiverCrossing" type="Node3D" parent="."]
+script = ExtResource("17_river")
 
 [node name="RacingFeelController" type="Node" parent="."]
 script = ExtResource("2_feel")
