@@ -1,19 +1,24 @@
 class_name WildDashGrandPrixV3OffroadStopGuard
 extends Node
 
-## Grand Prix V3.6 final offroad stop guard.
+## Grand Prix V3.7 directional offroad stop guard.
 ##
-## The normal offroad controller provides the gradual loss of grip and speed.
-## This guard only acts after a racer has already reached the intended deep-
-## offroad stop line. Holding steering/throttle outward must not let the racer
-## creep a few centimetres farther every physics frame until it eventually
-## reaches the edge of the land mesh. This is not a roadside wall: racers can
-## freely leave the road, cross the shoulder and drive several metres offroad
-## before the soft stop line is reached.
+## The guard only prevents additional OUTWARD travel after the racer reaches the
+## deep-offroad stop line. V3.6 zeroed all planar movement every frame, which also
+## erased the return crawl/traction from the offroad controller and could trap a
+## player outside the road. V3.7 immediately releases the guard when the racer is
+## facing or already moving back toward the route, nudges slightly inside the
+## stop line, and preserves a small return speed.
 
 const LOCAL_SEARCH_RADIUS: int = 12
 const SOFT_STOP_SLOP: float = 0.28
 const DEFAULT_STOP_DEPTH: float = 7.0
+const HOLD_INSET: float = 0.22
+const RETURN_RELEASE_INSET: float = 0.55
+const RETURN_HEADING_DOT: float = 0.05
+const RETURN_VELOCITY_EPSILON: float = 0.20
+const RETURN_RELEASE_SPEED: float = 3.80
+const RETURN_RELEASE_IMPULSE: float = 1.40
 
 const SECTION_STOP_DEPTHS: Dictionary = {
 	&"mountain_approach": 3.40,
@@ -26,7 +31,8 @@ const SECTION_STOP_DEPTHS: Dictionary = {
 var _track: WildDashGrandPrixV2Track
 var _route: Array[Vector3] = []
 var _segment_hint: Dictionary = {}
-var _clamp_count: int = 0
+var _hold_count: int = 0
+var _release_count: int = 0
 
 func _ready() -> void:
 	process_priority = 135
@@ -43,7 +49,10 @@ func _bind_when_ready() -> void:
 	if _route.size() < 2:
 		push_warning("GrandPrixV3OffroadStopGuard: route unavailable")
 		return
-	print("GRAND PRIX V3.6 OFFROAD SOFT STOP READY default=%.1fm mountain=2.2..3.4m roadside_wall=false post_slowdown_guard=true" % DEFAULT_STOP_DEPTH)
+	print("GRAND PRIX V3.7 OFFROAD RETURN GUARD READY outward_hold_only=true return_release=true release_speed=%.1f return_impulse=%.1f" % [
+		RETURN_RELEASE_SPEED,
+		RETURN_RELEASE_IMPULSE,
+	])
 
 func _physics_process(_delta: float) -> void:
 	if _track == null or _route.size() < 2 or not RaceManager.active:
@@ -72,22 +81,99 @@ func _enforce_soft_stop(racer: WildDashCharacterController) -> void:
 	planar_offset.y = 0.0
 	if planar_offset.length_squared() <= 0.001:
 		return
-	var direction: Vector3 = planar_offset.normalized()
-	var max_center_distance: float = float(sample["drivable_half_width"]) + stop_depth
-	var corrected: Vector3 = center + direction * max_center_distance
+	var outward: Vector3 = planar_offset.normalized()
+	var inward: Vector3 = -outward
+	var drivable_half_width: float = float(sample["drivable_half_width"])
+
+	if _is_returning_to_track(racer, inward):
+		_release_toward_track(racer, center, outward, inward, drivable_half_width, stop_depth, section_id, depth)
+		return
+
+	_hold_outward_edge(racer, center, outward, drivable_half_width, stop_depth, section_id, depth)
+
+func _is_returning_to_track(racer: WildDashCharacterController, inward: Vector3) -> bool:
+	var forward: Vector3 = -racer.global_transform.basis.z
+	forward.y = 0.0
+	if forward.length_squared() > 0.001:
+		forward = forward.normalized()
+		if forward.dot(inward) >= RETURN_HEADING_DOT:
+			return true
+
+	var planar_velocity: Vector3 = Vector3(racer.velocity.x, 0.0, racer.velocity.z)
+	return planar_velocity.dot(inward) >= RETURN_VELOCITY_EPSILON
+
+func _release_toward_track(
+	racer: WildDashCharacterController,
+	center: Vector3,
+	outward: Vector3,
+	inward: Vector3,
+	drivable_half_width: float,
+	stop_depth: float,
+	section_id: StringName,
+	depth: float
+) -> void:
+	# Move a little inside the stop line so this guard cannot immediately catch
+	# the racer again on the next physics frame while it is trying to return.
+	var release_depth: float = maxf(0.20, stop_depth - RETURN_RELEASE_INSET)
+	var corrected: Vector3 = center + outward * (drivable_half_width + release_depth)
 	corrected.y = racer.global_position.y
 	racer.global_position = corrected
-	racer.current_speed = 0.0
-	racer.velocity.x = 0.0
-	racer.velocity.z = 0.0
-	_clamp_count += 1
-	if racer.is_player and (_clamp_count <= 3 or _clamp_count % 60 == 0):
-		print("GRAND PRIX V3.6 OFFROAD SOFT STOP HOLD racer=%s section=%s depth=%.2f stop=%.2f count=%d" % [
+
+	# Remove only residual outward velocity. Preserve/restore inward movement.
+	var planar_velocity: Vector3 = Vector3(racer.velocity.x, 0.0, racer.velocity.z)
+	var outward_speed: float = planar_velocity.dot(outward)
+	if outward_speed > 0.0:
+		planar_velocity -= outward * outward_speed
+	racer.velocity.x = planar_velocity.x
+	racer.velocity.z = planar_velocity.z
+	racer.current_speed = maxf(racer.current_speed, RETURN_RELEASE_SPEED)
+	racer.apply_knockback(inward, RETURN_RELEASE_IMPULSE)
+
+	_release_count += 1
+	if racer.is_player and (_release_count <= 4 or _release_count % 40 == 0):
+		print("GRAND PRIX V3.7 OFFROAD RETURN RELEASE racer=%s section=%s depth=%.2f stop=%.2f release_depth=%.2f count=%d" % [
 			racer.name,
 			String(section_id),
 			depth,
 			stop_depth,
-			_clamp_count,
+			release_depth,
+			_release_count,
+		])
+
+func _hold_outward_edge(
+	racer: WildDashCharacterController,
+	center: Vector3,
+	outward: Vector3,
+	drivable_half_width: float,
+	stop_depth: float,
+	section_id: StringName,
+	depth: float
+) -> void:
+	# Hold slightly INSIDE the soft-stop line. This is deliberately not a road
+	# wall; several metres of offroad remain fully driveable before this point.
+	var hold_depth: float = maxf(0.20, stop_depth - HOLD_INSET)
+	var corrected: Vector3 = center + outward * (drivable_half_width + hold_depth)
+	corrected.y = racer.global_position.y
+	racer.global_position = corrected
+
+	# Kill only the component that pushes farther outward. Tangential movement is
+	# retained so the racer can rotate naturally and begin the return.
+	var planar_velocity: Vector3 = Vector3(racer.velocity.x, 0.0, racer.velocity.z)
+	var outward_speed: float = planar_velocity.dot(outward)
+	if outward_speed > 0.0:
+		planar_velocity -= outward * outward_speed
+	racer.velocity.x = planar_velocity.x
+	racer.velocity.z = planar_velocity.z
+	racer.current_speed = 0.0
+
+	_hold_count += 1
+	if racer.is_player and (_hold_count <= 3 or _hold_count % 60 == 0):
+		print("GRAND PRIX V3.7 OFFROAD OUTWARD HOLD racer=%s section=%s depth=%.2f stop=%.2f count=%d" % [
+			racer.name,
+			String(section_id),
+			depth,
+			stop_depth,
+			_hold_count,
 		])
 
 func _sample_route(racer: WildDashCharacterController, key: int) -> Dictionary:
