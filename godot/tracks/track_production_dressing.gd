@@ -144,20 +144,19 @@ func _build_route_beacons(route: Array[Vector3], palette: Dictionary) -> void:
 		for side in RAIL_SIDES:
 			var root := Node3D.new()
 			root.name = "RouteBeacon_%02d_%s" % [index, "L" if side < 0.0 else "R"]
-			# Beacon poles are deliberately placed on the same edge line as the
-			# guardrail so the player sees one continuous post-and-beam system.
+			# Beacon poles share the guardrail edge line and both sides intentionally
+			# use the same accent colors for a symmetric race-course silhouette.
 			root.position = route[index] + right * rail_offset * side
 			_art_root.add_child(root)
 			_add_cylinder(root, "Pole", Vector3.UP * 1.15, 0.085, 2.3, structure)
-			_add_box(root, "Flag", Vector3(side * 0.34, 1.78, 0), Vector3(0.64, 0.72, 0.08), primary if side < 0.0 else secondary)
-			_add_box(root, "Reflector", Vector3(0, 0.56, 0), Vector3(0.22, 0.28, 0.16), secondary if side < 0.0 else primary)
+			_add_box(root, "Flag", Vector3(side * 0.34, 1.78, 0), Vector3(0.64, 0.72, 0.08), primary)
+			_add_box(root, "Reflector", Vector3(0, 0.56, 0), Vector3(0.22, 0.28, 0.16), secondary)
 
 func _build_continuous_guardrails(route: Array[Vector3], palette: Dictionary) -> void:
 	var rail_offset: float = _get_rail_offset(palette)
 	var upper_height: float = float(palette.get("rail_upper_height", 1.34))
 	var lower_height: float = float(palette.get("rail_lower_height", 0.62))
 	var primary: StandardMaterial3D = _material(palette["primary"], 0.38, 0.22, bool(palette["emission"]))
-	var secondary: StandardMaterial3D = _material(palette["secondary"], 0.42, 0.18, bool(palette["emission"]))
 	var structure: StandardMaterial3D = _material(palette["structure"], 0.58, 0.30)
 	var total_beams: int = 0
 	var total_supports: int = 0
@@ -193,7 +192,7 @@ func _build_continuous_guardrails(route: Array[Vector3], palette: Dictionary) ->
 				GUARDRAIL_UPPER_WIDTH,
 				GUARDRAIL_UPPER_HEIGHT,
 				GUARDRAIL_BEAM_OVERLAP,
-				primary if side < 0.0 else secondary
+				primary
 			)
 			_add_beam(
 				_art_root,
@@ -207,7 +206,7 @@ func _build_continuous_guardrails(route: Array[Vector3], palette: Dictionary) ->
 			)
 			total_beams += 2
 
-	print("RC9 GUARDRAIL CONNECTED FULL ROUTE track=%s route_segments=%d beams=%d supports=%d offset=%.2f collision=false" % [
+	print("RC9 GUARDRAIL CONNECTED FULL ROUTE track=%s route_segments=%d beams=%d supports=%d offset=%.2f symmetric_color=true collision=false" % [
 		track_id, route.size() - 1, total_beams, total_supports, rail_offset,
 	])
 
