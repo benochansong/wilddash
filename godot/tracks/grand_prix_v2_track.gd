@@ -119,6 +119,13 @@ func get_v2_barrier_point(point_index: int, side: float) -> Vector3:
 		_v2_route, _v2_segment_widths, _v2_segment_sections, point_index, side
 	)
 
+func get_v2_barrier_inner_face_point(point_index: int, side: float) -> Vector3:
+	if point_index < 0 or point_index >= _v2_route.size():
+		return Vector3.ZERO
+	return WildDashGrandPrixV2Geometry.barrier_inner_face_point(
+		_v2_route, _v2_segment_widths, _v2_segment_sections, point_index, side
+	)
+
 func get_v2_road_mesh_count() -> int:
 	return _road_mesh_count
 
@@ -447,7 +454,17 @@ func _report_performance_once() -> void:
 	var node_count: float = Performance.get_monitor(Performance.OBJECT_NODE_COUNT)
 	var draw_calls: float = Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)
 	var physics_objects: float = Performance.get_monitor(Performance.PHYSICS_3D_ACTIVE_OBJECTS)
-	print("GRAND PRIX V2 PERF fps=%.1f road_meshes=%d shoulder_meshes=%d road_collision_shapes=%d runtime_nodes=%d monitor_nodes=%.0f draw_calls=%.0f physics_active=%.0f" % [
+	var guardrail_chunks: int = 0
+	var barrier_collision_shapes: int = 0
+	var parent: Node = get_parent()
+	if parent != null:
+		var guidance: Node = parent.get_node_or_null("V2CourseGuidance")
+		if guidance != null:
+			if guidance.has_method("get_barrier_chunk_count"):
+				guardrail_chunks = int(guidance.call("get_barrier_chunk_count"))
+			if guidance.has_method("get_barrier_collision_shape_count"):
+				barrier_collision_shapes = int(guidance.call("get_barrier_collision_shape_count"))
+	print("GRAND PRIX V2 PERF fps=%.1f road_meshes=%d shoulder_meshes=%d road_collision_shapes=%d guardrail_chunks=%d barrier_collision_shapes=%d runtime_nodes=%d monitor_nodes=%.0f draw_calls=%.0f physics_active=%.0f" % [
 		fps, _road_mesh_count, _shoulder_mesh_count, _road_collision_shape_count,
-		get_runtime_node_count(), node_count, draw_calls, physics_objects,
+		guardrail_chunks, barrier_collision_shapes, get_runtime_node_count(), node_count, draw_calls, physics_objects,
 	])
