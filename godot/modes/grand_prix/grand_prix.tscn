@@ -1,4 +1,4 @@
-[gd_scene load_steps=23 format=3]
+[gd_scene load_steps=24 format=3]
 
 [ext_resource type="Script" path="res://modes/grand_prix/grand_prix_v2_mode.gd" id="1_mode"]
 [ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="2_feel"]
@@ -22,6 +22,7 @@
 [ext_resource type="Script" path="res://modes/grand_prix/grand_prix_v3_combat_accessibility.gd" id="25_combat_access"]
 [ext_resource type="Script" path="res://tracks/grand_prix_v3_offroad_controller.gd" id="26_offroad"]
 [ext_resource type="Script" path="res://tracks/grand_prix_v3_mountain_clearance.gd" id="27_mountain_clearance"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v3_world_foundation.gd" id="28_world_foundation"]
 
 [node name="GrandPrix" type="Node3D"]
 script = ExtResource("1_mode")
@@ -34,6 +35,9 @@ script = ExtResource("21_terrain_shell")
 
 [node name="V2GroundingWorld" type="Node3D" parent="."]
 script = ExtResource("22_grounding_world")
+
+[node name="V35WorldFoundation" type="Node3D" parent="."]
+script = ExtResource("28_world_foundation")
 
 [node name="V2TerrainGameplay" type="Node3D" parent="."]
 script = ExtResource("17_terrain_gameplay")
