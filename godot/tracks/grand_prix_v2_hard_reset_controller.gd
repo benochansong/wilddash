@@ -1,15 +1,14 @@
 class_name WildDashGrandPrixV2HardResetController
 extends Node
 
-## V2.7 diagnostic gate.
-## Default mode C keeps only road/racers + the 4-post/2-rail prototype +
-## TerrainShell base + road grounding. Decorative Detail/Backdrop nodes stay
-## hidden until the minimal geometry is visually approved.
-## Press F8 at runtime to cycle A/B/C/D rendering isolation and log FPS.
+## V2.8 natural-boundary diagnostic gate.
+## Visible guardrail rails/posts are gone. TerrainShell Detail and GroundingWorld
+## Backdrop stay hidden in every isolation mode so the giant green-pole candidates
+## cannot re-enter the frame while road/terrain/performance are stabilized.
 
 const ISOLATION_MODES: Array[String] = ["A", "B", "C", "D"]
 const PERF_SAMPLE_DELAY: float = 1.5
-const DEBUG_LABEL_NAME: String = "V27HardResetLabel"
+const DEBUG_LABEL_NAME: String = "V28NaturalBoundaryLabel"
 
 var _mode: String = "C"
 var _sample_generation: int = 0
@@ -48,18 +47,15 @@ func _initialize_after_world_build() -> void:
 	_apply_section_debug_materials()
 	_apply_isolation_mode()
 	_schedule_perf_sample()
-	_report_hard_reset_state()
+	_report_state()
 
 func _apply_isolation_mode() -> void:
 	var parent: Node = get_parent()
 	if parent == null:
 		return
-	var guidance: CanvasItem = null
-	var guidance_node: Node = parent.get_node_or_null("V2CourseGuidance")
-	if guidance_node is CanvasItem:
-		guidance = guidance_node as CanvasItem
-	elif guidance_node is Node3D:
-		(guidance_node as Node3D).visible = _mode != "A"
+	var guidance: Node = parent.get_node_or_null("V2CourseGuidance")
+	if guidance != null and guidance.has_method("set_barrier_collision_enabled"):
+		guidance.call("set_barrier_collision_enabled", _mode != "A")
 
 	var shell: Node3D = parent.get_node_or_null("V2TerrainShell") as Node3D
 	var grounding: Node3D = parent.get_node_or_null("V2GroundingWorld") as Node3D
@@ -68,10 +64,12 @@ func _apply_isolation_mode() -> void:
 
 	if shell != null:
 		shell.visible = _mode == "C" or _mode == "D"
-		_set_named_descendants_visible(shell, "Detail", _mode == "D")
+		# Deliberately disabled in every mode until tree/prop transforms are rebuilt.
+		_set_named_descendants_visible(shell, "Detail", false)
 	if grounding != null:
 		grounding.visible = _mode == "C" or _mode == "D"
-		_set_named_descendants_visible(grounding, "Backdrop", _mode == "D")
+		# Hero/backdrop props remain off; subgrade/skirt stays visible through root.
+		_set_named_descendants_visible(grounding, "Backdrop", false)
 	if terrain_gameplay != null:
 		terrain_gameplay.visible = _mode == "C" or _mode == "D"
 	if stage3 != null:
@@ -79,7 +77,7 @@ func _apply_isolation_mode() -> void:
 
 	if _debug_label != null:
 		_debug_label.text = _label_text()
-	print("GRAND PRIX V2.7 ISOLATION APPLY mode=%s A=road_racers B=+minimal_guardrail C=+terrain_subgrade D=+environment f8_cycle=true" % _mode)
+	print("GRAND PRIX V2.8 ISOLATION APPLY mode=%s A=road_racers B=+invisible_safety_collision C=+terrain_subgrade D=+gameplay_obstacles visible_guardrails=0 decorative_props=0 f8_cycle=true" % _mode)
 
 func _set_named_descendants_visible(root: Node, target_name: String, visible_now: bool) -> void:
 	for child: Node in root.get_children():
@@ -149,7 +147,7 @@ func _build_debug_label() -> void:
 	get_parent().add_child(_debug_label)
 
 func _label_text() -> String:
-	return "V2.7 HARD RESET  |  Isolation %s  |  F8: A/B/C/D\nA Road+Racers  B +4 Posts/2 Rails  C +Terrain/Subgrade  D +Environment" % _mode
+	return "V2.8 NATURAL BOUNDARY  |  Isolation %s  |  F8: A/B/C/D\nRails 0 | Posts 0 | Decorative pole props OFF" % _mode
 
 func _schedule_perf_sample() -> void:
 	_sample_generation += 1
@@ -164,16 +162,19 @@ func _sample_perf_after_delay(generation: int) -> void:
 	var draw_calls: float = Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)
 	var physics_objects: float = Performance.get_monitor(Performance.PHYSICS_3D_ACTIVE_OBJECTS)
 	var node_count: float = Performance.get_monitor(Performance.OBJECT_NODE_COUNT)
-	print("GRAND PRIX V2.7 PERF ISOLATION mode=%s fps=%.1f draw_calls=%.0f physics_active=%.0f nodes=%.0f" % [
+	print("GRAND PRIX V2.8 PERF ISOLATION mode=%s fps=%.1f draw_calls=%.0f physics_active=%.0f nodes=%.0f" % [
 		_mode, fps, draw_calls, physics_objects, node_count,
 	])
 
-func _report_hard_reset_state() -> void:
+func _report_state() -> void:
 	var detail_roots: int = _count_named_descendants(get_parent().get_node_or_null("V2TerrainShell"), "Detail")
 	var backdrop_roots: int = _count_named_descendants(get_parent().get_node_or_null("V2GroundingWorld"), "Backdrop")
-	print("GRAND PRIX V2.7 HARD RESET ACTIVE mode=%s terrain_debug_colors=true terrain_detail_roots=%d backdrop_roots=%d details_default_visible=false giant_green_pole_candidates_isolated=true graphical_pass=REQUIRED" % [
-		_mode, detail_roots, backdrop_roots,
+	var visual_owners: int = get_tree().get_nodes_in_group(WildDashGrandPrixV2CourseGuidance.VISUAL_OWNER_GROUP).size()
+	print("GRAND PRIX V2.8 NATURAL BOUNDARY ACTIVE mode=%s visual_guardrail_owners=%d rails=0 posts=0 terrain_debug_colors=true terrain_detail_roots=%d backdrop_roots=%d details_visible=false backdrops_visible=false giant_green_pole_candidates_hidden=true graphical_pass=REQUIRED" % [
+		_mode, visual_owners, detail_roots, backdrop_roots,
 	])
+	if visual_owners != 0:
+		push_error("V2.8 expected zero visible guardrail owners")
 
 func _count_named_descendants(root: Node, target_name: String) -> int:
 	if root == null:
