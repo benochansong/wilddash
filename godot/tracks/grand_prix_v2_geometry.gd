@@ -87,6 +87,19 @@ static func point_shoulder_width(segment_sections: Array[StringName], point_inde
 	var next_width: float = shoulder_width_for_section(segment_sections[point_index])
 	return maxf(previous_width, next_width)
 
+static func point_barrier_half_width(segment_sections: Array[StringName], point_index: int) -> float:
+	if segment_sections.is_empty():
+		return barrier_half_width_for_profile(&"danger_rail")
+	if point_index <= 0:
+		return barrier_half_width_for_section(segment_sections[0])
+	if point_index >= segment_sections.size():
+		return barrier_half_width_for_section(segment_sections[-1])
+	# A shared section endpoint must fit both neighboring barrier profiles. This
+	# is especially important for rock_wall -> wood_fence transitions.
+	var previous_half: float = barrier_half_width_for_section(segment_sections[point_index - 1])
+	var next_half: float = barrier_half_width_for_section(segment_sections[point_index])
+	return maxf(previous_half, next_half)
+
 static func tangent_3d_at(route: Array[Vector3], point_index: int) -> Vector3:
 	if route.size() < 2:
 		return Vector3.FORWARD
@@ -182,12 +195,11 @@ static func barrier_point(
 	point_index: int,
 	side: float
 ) -> Vector3:
-	var section_id: StringName = point_section_id(segment_sections, point_index)
 	var distance: float = (
 		point_half_width(segment_widths, point_index)
 		+ point_shoulder_width(segment_sections, point_index)
 		+ BARRIER_MARGIN
-		+ barrier_half_width_for_section(section_id)
+		+ point_barrier_half_width(segment_sections, point_index)
 	)
 	return route[point_index] + lateral_offset(route, point_index, distance) * side
 
@@ -197,12 +209,25 @@ static func barrier_clearance(
 	segment_sections: Array[StringName],
 	point_index: int
 ) -> float:
-	# Safety is measured at the visual inner face, not at the barrier centerline.
+	# Safety is measured at the visual inner-face polyline, not the centerline.
 	var point: Vector3 = barrier_inner_face_point(route, segment_widths, segment_sections, point_index, 1.0)
 	var center: Vector3 = route[point_index]
 	var delta: Vector3 = point - center
 	delta.y = 0.0
 	return delta.length()
+
+static func barrier_visual_inner_clearance_bound(
+	route: Array[Vector3],
+	segment_widths: Array[float],
+	segment_sections: Array[StringName],
+	point_index: int
+) -> float:
+	# Conservative bound for the actual beam/rock body: regardless of its local
+	# lateral orientation, no point can be closer than center distance-half width.
+	var point: Vector3 = barrier_point(route, segment_widths, segment_sections, point_index, 1.0)
+	var delta: Vector3 = point - route[point_index]
+	delta.y = 0.0
+	return delta.length() - point_barrier_half_width(segment_sections, point_index)
 
 static func barrier_required_clearance(
 	segment_widths: Array[float],
