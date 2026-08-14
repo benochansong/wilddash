@@ -18,9 +18,11 @@ var _preview_racer: WildDashCharacterController
 var _summary_label: Label
 var _mode_label: Label
 var _start_button: Button
+var _stats_panel: WildDashAnimalStatsPanel
 var _palette_index := 0
 var _pattern_index := 0
 var _slot_labels: Dictionary = {}
+var _animal_buttons: Dictionary = {}
 
 func _ready() -> void:
 	GameManager.set_state(GameManager.GameState.CHARACTER_SELECT)
@@ -33,7 +35,7 @@ func _ready() -> void:
 	_build_preview_stage()
 	_build_ui()
 	_refresh_preview()
-	print("CHARACTER SELECT READY basic=12 chimera_parts=4")
+	print("CHARACTER SELECT READY basic=12 chimera_parts=4 stats=terrain5+defense")
 
 func _process(delta: float) -> void:
 	if _preview_racer != null:
@@ -154,7 +156,7 @@ func _build_ui() -> void:
 	box.add_child(title)
 
 	var subtitle := Label.new()
-	subtitle.text = "12 UNIQUE RACERS · 동물마다 주행·체급·아레나·스킬 튜닝이 다릅니다."
+	subtitle.text = "12 UNIQUE RACERS · 지형 적성·방어·체급·스킬을 비교하고 선택하세요."
 	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(subtitle)
 
@@ -186,8 +188,10 @@ func _build_ui() -> void:
 		button.text = definition.display_name.to_upper()
 		button.tooltip_text = "%s · %s · %s" % [definition.display_name, definition.role, definition.skill_name]
 		button.custom_minimum_size = Vector2(170, 48)
+		button.toggle_mode = true
 		button.pressed.connect(select_animal.bind(animal_id))
 		animal_grid.add_child(button)
+		_animal_buttons[animal_id] = button
 
 	var divider := HSeparator.new()
 	box.add_child(divider)
@@ -235,10 +239,16 @@ func _build_ui() -> void:
 	box.add_child(_start_button)
 
 	var hints := Label.new()
-	hints.text = "1~4: Core racers · 나머지 8종은 버튼 선택 · H/B/T: Chimera · Enter: Start"
+	hints.text = "동물 선택 → 오른쪽 능력치 비교 · H/B/T: Chimera · Enter: Start"
 	hints.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hints.modulate = Color(0.7, 0.76, 0.86)
 	box.add_child(hints)
+
+	_stats_panel = WildDashAnimalStatsPanel.new()
+	_stats_panel.name = "AnimalStatsPanel"
+	_stats_panel.position = Vector2(1152, 35)
+	layer.add_child(_stats_panel)
+
 	basic_button.grab_focus()
 
 func _add_slot_row(parent: VBoxContainer, slot: StringName, caption: String) -> void:
@@ -283,6 +293,9 @@ func _refresh_preview() -> void:
 		_slot_labels[&"body"].text = String(_loadout.body_id).to_upper()
 		_slot_labels[&"tail"].text = String(_loadout.tail_id).to_upper()
 		_start_button.text = "SAVE BUILD & START"
+		var body_definition := WildDashAnimalCatalog.get_definition(_loadout.body_id)
+		if _stats_panel != null:
+			_stats_panel.show_animal(_loadout.body_id, body_definition, true)
 	else:
 		_preview_racer.configure_animal(_selected_animal)
 		var definition := WildDashAnimalCatalog.get_definition(_selected_animal)
@@ -292,6 +305,17 @@ func _refresh_preview() -> void:
 			definition.arena_move_speed, definition.skill_name, definition.skill_cooldown, definition.skill_description,
 		]
 		_start_button.text = "START AS %s" % definition.display_name.to_upper()
+		if _stats_panel != null:
+			_stats_panel.show_animal(_selected_animal, definition, false)
+	_refresh_animal_button_states()
+
+func _refresh_animal_button_states() -> void:
+	for raw_id: Variant in _animal_buttons.keys():
+		var animal_id: StringName = StringName(raw_id)
+		var button: Button = _animal_buttons[raw_id] as Button
+		if button == null:
+			continue
+		button.button_pressed = not _chimera_mode and animal_id == _selected_animal
 
 func _cycle_palette() -> void:
 	_palette_index = (_palette_index + 1) % WildDashChimeraSystem.PALETTES.size()
