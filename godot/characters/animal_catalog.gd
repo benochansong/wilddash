@@ -1,21 +1,20 @@
 class_name WildDashAnimalCatalog
 extends RefCounted
 
-# RC8 expands the complete race roster to player selection while preserving
-# the original four as the balanced Chimera-part pool.
+# RC9 keeps a 12-animal active roster. Panda remains in the repository as a
+# future unlock/expansion character but Crocodile now owns the active heavy slot.
 const CHIMERA_IDS: Array[StringName] = [&"dog", &"rabbit", &"elephant", &"cat"]
 const PLAYABLE_IDS: Array[StringName] = [
 	&"dog", &"wolf", &"boar",
 	&"rabbit", &"deer", &"monkey",
-	&"elephant", &"bear", &"panda",
+	&"elephant", &"bear", &"crocodile",
 	&"cat", &"fox", &"raccoon",
 ]
-# Compatibility group: these eight began life as NPC-only species. They remain
-# useful for roster/visual tests even though RC8 now allows the player to pick them.
-const NPC_IDS: Array[StringName] = [&"fox", &"bear", &"raccoon", &"panda", &"wolf", &"boar", &"deer", &"monkey"]
+# Compatibility group for the species that began life as NPC-only racers.
+const NPC_IDS: Array[StringName] = [&"fox", &"bear", &"raccoon", &"crocodile", &"wolf", &"boar", &"deer", &"monkey"]
 const RACE_ROSTER_IDS: Array[StringName] = [
 	&"dog", &"fox", &"rabbit", &"bear", &"cat", &"raccoon",
-	&"elephant", &"panda", &"wolf", &"boar", &"deer", &"monkey",
+	&"elephant", &"crocodile", &"wolf", &"boar", &"deer", &"monkey",
 ]
 
 const PATHS := {
@@ -27,6 +26,7 @@ const PATHS := {
 	&"bear": "res://characters/definitions/bear.tres",
 	&"raccoon": "res://characters/definitions/raccoon.tres",
 	&"panda": "res://characters/definitions/panda.tres",
+	&"crocodile": "res://characters/definitions/crocodile.tres",
 	&"wolf": "res://characters/definitions/wolf.tres",
 	&"boar": "res://characters/definitions/boar.tres",
 	&"deer": "res://characters/definitions/deer.tres",
@@ -56,7 +56,10 @@ static func race_roster_ids() -> Array[StringName]:
 	return RACE_ROSTER_IDS.duplicate()
 
 static func all_known_ids() -> Array[StringName]:
-	return PLAYABLE_IDS.duplicate()
+	var ids := PLAYABLE_IDS.duplicate()
+	if not ids.has(&"panda"):
+		ids.append(&"panda")
+	return ids
 
 static func get_race_npc_id(index: int) -> StringName:
 	if RACE_ROSTER_IDS.is_empty():
