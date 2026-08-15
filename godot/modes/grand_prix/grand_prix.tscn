@@ -1,4 +1,4 @@
-[gd_scene load_steps=29 format=3]
+[gd_scene load_steps=30 format=3]
 
 [ext_resource type="Script" path="res://modes/grand_prix/grand_prix_v2_mode.gd" id="1_mode"]
 [ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="2_feel"]
@@ -28,6 +28,7 @@
 [ext_resource type="Script" path="res://tracks/grand_prix_v4_landscape_shell.gd" id="31_landscape_shell"]
 [ext_resource type="Script" path="res://tracks/grand_prix_v4_obstacle_expansion.gd" id="32_obstacle_expansion"]
 [ext_resource type="Script" path="res://modes/grand_prix/grand_prix_v4_combat_frequency.gd" id="33_combat_frequency"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v4_environment_dressing.gd" id="34_environment_dressing"]
 
 [node name="GrandPrix" type="Node3D"]
 script = ExtResource("1_mode")
@@ -46,6 +47,9 @@ script = ExtResource("28_world_foundation")
 
 [node name="V4LandscapeShell" type="Node3D" parent="."]
 script = ExtResource("31_landscape_shell")
+
+[node name="V42EnvironmentDressing" type="Node3D" parent="."]
+script = ExtResource("34_environment_dressing")
 
 [node name="V2TerrainGameplay" type="Node3D" parent="."]
 script = ExtResource("17_terrain_gameplay")
