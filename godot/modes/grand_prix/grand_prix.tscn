@@ -1,4 +1,4 @@
-[gd_scene load_steps=25 format=3]
+[gd_scene load_steps=26 format=3]
 
 [ext_resource type="Script" path="res://modes/grand_prix/grand_prix_v2_mode.gd" id="1_mode"]
 [ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="2_feel"]
@@ -24,6 +24,7 @@
 [ext_resource type="Script" path="res://tracks/grand_prix_v3_mountain_clearance.gd" id="27_mountain_clearance"]
 [ext_resource type="Script" path="res://tracks/grand_prix_v3_world_foundation.gd" id="28_world_foundation"]
 [ext_resource type="Script" path="res://tracks/grand_prix_v3_offroad_stop_guard.gd" id="29_offroad_stop"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v3_water_reentry.gd" id="30_water_reentry"]
 
 [node name="GrandPrix" type="Node3D"]
 script = ExtResource("1_mode")
@@ -78,6 +79,9 @@ script = ExtResource("26_offroad")
 
 [node name="V36OffroadSoftStop" type="Node" parent="."]
 script = ExtResource("29_offroad_stop")
+
+[node name="V3WaterReentry" type="Node3D" parent="."]
+script = ExtResource("30_water_reentry")
 
 [node name="V3MountainClearance" type="Node" parent="."]
 script = ExtResource("27_mountain_clearance")
