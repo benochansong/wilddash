@@ -1,4 +1,4 @@
-[gd_scene load_steps=27 format=3]
+[gd_scene load_steps=29 format=3]
 
 [ext_resource type="Script" path="res://modes/grand_prix/grand_prix_v2_mode.gd" id="1_mode"]
 [ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="2_feel"]
@@ -26,6 +26,8 @@
 [ext_resource type="Script" path="res://tracks/grand_prix_v3_offroad_stop_guard.gd" id="29_offroad_stop"]
 [ext_resource type="Script" path="res://tracks/grand_prix_v3_water_reentry.gd" id="30_water_reentry"]
 [ext_resource type="Script" path="res://tracks/grand_prix_v4_landscape_shell.gd" id="31_landscape_shell"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v4_obstacle_expansion.gd" id="32_obstacle_expansion"]
+[ext_resource type="Script" path="res://modes/grand_prix/grand_prix_v4_combat_frequency.gd" id="33_combat_frequency"]
 
 [node name="GrandPrix" type="Node3D"]
 script = ExtResource("1_mode")
@@ -53,6 +55,9 @@ script = ExtResource("18_stage3")
 
 [node name="V3ObstacleRecovery" type="Node3D" parent="."]
 script = ExtResource("24_obstacles")
+
+[node name="V4ObstacleExpansion" type="Node3D" parent="."]
+script = ExtResource("32_obstacle_expansion")
 
 [node name="V2HardResetController" type="Node" parent="."]
 script = ExtResource("23_hard_reset")
@@ -102,6 +107,9 @@ script = ExtResource("7_rival")
 
 [node name="V3CombatAccessibility" type="Node" parent="."]
 script = ExtResource("25_combat_access")
+
+[node name="V4CombatFrequency" type="Node" parent="."]
+script = ExtResource("33_combat_frequency")
 
 [node name="ItemCombatExpansionController" type="Node" parent="."]
 script = ExtResource("4_items")
