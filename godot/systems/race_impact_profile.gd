@@ -39,90 +39,90 @@ func copy_profile() -> WildDashRaceImpactProfile:
 
 static func pack_buster_inner() -> WildDashRaceImpactProfile:
 	var p: WildDashRaceImpactProfile = WildDashRaceImpactProfile.new()
-	p.impact_strength = 1.35
-	p.knockback = 5.85
-	p.speed_loss_ratio = 0.32
-	p.slow_multiplier = 0.74
-	p.slow_duration = 0.82
-	p.stagger_duration = 0.62
-	p.yaw_instability = 0.20
-	p.air_pop = 2.0
-	p.camera_strength = 0.22
-	p.hitstop_seconds = 0.065
+	p.impact_strength = 1.48
+	p.knockback = 6.45
+	p.speed_loss_ratio = 0.36
+	p.slow_multiplier = 0.70
+	p.slow_duration = 0.84
+	p.stagger_duration = 0.66
+	p.yaw_instability = 0.22
+	p.air_pop = 2.15
+	p.camera_strength = 0.25
+	p.hitstop_seconds = 0.070
 	p.protection_seconds = 0.78
 	p.impact_label = &"HEAVY"
 	return p
 
 static func pack_buster_outer() -> WildDashRaceImpactProfile:
 	var p: WildDashRaceImpactProfile = WildDashRaceImpactProfile.new()
-	p.impact_strength = 1.0
-	p.knockback = 4.35
-	p.speed_loss_ratio = 0.20
-	p.slow_multiplier = 0.82
-	p.slow_duration = 0.62
-	p.stagger_duration = 0.38
-	p.yaw_instability = 0.12
-	p.camera_strength = 0.14
-	p.hitstop_seconds = 0.045
-	p.protection_seconds = 0.70
+	p.impact_strength = 1.10
+	p.knockback = 4.80
+	p.speed_loss_ratio = 0.23
+	p.slow_multiplier = 0.79
+	p.slow_duration = 0.64
+	p.stagger_duration = 0.40
+	p.yaw_instability = 0.14
+	p.camera_strength = 0.16
+	p.hitstop_seconds = 0.048
+	p.protection_seconds = 0.72
 	p.impact_label = &"STRONG"
 	return p
 
 static func rocket_nut() -> WildDashRaceImpactProfile:
 	var p: WildDashRaceImpactProfile = WildDashRaceImpactProfile.new()
-	p.impact_strength = 1.0
-	p.knockback = 3.65
-	p.speed_loss_ratio = 0.24
-	p.slow_multiplier = 0.78
-	p.slow_duration = 0.52
-	p.stagger_duration = 0.44
-	p.yaw_instability = 0.22
-	p.camera_strength = 0.13
-	p.hitstop_seconds = 0.045
-	p.protection_seconds = 0.68
+	p.impact_strength = 1.10
+	p.knockback = 4.00
+	p.speed_loss_ratio = 0.27
+	p.slow_multiplier = 0.75
+	p.slow_duration = 0.54
+	p.stagger_duration = 0.46
+	p.yaw_instability = 0.24
+	p.camera_strength = 0.15
+	p.hitstop_seconds = 0.048
+	p.protection_seconds = 0.70
 	p.impact_label = &"DIRECT"
 	return p
 
 static func shockwave() -> WildDashRaceImpactProfile:
 	var p: WildDashRaceImpactProfile = WildDashRaceImpactProfile.new()
-	p.impact_strength = 1.05
-	p.knockback = 5.25
-	p.speed_loss_ratio = 0.18
-	p.slow_multiplier = 0.84
-	p.slow_duration = 0.50
-	p.stagger_duration = 0.32
-	p.yaw_instability = 0.10
-	p.camera_strength = 0.10
-	p.protection_seconds = 0.62
+	p.impact_strength = 1.16
+	p.knockback = 5.75
+	p.speed_loss_ratio = 0.20
+	p.slow_multiplier = 0.82
+	p.slow_duration = 0.52
+	p.stagger_duration = 0.34
+	p.yaw_instability = 0.11
+	p.camera_strength = 0.12
+	p.protection_seconds = 0.65
 	p.impact_label = &"BLAST"
 	return p
 
 static func banana_peel() -> WildDashRaceImpactProfile:
 	var p: WildDashRaceImpactProfile = WildDashRaceImpactProfile.new()
-	p.impact_strength = 0.85
-	p.knockback = 1.15
-	p.speed_loss_ratio = 0.27
-	p.slow_multiplier = 0.78
-	p.slow_duration = 0.62
-	p.stagger_duration = 0.50
-	p.yaw_instability = 0.72
-	p.camera_strength = 0.08
-	p.protection_seconds = 0.65
+	p.impact_strength = 0.94
+	p.knockback = 1.25
+	p.speed_loss_ratio = 0.30
+	p.slow_multiplier = 0.75
+	p.slow_duration = 0.64
+	p.stagger_duration = 0.52
+	p.yaw_instability = 0.78
+	p.camera_strength = 0.09
+	p.protection_seconds = 0.68
 	p.impact_label = &"SLIP"
 	return p
 
 static func sticky_fruit() -> WildDashRaceImpactProfile:
 	var p: WildDashRaceImpactProfile = WildDashRaceImpactProfile.new()
-	p.impact_strength = 0.78
-	p.knockback = 1.10
-	p.speed_loss_ratio = 0.19
-	p.slow_multiplier = 0.80
-	p.slow_duration = 1.30
-	p.stagger_duration = 0.24
-	p.yaw_instability = 0.16
-	p.acceleration_multiplier = 0.76
-	p.handling_multiplier = 0.89
-	p.camera_strength = 0.06
-	p.protection_seconds = 0.60
+	p.impact_strength = 0.86
+	p.knockback = 1.20
+	p.speed_loss_ratio = 0.21
+	p.slow_multiplier = 0.78
+	p.slow_duration = 1.40
+	p.stagger_duration = 0.25
+	p.yaw_instability = 0.18
+	p.acceleration_multiplier = 0.72
+	p.handling_multiplier = 0.86
+	p.camera_strength = 0.07
+	p.protection_seconds = 0.65
 	p.impact_label = &"STICKY"
 	return p
