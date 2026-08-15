@@ -2,12 +2,14 @@ extends "res://modes/fruit_collection/fruit_frenzy_v2_polish.gd"
 
 ## Round 2 V3 AI dispersion layer.
 ## Prevents the entire roster from selecting the same fruit/carrier/cart point.
-## Core Harvest Heist rules, V2 combat polish and visibility guard remain intact.
+## Core Harvest Heist rules and V2 combat polish remain intact.
+## V3.1 also makes pickup visibility atomic for composite fruit visuals.
 
 const MAX_GOLDEN_CHASERS := 3
 const MAX_CARRIER_CHASERS := 2
 const HOME_ZONE_BIAS := 28.0
 const BANK_SLOT_RADIUS := 1.65
+const REGULAR_RESPAWN_SECONDS := 4.5
 
 var _ai_home_zone_by_id: Dictionary = {}
 
@@ -17,10 +19,79 @@ func _ready() -> void:
 		var racer: WildDashCharacterController = ai_racers[i]
 		if racer != null:
 			_ai_home_zone_by_id[racer.get_instance_id()] = i % 4
-	print("FRUIT FRENZY V3 AI DISPERSION READY zones=4 fruit_reservation=true spill_reservation=true carrier_cap=%d golden_cap=%d bank_slots=true" % [
+	_sync_all_fruit_visuals()
+	print("FRUIT FRENZY V3.1 READY zones=4 fruit_reservation=true spill_reservation=true carrier_cap=%d golden_cap=%d bank_slots=true pickup_visibility=atomic respawn=%.1fs" % [
 		MAX_CARRIER_CHASERS,
 		MAX_GOLDEN_CHASERS,
+		REGULAR_RESPAWN_SECONDS,
 	])
+
+# -----------------------------------------------------------------------------
+# Composite fruit visibility safety
+# -----------------------------------------------------------------------------
+
+func _set_visual_tree_visible(root: Node, visible_state: bool) -> void:
+	if root == null:
+		return
+	if root is GeometryInstance3D:
+		(root as GeometryInstance3D).visible = visible_state
+	for child: Node in root.get_children():
+		_set_visual_tree_visible(child, visible_state)
+
+func _sync_all_fruit_visuals() -> void:
+	for i in range(fruits.size()):
+		if i < fruit_active.size():
+			_set_visual_tree_visible(fruits[i], fruit_active[i])
+	for i in range(spill_fruits.size()):
+		if i < spill_active.size():
+			_set_visual_tree_visible(spill_fruits[i], spill_active[i])
+	if _golden_fruit != null:
+		_set_visual_tree_visible(_golden_fruit, _golden_active)
+
+func _collect_regular_fruit(racer: WildDashCharacterController, index: int) -> void:
+	super(racer, index)
+	if index < 0 or index >= fruits.size():
+		return
+	# Keep the collected fruit gone long enough that pickup feedback is obvious.
+	fruit_respawn[index] = REGULAR_RESPAWN_SECONDS
+	_set_visual_tree_visible(fruits[index], false)
+
+func _update_fruits(delta: float) -> void:
+	super(delta)
+	for i in range(fruits.size()):
+		if i < fruit_active.size():
+			_set_visual_tree_visible(fruits[i], fruit_active[i])
+
+func _update_spill_fruits(delta: float) -> void:
+	super(delta)
+	for i in range(spill_fruits.size()):
+		if i < spill_active.size():
+			_set_visual_tree_visible(spill_fruits[i], spill_active[i])
+
+func _process_pickups_and_banking() -> void:
+	super()
+	# Pickup happens in this physics tick; hide every composite child immediately.
+	_sync_all_fruit_visuals()
+
+func _spawn_spilled_fruit(position: Vector3, fruit_type: StringName, value: int) -> void:
+	super(position, fruit_type, value)
+	for i in range(spill_fruits.size()):
+		if i < spill_active.size():
+			_set_visual_tree_visible(spill_fruits[i], spill_active[i])
+
+func _update_golden_event(delta: float) -> void:
+	super(delta)
+	if _golden_fruit != null:
+		_set_visual_tree_visible(_golden_fruit, _golden_active)
+
+func _update_golden_harvest() -> void:
+	super()
+	if _golden_fruit != null:
+		_set_visual_tree_visible(_golden_fruit, _golden_active)
+
+# -----------------------------------------------------------------------------
+# AI dispersion
+# -----------------------------------------------------------------------------
 
 func _update_ai_decisions() -> void:
 	var fruit_claims: Dictionary = {}
