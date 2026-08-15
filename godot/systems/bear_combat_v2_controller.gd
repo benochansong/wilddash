@@ -10,6 +10,11 @@ extends Node
 ## A/D + F     : biases target acquisition and knockback to that side.
 ## Out of range: a short Bear Lunge can close a small gap before the hit.
 ## Successful hits grant FURY MOMENTUM so Bear can re-enter the racing pack.
+##
+## RC9 race-damage pass:
+## A hit now also applies deterministic MOMENTUM DAMAGE. This is not an HP/death
+## system; it creates real race time loss through an immediate speed cut plus a
+## short recovery speed cap. Defense/Stability reduce damage and recovery lock.
 
 const BEAR_IMPACT_PER_ATTACK_POINT: float = 2.20
 const BEAR_DIRECTIONAL_POWER_MULTIPLIER: float = 1.08
@@ -29,6 +34,20 @@ const TAP_RETENTION_MAX: float = 0.72
 const HOLD_RETENTION_MIN: float = 0.28
 const HOLD_RETENTION_MAX: float = 0.56
 
+# Race damage is intentionally momentum/time loss, not HP. Light racers suffer
+# a deeper recovery hole while high Defense/Stability racers retain their tank
+# identity. Values are deterministic and therefore multiplayer-friendly.
+const TAP_RACE_DAMAGE: float = 30.0
+const HOLD_RACE_DAMAGE: float = 48.0
+const TAP_DISRUPTION_SECONDS: float = 1.10
+const HOLD_DISRUPTION_SECONDS: float = 1.60
+const TAP_SPEED_CAP_LIGHT: float = 0.58
+const TAP_SPEED_CAP_HEAVY: float = 0.80
+const HOLD_SPEED_CAP_LIGHT: float = 0.46
+const HOLD_SPEED_CAP_HEAVY: float = 0.72
+const MOMENTUM_DAMAGE_DECAY_PER_SECOND: float = 18.0
+const MOMENTUM_DAMAGE_MAX: float = 100.0
+
 var _racer: WildDashCharacterController
 var _combat_core: WildDashRaceCombatCoreV2
 var _cooldown_remaining: float = 0.0
@@ -38,6 +57,7 @@ var _pending_command: Dictionary = {}
 var _fury_remaining: float = 0.0
 var _feedback_text: String = ""
 var _feedback_remaining: float = 0.0
+var _victim_disruptions: Dictionary = {}
 
 func _ready() -> void:
 	process_priority = 85
@@ -63,6 +83,7 @@ func _physics_process(delta: float) -> void:
 	_update_lunge(delta)
 	_update_pending_attack(delta)
 	_update_fury_momentum(delta)
+	_update_victim_disruptions(delta)
 
 func get_action_name() -> String:
 	return "BEAR BASH / SLAM"
@@ -76,6 +97,24 @@ func get_status_text() -> String:
 	if _cooldown_remaining > 0.01:
 		return "COOLDOWN %.1fs" % _cooldown_remaining
 	return "TAP BASH · HOLD SLAM · F / Y"
+
+static func get_race_damage(kind: StringName, target_id: StringName) -> float:
+	var base_damage: float = HOLD_RACE_DAMAGE if kind == &"hold" else TAP_RACE_DAMAGE
+	var defense_ratio: float = clampf(WildDashRaceCombatProfile.get_defense(target_id) / 10.0, 0.0, 1.0)
+	return base_damage * lerpf(1.12, 0.72, defense_ratio)
+
+static func get_disruption_seconds(kind: StringName, target_id: StringName) -> float:
+	var base_seconds: float = HOLD_DISRUPTION_SECONDS if kind == &"hold" else TAP_DISRUPTION_SECONDS
+	var defense_ratio: float = clampf(WildDashRaceCombatProfile.get_defense(target_id) / 10.0, 0.0, 1.0)
+	var stability_ratio: float = clampf(WildDashRaceCombatProfile.get_stability(target_id) / 10.0, 0.0, 1.0)
+	var resistance: float = defense_ratio * 0.65 + stability_ratio * 0.35
+	return base_seconds * lerpf(1.18, 0.68, resistance)
+
+static func get_disruption_speed_cap_ratio(kind: StringName, target_id: StringName) -> float:
+	var defense_ratio: float = clampf(WildDashRaceCombatProfile.get_defense(target_id) / 10.0, 0.0, 1.0)
+	if kind == &"hold":
+		return lerpf(HOLD_SPEED_CAP_LIGHT, HOLD_SPEED_CAP_HEAVY, defense_ratio)
+	return lerpf(TAP_SPEED_CAP_LIGHT, TAP_SPEED_CAP_HEAVY, defense_ratio)
 
 func _connect_combat_core() -> void:
 	var parent: Node = get_parent()
@@ -195,6 +234,11 @@ func _apply_bear_attack(target: WildDashCharacterController, command: Dictionary
 		retention = clampf(0.74 - maxf(0.0, effective_impulse - 10.0) * 0.010, TAP_RETENTION_MIN, TAP_RETENTION_MAX)
 	target.current_speed *= retention
 
+	var race_damage: float = get_race_damage(kind, target.animal_id)
+	var disruption_seconds: float = get_disruption_seconds(kind, target.animal_id)
+	var speed_cap_ratio: float = get_disruption_speed_cap_ratio(kind, target.animal_id)
+	_apply_victim_disruption(target, race_damage, disruption_seconds, speed_cap_ratio)
+
 	var visual: WildDashCharacterVisual = target.get_visual()
 	if visual != null:
 		visual.play_action(&"Hit", 0.52 if kind == &"hold" else 0.36)
@@ -206,13 +250,13 @@ func _apply_bear_attack(target: WildDashCharacterController, command: Dictionary
 	_cooldown_remaining = float(command.get("cooldown", WildDashRaceCombatProfile.get_cooldown(&"bear")))
 	_fury_remaining = FURY_MOMENTUM_DURATION
 	_racer.current_speed = maxf(_racer.current_speed, _racer.max_speed * 1.04)
-	_feedback_text = "%s · HIT %s · POWER %.1f" % [
+	_feedback_text = "%s · RACE DMG %.0f · SLOW %.1fs" % [
 		"BEAR SLAM" if kind == &"hold" else "SHOULDER BASH",
-		target.get_display_name().to_upper(),
-		effective_impulse,
+		race_damage,
+		disruption_seconds,
 	]
 	_feedback_remaining = 0.90
-	print("RC9 BEAR COMBAT kind=%s target=%s defense=%.1f raw=%.2f effective=%.2f launch=%.2f retention=%.2f lunge=%s fury=%.2fs cooldown=%.2f" % [
+	print("RC9 BEAR COMBAT kind=%s target=%s defense=%.1f raw=%.2f effective=%.2f launch=%.2f retention=%.2f race_damage=%.1f disruption=%.2fs speed_cap=%.2f lunge=%s fury=%.2fs cooldown=%.2f" % [
 		String(kind),
 		String(target.animal_id),
 		WildDashRaceCombatBalance.get_defense_rating(target.animal_id),
@@ -220,10 +264,69 @@ func _apply_bear_attack(target: WildDashCharacterController, command: Dictionary
 		effective_impulse,
 		launch_strength,
 		retention,
+		race_damage,
+		disruption_seconds,
+		speed_cap_ratio,
 		str(from_lunge),
 		FURY_MOMENTUM_DURATION,
 		_cooldown_remaining,
 	])
+
+func _apply_victim_disruption(
+	target: WildDashCharacterController,
+	race_damage: float,
+	duration: float,
+	speed_cap_ratio: float,
+) -> void:
+	var target_id: int = target.get_instance_id()
+	var previous_value: Variant = _victim_disruptions.get(target_id, {})
+	var previous: Dictionary = previous_value if previous_value is Dictionary else {}
+	var previous_remaining: float = float(previous.get("remaining", 0.0))
+	var previous_cap: float = float(previous.get("speed_cap_ratio", 1.0))
+	var previous_damage: float = float(previous.get("damage", 0.0))
+	_victim_disruptions[target_id] = {
+		"racer": target,
+		"remaining": maxf(previous_remaining, duration),
+		"speed_cap_ratio": minf(previous_cap, speed_cap_ratio),
+		"damage": minf(MOMENTUM_DAMAGE_MAX, previous_damage + race_damage),
+	}
+
+func _update_victim_disruptions(delta: float) -> void:
+	if _victim_disruptions.is_empty():
+		return
+	var expired: Array[int] = []
+	for raw_id: Variant in _victim_disruptions.keys():
+		var target_id: int = int(raw_id)
+		var state_value: Variant = _victim_disruptions.get(target_id)
+		if not state_value is Dictionary:
+			expired.append(target_id)
+			continue
+		var state: Dictionary = state_value
+		var racer_value: Variant = state.get("racer")
+		if not racer_value is WildDashCharacterController:
+			expired.append(target_id)
+			continue
+		var victim: WildDashCharacterController = racer_value as WildDashCharacterController
+		if victim == null or not is_instance_valid(victim) or victim.finished:
+			expired.append(target_id)
+			continue
+
+		var remaining: float = maxf(0.0, float(state.get("remaining", 0.0)) - delta)
+		var speed_cap_ratio: float = clampf(float(state.get("speed_cap_ratio", 1.0)), 0.35, 1.0)
+		var damage: float = maxf(0.0, float(state.get("damage", 0.0)) - MOMENTUM_DAMAGE_DECAY_PER_SECOND * delta)
+		if remaining > 0.0:
+			var speed_cap: float = victim.max_speed * speed_cap_ratio
+			victim.current_speed = minf(victim.current_speed, speed_cap)
+
+		if remaining <= 0.0 and damage <= 0.0:
+			expired.append(target_id)
+			continue
+		state["remaining"] = remaining
+		state["damage"] = damage
+		_victim_disruptions[target_id] = state
+
+	for target_id: int in expired:
+		_victim_disruptions.erase(target_id)
 
 func _update_fury_momentum(delta: float) -> void:
 	if _fury_remaining <= 0.0 or _racer == null:
@@ -277,6 +380,7 @@ func _reset_runtime() -> void:
 	_fury_remaining = 0.0
 	_feedback_text = ""
 	_feedback_remaining = 0.0
+	_victim_disruptions.clear()
 
 func _resolve_player() -> void:
 	if _racer != null and is_instance_valid(_racer):

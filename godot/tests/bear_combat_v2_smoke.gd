@@ -42,9 +42,43 @@ func _init() -> void:
 	if bear_hold_received >= raccoon_hold * 0.65:
 		failures.append("Bear defense must clearly resist the same heavy impact")
 
+	# Race-damage pass: a successful Bear hit must cost real race time, not only
+	# produce a visual knockback. Defense/Stability must still protect heavy racers.
+	var cat_tap_damage: float = WildDashBearCombatV2Controller.get_race_damage(&"tap", &"cat")
+	var elephant_tap_damage: float = WildDashBearCombatV2Controller.get_race_damage(&"tap", &"elephant")
+	var cat_hold_damage: float = WildDashBearCombatV2Controller.get_race_damage(&"hold", &"cat")
+	var cat_tap_disruption: float = WildDashBearCombatV2Controller.get_disruption_seconds(&"tap", &"cat")
+	var cat_hold_disruption: float = WildDashBearCombatV2Controller.get_disruption_seconds(&"hold", &"cat")
+	var cat_hold_cap: float = WildDashBearCombatV2Controller.get_disruption_speed_cap_ratio(&"hold", &"cat")
+	var elephant_hold_cap: float = WildDashBearCombatV2Controller.get_disruption_speed_cap_ratio(&"hold", &"elephant")
+
+	if cat_tap_damage <= elephant_tap_damage:
+		failures.append("Low-defense racers must take more Bear momentum damage than Elephant")
+	if cat_hold_damage <= cat_tap_damage * 1.45:
+		failures.append("Bear Slam must create materially more race damage than Shoulder Bash")
+	if cat_tap_disruption < 0.70:
+		failures.append("Bear Shoulder Bash disruption is too short to create race-position loss")
+	if cat_hold_disruption <= cat_tap_disruption:
+		failures.append("Bear Slam disruption must last longer than Shoulder Bash")
+	if cat_hold_cap >= 0.62:
+		failures.append("Bear Slam must significantly cap a light racer's recovery speed")
+	if elephant_hold_cap <= cat_hold_cap:
+		failures.append("Elephant Defense must preserve a higher post-hit recovery speed cap")
+
 	if failures.is_empty():
-		print("RC9 BEAR COMBAT V2 PASS tap_atk=%.2f hold_atk=%.2f tap_raccoon=%.2f hold_raccoon=%.2f bear_received=%.2f" % [
-			float(tap["attack_power"]), float(hold["attack_power"]), raccoon_tap, raccoon_hold, bear_hold_received,
+		print("RC9 BEAR COMBAT V2 PASS tap_atk=%.2f hold_atk=%.2f tap_raccoon=%.2f hold_raccoon=%.2f bear_received=%.2f cat_tap_damage=%.1f elephant_tap_damage=%.1f cat_hold_damage=%.1f cat_tap_disruption=%.2fs cat_hold_disruption=%.2fs cat_hold_cap=%.2f elephant_hold_cap=%.2f" % [
+			float(tap["attack_power"]),
+			float(hold["attack_power"]),
+			raccoon_tap,
+			raccoon_hold,
+			bear_hold_received,
+			cat_tap_damage,
+			elephant_tap_damage,
+			cat_hold_damage,
+			cat_tap_disruption,
+			cat_hold_disruption,
+			cat_hold_cap,
+			elephant_hold_cap,
 		])
 		quit(0)
 		return
