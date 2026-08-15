@@ -1,25 +1,45 @@
 class_name WildDashCombatAbilitySystem
 extends RefCounted
 
-## Thin typed facade over AnimalCombatProfile. Character passes add bespoke data
-## here without changing Round 2 / Round 4 input code.
+## Typed facade over the staged Combat V2 profiles. Phase 3 specializes the
+## Heavy/Hunter/Thief kits while Phase 2 keeps the agile/aerial and Crocodile
+## Bite/Tail data. Mode code asks this facade rather than caring which phase owns
+## a particular animal.
 
 static func get_basic_attack(animal_id: StringName) -> WildDashCombatAbilitySpec:
+	if WildDashCombatV2Phase3Profile.has_profile(animal_id):
+		var phase3: WildDashCombatAbilitySpec = WildDashCombatV2Phase3Profile.get_basic_attack(animal_id)
+		if phase3 != null:
+			return phase3
 	return WildDashAnimalCombatProfile.get_basic_attack(animal_id)
 
 static func get_heavy_attack(animal_id: StringName) -> WildDashCombatAbilitySpec:
+	if WildDashCombatV2Phase3Profile.has_profile(animal_id):
+		var phase3: WildDashCombatAbilitySpec = WildDashCombatV2Phase3Profile.get_heavy_attack(animal_id)
+		if phase3 != null:
+			return phase3
 	return WildDashAnimalCombatProfile.get_heavy_attack(animal_id)
 
 static func get_aerial_attack(animal_id: StringName) -> WildDashCombatAbilitySpec:
+	if WildDashCombatV2Phase3Profile.has_profile(animal_id):
+		var phase3: WildDashCombatAbilitySpec = WildDashCombatV2Phase3Profile.get_aerial_attack(animal_id)
+		if phase3 != null:
+			return phase3
 	return WildDashAnimalCombatProfile.get_aerial_attack(animal_id)
 
 static func get_mobility_attack(animal_id: StringName) -> WildDashCombatAbilitySpec:
 	return WildDashAnimalCombatProfile.get_mobility_attack(animal_id)
 
 static func get_special_attack(animal_id: StringName) -> WildDashCombatAbilitySpec:
+	var phase3: WildDashCombatAbilitySpec = WildDashCombatV2Phase3Profile.get_special_attack(animal_id)
+	if phase3 != null:
+		return phase3
 	return WildDashAnimalCombatProfile.get_special_attack(animal_id)
 
 static func get_ability(animal_id: StringName, ability_id: StringName) -> WildDashCombatAbilitySpec:
+	var phase3: WildDashCombatAbilitySpec = WildDashCombatV2Phase3Profile.get_ability(animal_id, ability_id)
+	if phase3 != null:
+		return phase3
 	return WildDashAnimalCombatProfile.get_ability(animal_id, ability_id)
 
 static func get_effective_range(spec: WildDashCombatAbilitySpec, in_water: bool) -> float:
