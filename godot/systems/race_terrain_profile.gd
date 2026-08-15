@@ -48,7 +48,9 @@ static func get_rough(animal_id: StringName) -> float:
 	return float(_profile(animal_id).get("rough", 5.0))
 
 static func get_swim_speed_ratio(animal_id: StringName) -> float:
-	return lerpf(0.68, 1.03, clampf(get_swim(animal_id) / 10.0, 0.0, 1.0))
+	# 9-10 point water specialists retain a small real advantage while weak
+	# swimmers still suffer a meaningful pace loss.
+	return lerpf(0.68, 1.05, clampf(get_swim(animal_id) / 10.0, 0.0, 1.0))
 
 static func get_swim_acceleration_scale(animal_id: StringName) -> float:
 	return lerpf(0.72, 1.18, clampf(get_swim(animal_id) / 10.0, 0.0, 1.0))
