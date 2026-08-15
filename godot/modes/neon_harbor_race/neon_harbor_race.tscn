@@ -14,7 +14,7 @@
 [ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_respawn_guard.gd" id="16_respawn"]
 [ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_route_network.gd" id="17_routes"]
 [ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_route_guidance.gd" id="18_guidance"]
-[ext_resource type="Script" path="res://systems/race_combat_ai_director_safe.gd" id="19_combat_ai"]
+[ext_resource type="Script" path="res://systems/race_combat_ai_director_aggressive.gd" id="19_combat_ai"]
 
 [node name="NeonHarborRace" type="Node3D"]
 script = ExtResource("1_mode")
