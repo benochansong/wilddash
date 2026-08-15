@@ -87,7 +87,7 @@ script = ExtResource("20_difficulty")
 [node name="RacingActionController" type="Node" parent="."]
 script = ExtResource("10_actions")
 
-[node name="RaceCombatCoreV3" type="Node" parent="."]
+[node name="RaceCombatCoreV2" type="Node" parent="."]
 script = ExtResource("14_combat_v3")
 
 [node name="ElephantTrunkLungeController" type="Node" parent="."]
