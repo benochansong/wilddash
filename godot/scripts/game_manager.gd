@@ -77,10 +77,10 @@ func configure_run(
 	difficulty = difficulty_id
 	if not parts.is_empty():
 		chimera_parts = WildDashChimeraLoadout.from_dictionary(parts).to_dictionary()
-	var resolved_ai := get_recommended_ai_count(difficulty_id) if requested_ai_count < 0 else requested_ai_count
+	var resolved_ai: int = get_recommended_ai_count(difficulty_id) if requested_ai_count < 0 else requested_ai_count
 	ai_count = clampi(resolved_ai, MIN_AI_COUNT, MAX_AI_COUNT)
 	SaveManager.set_last_character(selected_animal)
-	print("RACER CONFIG difficulty=%s ai=%d total=%d" % [difficulty, ai_count, ai_count + 1])
+	print("RACER CONFIG animal=%s difficulty=%s ai=%d total=%d" % [String(selected_animal), difficulty, ai_count, ai_count + 1])
 
 func get_recommended_ai_count(difficulty_id: StringName) -> int:
 	match difficulty_id:
@@ -107,7 +107,7 @@ func set_ai_count(value: int) -> void:
 func show_character_select() -> void:
 	set_state(GameState.CHARACTER_SELECT)
 	print("RC_FLOW Character Select")
-	var error := get_tree().change_scene_to_file(CHARACTER_SELECT_SCENE)
+	var error: Error = get_tree().change_scene_to_file(CHARACTER_SELECT_SCENE)
 	if error != OK:
 		push_error("Failed to load Character Select: %s" % error_string(error))
 		return
@@ -118,12 +118,36 @@ func show_settings() -> void:
 	get_tree().change_scene_to_file(SETTINGS_SCENE)
 
 func start_campaign() -> void:
+	# Character Select is always the start of a NEW campaign. During editor/manual
+	# testing it is possible to return here while the autoload still carries a stale
+	# campaign_running=true flag from a previous interrupted run. The old behavior
+	# silently returned, making the START button appear dead (often noticed after
+	# choosing a different racer such as Raccoon). Recover only from Character Select;
+	# duplicate start requests during live gameplay are still ignored.
 	if campaign_running:
-		return
+		if state != GameState.CHARACTER_SELECT:
+			print("CAMPAIGN START IGNORED state=%s already_running=true" % str(state))
+			return
+		print("CAMPAIGN START RECOVERY stale_campaign=true animal=%s" % String(selected_animal))
+		campaign_running = false
+		round_active = false
+		current_round_index = -1
+		_transition_pending = false
+		RaceManager.active = false
+		RaceManager.clear_racers()
+		RaceManager.clear_track()
+
+	if not WildDashAnimalCatalog.is_playable(selected_animal):
+		push_warning("CAMPAIGN START invalid/non-playable racer=%s; falling back to dog" % String(selected_animal))
+		selected_animal = &"dog"
+
 	ResultManager.reset_campaign()
 	campaign_running = true
 	current_round_index = 0
 	_transition_pending = false
+	print("CAMPAIGN START REQUEST animal=%s rounds=%d first=%s" % [
+		String(selected_animal), ROUND_SCENES.size(), ROUND_SCENES[0],
+	])
 	call_deferred("_load_current_round")
 
 func begin_round(mode_id: StringName) -> void:
@@ -202,13 +226,15 @@ func _load_current_round() -> void:
 		return
 	var scene_path: String = ROUND_SCENES[current_round_index]
 	var mode_id: StringName = ROUND_IDS[current_round_index]
-	print("LOAD MODE index=%d id=%s ai=%d" % [current_round_index + 1, mode_id, ai_count])
+	print("LOAD MODE index=%d id=%s ai=%d animal=%s" % [current_round_index + 1, mode_id, ai_count, String(selected_animal)])
 	var error: Error = get_tree().change_scene_to_file(scene_path)
 	if error != OK:
+		campaign_running = false
+		current_round_index = -1
 		push_error("Failed to load round scene %s: %s" % [scene_path, error_string(error)])
 
 func _transition_after_round() -> void:
-	var delay := 0.05 if DisplayServer.get_name() == "headless" else 1.2
+	var delay: float = 0.05 if DisplayServer.get_name() == "headless" else 1.2
 	await get_tree().create_timer(delay).timeout
 	_transition_pending = false
 	if current_round_index + 1 < ROUND_SCENES.size():
@@ -226,7 +252,7 @@ func _transition_after_round() -> void:
 func _autotest_start_character_select() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
-	var scene := get_tree().current_scene
+	var scene: Node = get_tree().current_scene
 	if scene == null or not scene.has_method("_start_run"):
 		push_error("RC3 autotest could not start Character Select")
 		get_tree().quit(3)
@@ -252,7 +278,7 @@ func _arena_theme_for_current_round() -> String:
 			return "arena"
 
 func _update_audio_for_state(next_state: GameState) -> void:
-	var audio := get_node_or_null("/root/AudioManager")
+	var audio: Node = get_node_or_null("/root/AudioManager")
 	if audio == null:
 		return
 	match next_state:
