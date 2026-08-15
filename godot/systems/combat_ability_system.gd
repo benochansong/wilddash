@@ -1,8 +1,8 @@
 class_name WildDashCombatAbilitySystem
 extends RefCounted
 
-## Thin typed facade over AnimalCombatProfile. Later character passes can add
-## bespoke data here without changing Round 2 / Round 4 input code.
+## Thin typed facade over AnimalCombatProfile. Character passes add bespoke data
+## here without changing Round 2 / Round 4 input code.
 
 static func get_basic_attack(animal_id: StringName) -> WildDashCombatAbilitySpec:
 	return WildDashAnimalCombatProfile.get_basic_attack(animal_id)
@@ -12,6 +12,9 @@ static func get_heavy_attack(animal_id: StringName) -> WildDashCombatAbilitySpec
 
 static func get_aerial_attack(animal_id: StringName) -> WildDashCombatAbilitySpec:
 	return WildDashAnimalCombatProfile.get_aerial_attack(animal_id)
+
+static func get_mobility_attack(animal_id: StringName) -> WildDashCombatAbilitySpec:
+	return WildDashAnimalCombatProfile.get_mobility_attack(animal_id)
 
 static func get_special_attack(animal_id: StringName) -> WildDashCombatAbilitySpec:
 	return WildDashAnimalCombatProfile.get_special_attack(animal_id)
@@ -33,6 +36,17 @@ static func get_environment_effect_multiplier(spec: WildDashCombatAbilitySpec, i
 	if spec == null:
 		return 1.0
 	return spec.water_effect_multiplier if in_water else spec.land_effect_multiplier
+
+static func get_momentum_effect_multiplier(spec: WildDashCombatAbilitySpec, normalized_momentum: float) -> float:
+	if spec == null or spec.momentum_scaling <= 0.001:
+		return 1.0
+	var ratio: float = clampf(normalized_momentum, 0.0, 1.0)
+	var low: float = maxf(0.72, 1.0 - spec.momentum_scaling * 0.25)
+	var high: float = 1.0 + spec.momentum_scaling * 0.35
+	return lerpf(low, high, ratio)
+
+static func get_monkey_swing_impact_scale(normalized_swing_speed: float) -> float:
+	return lerpf(0.75, 1.35, clampf(normalized_swing_speed, 0.0, 1.0))
 
 static func get_tail_direction_multiplier(source: WildDashCharacterController, target: WildDashCharacterController) -> float:
 	if source == null or target == null:
@@ -56,13 +70,11 @@ static func get_tail_direction_multiplier(source: WildDashCharacterController, t
 
 static func get_legacy_special_bridge(animal_id: StringName) -> Dictionary:
 	## Compatibility bridge only. Fart behavior stays in the proven special
-	## runtime for Phase 1, but future resolvers can inspect equivalent impacts.
+	## runtime, while the shared resolver can inspect equivalent impacts.
 	if not WildDashAnimalSpecialAbilitySystem.can_use_special(animal_id, &"fruit_collection"):
 		return {}
 	var legacy: Dictionary = WildDashAnimalSpecialAbilitySystem.get_special(animal_id)
-	var impacts: Array[int] = [
-		WildDashCombatAbilitySpec.ImpactType.CONTROL,
-	]
+	var impacts: Array[int] = [WildDashCombatAbilitySpec.ImpactType.CONTROL]
 	if float(legacy.get("knockback", 0.0)) > 0.0:
 		impacts.append(WildDashCombatAbilitySpec.ImpactType.PUSH)
 	if float(legacy.get("stagger", 0.0)) > 0.0:
