@@ -1,0 +1,6 @@
+Run with Godot 4.7.1 headless:
+
+godot --headless --path godot res://tests/animal_ability_profile_smoke.tscn
+
+Expected marker:
+ANIMAL ABILITY PROFILE SMOKE PASS animals=12 stats=6 source=WildDashAnimalAbilityProfile
