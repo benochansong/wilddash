@@ -5,12 +5,13 @@ const WORLD_SCRIPT: Script = preload("res://modes/neon_harbor_race/wild_tide_wor
 const CANOPY_SCRIPT: Script = preload("res://modes/neon_harbor_race/wild_tide_canopy_controller.gd")
 const TITAN_SCRIPT: Script = preload("res://modes/neon_harbor_race/mangrove_titan_controller.gd")
 const BREAKTHROUGH_SCRIPT: Script = preload("res://modes/neon_harbor_race/wild_tide_breakthrough_route.gd")
+const RESPAWN_SCRIPT: Script = preload("res://modes/neon_harbor_race/wild_tide_respawn_guard.gd")
 
 func _ready() -> void:
 	var failures: Array[String] = []
 	if ROUND3_SCENE == null:
 		failures.append("Round 3 scene failed to preload")
-	if WORLD_SCRIPT == null or CANOPY_SCRIPT == null or TITAN_SCRIPT == null or BREAKTHROUGH_SCRIPT == null:
+	if WORLD_SCRIPT == null or CANOPY_SCRIPT == null or TITAN_SCRIPT == null or BREAKTHROUGH_SCRIPT == null or RESPAWN_SCRIPT == null:
 		failures.append("Wild Tide runtime scripts failed to preload")
 
 	var croc_deep: float = WildDashTerrainAbilitySystem.get_terrain_speed_multiplier(
@@ -32,7 +33,7 @@ func _ready() -> void:
 		failures.append("Crocodile Titan-wave resistance missing")
 
 	if failures.is_empty():
-		print("WILD TIDE ROUND3 SMOKE PASS scene=true water=true canopy=true titan=true breakthrough=true pack_buster=true")
+		print("WILD TIDE ROUND3 SMOKE PASS scene=true water=true canopy=true titan=true breakthrough=true respawn=true pack_buster=true")
 		get_tree().quit(0)
 		return
 	for failure: String in failures:
