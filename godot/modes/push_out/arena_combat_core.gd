@@ -130,6 +130,7 @@ func apply_hit(
 		"stagger": 0.0,
 		"stun": 0.0,
 		"finisher": false,
+		"stagger_knockback_scale": 1.0,
 	}
 	if source == null or target == null or source == target:
 		return result
@@ -172,7 +173,17 @@ func apply_hit(
 		knockback *= 1.12
 		stagger_gain *= 1.12
 
+	# Smash-style pressure curve: the more stagger a target is already carrying,
+	# the farther the next successful hit launches them. This preserves the same
+	# Power/Defense formulas while making late exchanges naturally produce KOs.
 	var target_id := target.get_instance_id()
+	var stagger_before := float(_stagger.get(target_id, 0.0))
+	var stagger_ratio := clampf(stagger_before / MAX_STAGGER, 0.0, 1.0)
+	var stagger_knockback_scale := lerpf(1.0, 1.72, pow(stagger_ratio, 1.35))
+	if kind == &"hold" and stagger_before >= 90.0:
+		stagger_knockback_scale *= 1.18
+	knockback *= stagger_knockback_scale
+
 	if float(_break_vulnerability.get(target_id, 0.0)) > 0.0:
 		knockback *= BREAK_FINISHER_KNOCKBACK
 		_break_vulnerability[target_id] = 0.0
@@ -188,8 +199,6 @@ func apply_hit(
 	source.apply_knockback(-launch_direction, (1.10 if kind == &"hold" else 0.62) * recoil_scale)
 
 	# Round 4 combat must read as an actual brawl, not invisible stat math.
-	# These states are supported by both production animation rigs and the
-	# procedural placeholders, so every resolved hit visibly shows attack/recoil.
 	var source_visual := source.get_visual()
 	if source_visual != null:
 		source_visual.play_action(&"Skill", 0.42 if kind == &"hold" else 0.28)
@@ -198,7 +207,7 @@ func apply_hit(
 		target_visual.play_action(&"Hit", 0.48 if kind == &"hold" else 0.32)
 
 	_since_hit[target_id] = 0.0
-	var next_stagger := minf(MAX_STAGGER, float(_stagger.get(target_id, 0.0)) + stagger_gain)
+	var next_stagger := minf(MAX_STAGGER, stagger_before + stagger_gain)
 	var broke := false
 	var stun_seconds := 0.0
 	if next_stagger >= MAX_STAGGER:
@@ -226,13 +235,28 @@ func apply_hit(
 	result["target_stability"] = target_stability
 	result["kind"] = kind
 	result["directional"] = directional
+	result["stagger_knockback_scale"] = stagger_knockback_scale
 	hit_resolved.emit(source, target, result.duplicate(true))
 	if broke:
 		stagger_break.emit(source, target, result.duplicate(true))
-		print("WILD RUMBLE BREAK source=%s target=%s power=%.1f defense=%.1f stagger_gain=%.1f stun=%.2f" % [
-			source.get_display_name(), target.get_display_name(), power, target_defense, stagger_gain, stun_seconds,
+		print("WILD RUMBLE BREAK source=%s target=%s power=%.1f defense=%.1f stagger_gain=%.1f kb_scale=%.2f stun=%.2f" % [
+			source.get_display_name(), target.get_display_name(), power, target_defense, stagger_gain, stagger_knockback_scale, stun_seconds,
 		])
 	return result
+
+func add_environment_stagger(racer: WildDashCharacterController, amount: float) -> float:
+	if racer == null or not is_instance_valid(racer):
+		return 0.0
+	var id := racer.get_instance_id()
+	if not _racers.has(id):
+		register_racer(racer)
+	var current := float(_stagger.get(id, 0.0))
+	# Environment contact builds pressure but never causes BREAK by itself;
+	# another racer must still land the finishing combat hit.
+	var next := minf(92.0, current + maxf(0.0, amount))
+	_stagger[id] = next
+	_since_hit[id] = 0.0
+	return next
 
 func get_stagger(racer: WildDashCharacterController) -> float:
 	return 0.0 if racer == null else float(_stagger.get(racer.get_instance_id(), 0.0))
