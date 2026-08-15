@@ -16,6 +16,7 @@ const SHOULDER_OVERLAP: float = 0.40
 const SURFACE_LIFT: float = 0.035
 const OUTER_DROP: float = 0.09
 const SAMPLE_INTERVAL: float = 0.08
+const TERRAIN_CHUNK_LENGTH: float = 100.0
 const OFFROAD_ENTER_DEPTH: float = 0.25
 const MAX_ASSIST_DEPTH: float = 5.50
 const RETURN_HEADING_DOT: float = 0.05
@@ -37,6 +38,7 @@ var _band_root: Node3D
 var _band_body: StaticBody3D
 var _legacy_bridge_shapes_disabled: int = 0
 var _legacy_bank_visuals_hidden: int = 0
+var _legacy_near_visuals_hidden: int = 0
 var _assist_count: int = 0
 
 func _ready() -> void:
@@ -59,13 +61,15 @@ func _bind_when_ready() -> void:
 	_build_reentry_band()
 	_legacy_bridge_shapes_disabled = _disable_redundant_generic_bridge()
 	_legacy_bank_visuals_hidden = _hide_legacy_river_bank_visuals()
-	print("GRAND PRIX V3.8 WATER REENTRY READY section=long_river band=%.2fm overlap=%.2fm drop=%.2fm slope_deg=%.2f legacy_bridge_shapes_disabled=%d legacy_bank_visuals_hidden=%d open_edge=true" % [
+	_legacy_near_visuals_hidden = _hide_river_near_terrain_visuals()
+	print("GRAND PRIX V3.8 WATER REENTRY READY section=long_river band=%.2fm overlap=%.2fm drop=%.2fm slope_deg=%.2f legacy_bridge_shapes_disabled=%d legacy_bank_visuals_hidden=%d legacy_near_visuals_hidden=%d open_edge=true" % [
 		BAND_WIDTH,
 		SHOULDER_OVERLAP,
 		OUTER_DROP,
 		rad_to_deg(atan2(OUTER_DROP, BAND_WIDTH)),
 		_legacy_bridge_shapes_disabled,
 		_legacy_bank_visuals_hidden,
+		_legacy_near_visuals_hidden,
 	])
 
 func _physics_process(delta: float) -> void:
@@ -287,6 +291,39 @@ func _hide_legacy_river_bank_visuals() -> int:
 			(node as Node3D).visible = false
 			hidden += 1
 	return hidden
+
+func _hide_river_near_terrain_visuals() -> int:
+	var terrain_shell: Node = _find_named_recursive(get_parent(), "V2TerrainShell")
+	if terrain_shell == null:
+		return 0
+	var chunk_ranges: Array[Vector2i] = _build_terrain_chunk_ranges()
+	var hidden: int = 0
+	for chunk_index: int in range(chunk_ranges.size()):
+		var point_range: Vector2i = chunk_ranges[chunk_index]
+		if point_range.y < _river_range.x or point_range.x > _river_range.y + 1:
+			continue
+		var chunk: Node = terrain_shell.get_node_or_null("V2SpatialChunk_%02d" % chunk_index)
+		if chunk == null:
+			continue
+		var near_visual: Node = chunk.get_node_or_null("Terrain/NearTerrain")
+		if near_visual is Node3D:
+			(near_visual as Node3D).visible = false
+			hidden += 1
+	return hidden
+
+func _build_terrain_chunk_ranges() -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	var start_point: int = 0
+	var distance: float = 0.0
+	for segment_index: int in range(_route.size() - 1):
+		distance += _route[segment_index].distance_to(_route[segment_index + 1])
+		if distance >= TERRAIN_CHUNK_LENGTH and segment_index + 1 < _route.size() - 1:
+			result.append(Vector2i(start_point, segment_index + 1))
+			start_point = segment_index + 1
+			distance = 0.0
+	if start_point < _route.size() - 1:
+		result.append(Vector2i(start_point, _route.size() - 1))
+	return result
 
 func _disable_collision_shapes_recursive(root: Node) -> int:
 	var disabled: int = 0
