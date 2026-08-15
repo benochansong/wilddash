@@ -8,11 +8,29 @@ const ARENA_COMBAT_CORE_SCRIPT: Script = preload("res://modes/push_out/arena_com
 const BREAK_SCORE := 2
 const PHASE2_AI_DECISION_INTERVAL := 0.20
 
+# Arena engagement tuning. The old nearest-target-every-tick behavior made AI
+# pairs repeatedly swap targets at contact distance, producing the visible
+# "shivering in place" failure. Targets now stay locked briefly, approach an
+# attack ring instead of the opponent's exact center, and strafe/drive through
+# close engagements so bodies keep moving while attacks resolve.
+const PHASE2_AI_TARGET_LOCK_SECONDS := 1.35
+const PHASE2_AI_EDGE_RECOVERY_RADIUS := 16.25
+const PHASE2_AI_STANDOFF_DISTANCE := 2.15
+const PHASE2_AI_STRAFE_DISTANCE := 1.15
+const PHASE2_AI_CLOSE_DISTANCE := 1.45
+const PHASE2_AI_ATTACK_REACH_MARGIN := 0.38
+const PHASE2_AI_QUICK_COMMIT_IMPULSE := 1.35
+const PHASE2_AI_HEAVY_COMMIT_IMPULSE := 2.15
+const PHASE2_AI_MAX_DIRECT_CHASERS := 3
+
 var _combat_core: WildDashArenaCombatCore
 var _phase2_initialized := false
 var _base_arena_move_speeds: Dictionary = {}
 var _base_ai_target_speeds: Dictionary = {}
 var _phase2_active_state: Dictionary = {}
+var _phase2_ai_targets: Dictionary = {}
+var _phase2_ai_target_lock: Dictionary = {}
+var _phase2_ai_strafe_sign: Dictionary = {}
 
 func _ensure_phase2_core() -> void:
 	if _phase2_initialized:
@@ -35,7 +53,10 @@ func _ensure_phase2_core() -> void:
 		if i >= ai_drivers.size():
 			break
 		var racer: WildDashCharacterController = ai_racers[i]
-		_base_ai_target_speeds[racer.get_instance_id()] = ai_drivers[i].target_speed
+		var id := racer.get_instance_id()
+		_base_ai_target_speeds[id] = ai_drivers[i].target_speed
+		_phase2_ai_target_lock[id] = 0.0
+		_phase2_ai_strafe_sign[id] = -1.0 if i % 2 == 0 else 1.0
 	if hud != null:
 		hud.configure(
 			"ROUND 4 — WILD RUMBLE: TITAN CLASH",
@@ -56,6 +77,7 @@ func _update_phase1_ai(delta: float) -> void:
 		return
 	_sync_respawn_resets()
 	_apply_break_control_locks()
+	_tick_phase2_ai_target_locks(delta)
 
 	_ai_decision_elapsed += delta
 	if _ai_decision_elapsed >= PHASE2_AI_DECISION_INTERVAL:
@@ -69,10 +91,17 @@ func _update_phase1_ai(delta: float) -> void:
 			if _combat_core.get_stun_remaining(racer) > 0.0:
 				ai_drivers[i].set_arena_target(racer.global_position)
 				continue
-			var target := _nearest_active_opponent(racer)
+
+			# Edge recovery always wins. This keeps combatants on the octagon long
+			# enough to re-engage instead of vibrating against the ring-out lip.
+			var planar_radius := Vector2(racer.global_position.x, racer.global_position.z).length()
+			if planar_radius >= PHASE2_AI_EDGE_RECOVERY_RADIUS:
+				ai_drivers[i].set_arena_target(Vector3.ZERO)
+				continue
+
+			var target := _phase2_target_for(i, racer)
 			if target != null:
-				var center_bias := Vector3.ZERO if i % 3 != 0 else -racer.global_position * 0.13
-				ai_drivers[i].set_arena_target(target.global_position + center_bias)
+				ai_drivers[i].set_arena_target(_phase2_engagement_point(racer, target))
 			else:
 				ai_drivers[i].set_arena_target(Vector3.ZERO)
 
@@ -84,7 +113,7 @@ func _update_phase1_ai(delta: float) -> void:
 			continue
 		if not _combat_core.can_attack(racer):
 			continue
-		var target := _nearest_active_opponent(racer)
+		var target := _phase2_target_for(i, racer)
 		if target == null:
 			continue
 		if float(_spawn_protection.get(target.get_instance_id(), 0.0)) > 0.0:
@@ -98,18 +127,108 @@ func _update_phase1_ai(delta: float) -> void:
 		var phase_tick := int(Time.get_ticks_msec() / 900)
 		var heavy_window := power >= 8.5 and (target_stagger >= 48.0 or ((phase_tick + i) % 3 == 0))
 		var kind: StringName = &"hold" if heavy_window else &"tap"
-		if offset.length() > _combat_core.get_attack_radius(kind):
+		if offset.length() > _combat_core.get_attack_radius(kind) + PHASE2_AI_ATTACK_REACH_MARGIN:
 			continue
+
+		# Face the opponent before the strike so the animation/readability matches
+		# the actual hit direction even though arena movement itself is world-space.
+		var attack_direction := offset.normalized()
+		var target_yaw := atan2(-attack_direction.x, -attack_direction.z)
+		racer.rotation.y = lerp_angle(racer.rotation.y, target_yaw, 0.62)
 		if not _combat_core.try_begin_attack(racer, kind):
 			continue
 		var result := _combat_core.apply_hit(racer, target, offset, kind, 0)
 		if bool(result.get("applied", false)):
 			_record_phase2_hit_credit(racer, target)
+			# A short forward commit keeps combat visually aggressive and prevents
+			# both bodies from immediately settling into a collision deadlock.
+			var commit_impulse := PHASE2_AI_HEAVY_COMMIT_IMPULSE if kind == &"hold" else PHASE2_AI_QUICK_COMMIT_IMPULSE
+			racer.apply_knockback(attack_direction, commit_impulse)
+			_phase2_ai_target_lock[racer.get_instance_id()] = maxf(
+				float(_phase2_ai_target_lock.get(racer.get_instance_id(), 0.0)),
+				0.55
+			)
 			if target == player:
 				hud.set_message("%s HIT · STAGGER %.0f/100" % [
 					"HEAVY SMASH" if kind == &"hold" else "QUICK BASH",
 					_combat_core.get_stagger(player),
 				])
+
+func _tick_phase2_ai_target_locks(delta: float) -> void:
+	for raw_id in _phase2_ai_target_lock.keys():
+		var id := int(raw_id)
+		_phase2_ai_target_lock[id] = maxf(0.0, float(_phase2_ai_target_lock.get(id, 0.0)) - delta)
+
+func _phase2_target_for(ai_index: int, racer: WildDashCharacterController) -> WildDashCharacterController:
+	if racer == null:
+		return null
+	var racer_id := racer.get_instance_id()
+	var locked_target: WildDashCharacterController = _phase2_ai_targets.get(racer_id, null) as WildDashCharacterController
+	var lock_remaining := float(_phase2_ai_target_lock.get(racer_id, 0.0))
+	if locked_target != null and is_instance_valid(locked_target) and locked_target != racer and _is_combatant_active(locked_target) and lock_remaining > 0.0:
+		return locked_target
+
+	var best: WildDashCharacterController
+	var best_score := INF
+	for candidate in racers:
+		if candidate == racer or not _is_combatant_active(candidate):
+			continue
+		var distance_sq := racer.global_position.distance_squared_to(candidate.global_position)
+		var direct_chasers := _phase2_direct_chaser_count(candidate, racer_id)
+		# Keep the fight distributed. Three attackers can dogpile one carrier/player,
+		# but additional AI strongly prefer another nearby opponent.
+		var crowd_penalty := float(direct_chasers) * 14.0
+		if direct_chasers >= PHASE2_AI_MAX_DIRECT_CHASERS:
+			crowd_penalty += 180.0
+		# Tiny deterministic bias prevents exact-score ties from flipping every tick.
+		var tie_bias := float((candidate.get_instance_id() + ai_index * 17) % 11) * 0.025
+		var score := distance_sq + crowd_penalty + tie_bias
+		if score < best_score:
+			best_score = score
+			best = candidate
+
+	if best != null:
+		_phase2_ai_targets[racer_id] = best
+		_phase2_ai_target_lock[racer_id] = PHASE2_AI_TARGET_LOCK_SECONDS + float(ai_index % 3) * 0.12
+	return best
+
+func _phase2_direct_chaser_count(target: WildDashCharacterController, excluding_racer_id: int) -> int:
+	if target == null:
+		return 0
+	var count := 0
+	for raw_source_id in _phase2_ai_targets.keys():
+		var source_id := int(raw_source_id)
+		if source_id == excluding_racer_id:
+			continue
+		var assigned: WildDashCharacterController = _phase2_ai_targets.get(source_id, null) as WildDashCharacterController
+		if assigned == target and float(_phase2_ai_target_lock.get(source_id, 0.0)) > 0.0:
+			count += 1
+	return count
+
+func _phase2_engagement_point(
+	racer: WildDashCharacterController,
+	target: WildDashCharacterController,
+) -> Vector3:
+	var offset := target.global_position - racer.global_position
+	offset.y = 0.0
+	if offset.length_squared() <= 0.001:
+		return target.global_position
+	var distance := offset.length()
+	var direction := offset / distance
+	var tangent := Vector3(-direction.z, 0.0, direction.x)
+	var side := float(_phase2_ai_strafe_sign.get(racer.get_instance_id(), 1.0))
+
+	if distance > 4.4:
+		# Long approach: aim for the near side of the opponent, not its collider center.
+		return target.global_position - direction * PHASE2_AI_STANDOFF_DISTANCE + tangent * side * 0.55
+	if distance > PHASE2_AI_CLOSE_DISTANCE:
+		# Fighting range: circle slightly while continuing to close. This produces
+		# visible lateral motion and gives repeated hits room to create knockback.
+		return target.global_position - direction * 0.95 + tangent * side * PHASE2_AI_STRAFE_DISTANCE
+
+	# Too close / body-blocked: drive through and off-axis instead of reversing
+	# target direction every decision tick. This is the key anti-shiver behavior.
+	return target.global_position + direction * 0.85 + tangent * side * (PHASE2_AI_STRAFE_DISTANCE + 0.45)
 
 func _on_phase1_combat_action(action: Dictionary) -> void:
 	_ensure_phase2_core()
