@@ -1,24 +1,38 @@
 class_name WildDashItemBox
 extends Area3D
 
-const AI_PICKUP_RADIUS := 3.3
-const PLAYER_PICKUP_RADIUS := 4.4
-const PLAYER_PICKUP_BONUS := 0.75
-const PLAYER_VERTICAL_TOLERANCE := 3.4
-const PLAYER_SCAN_INTERVAL := 0.025
-const AI_SCAN_INTERVAL := 0.10
-const PLAYER_REPICKUP_COOLDOWN_MSEC := 320
+## RC9 party-racing pickup model.
+##
+## Race item boxes no longer disappear globally when the first racer touches
+## them. Each racer gets an independent same-box cooldown, so a leader can take
+## a box and the following pack can still collect from that station immediately.
+## Non-race/legacy use keeps the old global respawn behavior as a regression
+## guard for arena modes that may reuse this scene later.
+
+const AI_PICKUP_RADIUS: float = 3.3
+const PLAYER_PICKUP_RADIUS: float = 4.4
+const PLAYER_PICKUP_BONUS: float = 0.75
+const PLAYER_VERTICAL_TOLERANCE: float = 3.4
+const PLAYER_SCAN_INTERVAL: float = 0.025
+const AI_SCAN_INTERVAL: float = 0.10
+const RACER_GLOBAL_PICKUP_LOCK_MSEC: int = 360
+const SAME_BOX_RACER_COOLDOWN_MSEC: int = 2200
+const PARTY_FLASH_MSEC: int = 150
+const PARTY_COOLDOWN_CLEANUP_SECONDS: float = 1.0
 const PICKUP_LOCK_META: StringName = &"wilddash_item_box_pickup_until_msec"
 
-@export var respawn_seconds := 5.0
+@export var respawn_seconds: float = 5.0
 
-var _active := true
+var _active: bool = true
 var _visual_root: Node3D
 var _collision: CollisionShape3D
-var _time := 0.0
-var _player_scan_elapsed := 0.0
-var _ai_scan_elapsed := 0.0
+var _time: float = 0.0
+var _player_scan_elapsed: float = 0.0
+var _ai_scan_elapsed: float = 0.0
+var _cleanup_elapsed: float = 0.0
+var _flash_until_msec: int = 0
 var _previous_probe_positions: Dictionary = {}
+var _picked_racer_until_msec: Dictionary = {}
 
 func _ready() -> void:
 	add_to_group("wilddash_item_box")
@@ -28,20 +42,30 @@ func _ready() -> void:
 	monitorable = true
 	_build_visual()
 	body_entered.connect(_on_body_entered)
+	print("ITEM BOX PARTY READY box=%s same_racer_cooldown=%.2fs global_disappear_race=false" % [
+		name, float(SAME_BOX_RACER_COOLDOWN_MSEC) / 1000.0,
+	])
 
 func _process(delta: float) -> void:
 	_time += delta
+	_cleanup_elapsed += delta
+	if _cleanup_elapsed >= PARTY_COOLDOWN_CLEANUP_SECONDS:
+		_cleanup_elapsed = 0.0
+		_cleanup_party_cooldowns()
 	if _visual_root != null and _active:
 		_visual_root.rotation.y += delta * 1.9
 		_visual_root.position.y = sin(_time * 2.6) * 0.22
+		if _flash_until_msec > 0 and Time.get_ticks_msec() >= _flash_until_msec:
+			_flash_until_msec = 0
+			_visual_root.scale = Vector3.ONE
 
 func _physics_process(delta: float) -> void:
 	if not _active:
 		return
 	_player_scan_elapsed += delta
 	_ai_scan_elapsed += delta
-	var scan_player := _player_scan_elapsed >= PLAYER_SCAN_INTERVAL
-	var scan_ai := _ai_scan_elapsed >= AI_SCAN_INTERVAL
+	var scan_player: bool = _player_scan_elapsed >= PLAYER_SCAN_INTERVAL
+	var scan_ai: bool = _ai_scan_elapsed >= AI_SCAN_INTERVAL
 	if not scan_player and not scan_ai:
 		return
 	if scan_player:
@@ -49,38 +73,33 @@ func _physics_process(delta: float) -> void:
 	if scan_ai:
 		_ai_scan_elapsed = 0.0
 
-	for racer in RaceManager.racers:
+	for racer_value: Variant in RaceManager.racers:
+		if not (racer_value is WildDashCharacterController):
+			continue
+		var racer: WildDashCharacterController = racer_value as WildDashCharacterController
 		if racer == null or not is_instance_valid(racer) or RaceManager.finish_order.has(racer):
 			continue
-		var is_human_player := _is_human_player(racer)
+		var is_human_player: bool = _is_human_player(racer)
 		if is_human_player and not scan_player:
 			continue
 		if not is_human_player and not scan_ai:
 			continue
 
-		var probe_position := racer.global_position + Vector3.UP * 0.8
-		var pickup_radius := PLAYER_PICKUP_RADIUS if is_human_player else AI_PICKUP_RADIUS
+		var probe_position: Vector3 = racer.global_position + Vector3.UP * 0.8
+		var pickup_radius: float = PLAYER_PICKUP_RADIUS if is_human_player else AI_PICKUP_RADIUS
 		if racer.has_method("get_interaction_radius"):
 			pickup_radius = float(racer.call("get_interaction_radius", pickup_radius))
 		pickup_radius = ItemSystem.get_pickup_radius(racer, pickup_radius)
 
 		if is_human_player:
 			pickup_radius += PLAYER_PICKUP_BONUS
-			var racer_id := racer.get_instance_id()
+			var racer_id: int = racer.get_instance_id()
 			var previous_probe: Vector3 = _previous_probe_positions.get(racer_id, probe_position)
 			_previous_probe_positions[racer_id] = probe_position
-			# Use horizontal swept pickup plus a separate vertical tolerance. This
-			# catches fast crossings on slopes/ice without allowing a box on an
-			# overpass several metres above/below the racer to be collected.
 			if _player_swept_pickup_hit(global_position, previous_probe, probe_position, pickup_radius):
-				if _try_pickup(racer):
-					return
+				_try_pickup(racer)
 		elif global_position.distance_to(probe_position) <= pickup_radius:
-			# Preserve the original AI cadence/radius and one-slot behaviour. The
-			# high-frequency swept forgiveness and replacement behaviour are kept
-			# player-only so AI combat density and balance do not inflate.
-			if _try_pickup(racer):
-				return
+			_try_pickup(racer)
 
 func force_pickup(racer: Node) -> bool:
 	return _try_pickup(racer)
@@ -94,17 +113,59 @@ func _on_body_entered(body: Node) -> void:
 func _try_pickup(body: Node) -> bool:
 	if not _active or body == null or not body.has_method("get_held_item") or not body.has_method("set_held_item"):
 		return false
+	if _is_party_race_racer(body):
+		return _try_party_race_pickup(body as WildDashCharacterController)
+	return _try_legacy_pickup(body)
 
-	var is_human_player := _is_human_player(body)
-	if is_human_player and _player_pickup_locked(body):
+func _try_party_race_pickup(racer: WildDashCharacterController) -> bool:
+	if racer == null or racer.finished:
+		return false
+	var now_msec: int = Time.get_ticks_msec()
+	var racer_id: int = racer.get_instance_id()
+	if now_msec < int(_picked_racer_until_msec.get(racer_id, 0)):
+		return false
+	if now_msec < int(racer.get_meta(PICKUP_LOCK_META, 0)):
 		return false
 
-	var previous_item := StringName(body.call("get_held_item"))
-	var replaced_existing := false
+	var is_human_player: bool = _is_human_player(racer)
+	var previous_item: StringName = racer.get_held_item()
+	var replaced_existing: bool = false
 	if previous_item != &"":
-		# Human racing should always get a clear response from driving through a
-		# box. Refresh the one-slot inventory instead of silently ignoring the
-		# pickup. AI retains the original no-replacement rule.
+		# Keep the established one-slot policy: AI waits until it has used the held
+		# item; the human player's forgiving replacement behavior stays intact.
+		if not is_human_player:
+			return false
+		racer.set_held_item(&"")
+		replaced_existing = true
+
+	if not ItemSystem.grant_weighted_item(racer):
+		if replaced_existing:
+			racer.set_held_item(previous_item)
+		return false
+
+	var global_until: int = now_msec + RACER_GLOBAL_PICKUP_LOCK_MSEC
+	var same_box_until: int = now_msec + SAME_BOX_RACER_COOLDOWN_MSEC
+	racer.set_meta(PICKUP_LOCK_META, global_until)
+	_picked_racer_until_msec[racer_id] = same_box_until
+	var item_id: StringName = racer.get_held_item()
+	print("ITEM BOX PARTY PICKUP box=%s racer=%s item=%s rank=%d replaced=%s same_box_racer_cooldown=true box_global_active=true" % [
+		name,
+		RaceManager.get_racer_label(racer),
+		ItemSystem.get_display_name(item_id),
+		RaceManager.get_rank(racer),
+		str(replaced_existing),
+	])
+	_flash_party_visual()
+	return true
+
+func _try_legacy_pickup(body: Node) -> bool:
+	var is_human_player: bool = _is_human_player(body)
+	if is_human_player and _global_pickup_locked(body):
+		return false
+
+	var previous_item: StringName = StringName(body.call("get_held_item"))
+	var replaced_existing: bool = false
+	if previous_item != &"":
 		if not is_human_player:
 			return false
 		body.call("set_held_item", &"")
@@ -116,10 +177,9 @@ func _try_pickup(body: Node) -> bool:
 		return false
 
 	if is_human_player:
-		body.set_meta(PICKUP_LOCK_META, Time.get_ticks_msec() + PLAYER_REPICKUP_COOLDOWN_MSEC)
-
-	var item_id := StringName(body.call("get_held_item"))
-	print("ITEM BOX PICKUP racer=%s item=%s rank=%d replaced=%s" % [
+		body.set_meta(PICKUP_LOCK_META, Time.get_ticks_msec() + RACER_GLOBAL_PICKUP_LOCK_MSEC)
+	var item_id: StringName = StringName(body.call("get_held_item"))
+	print("ITEM BOX PICKUP racer=%s item=%s rank=%d replaced=%s legacy_global_respawn=true" % [
 		RaceManager.get_racer_label(body) if body is Node3D else body.name,
 		ItemSystem.get_display_name(item_id),
 		RaceManager.get_rank(body) if body is Node3D else 0,
@@ -128,12 +188,33 @@ func _try_pickup(body: Node) -> bool:
 	_deactivate()
 	return true
 
-func _player_pickup_locked(body: Node) -> bool:
-	var until_msec := int(body.get_meta(PICKUP_LOCK_META, 0))
+func _is_party_race_racer(body: Node) -> bool:
+	if not (body is WildDashCharacterController):
+		return false
+	var racer: WildDashCharacterController = body as WildDashCharacterController
+	return racer.movement_mode == WildDashCharacterController.MovementMode.RACE and RaceManager.racers.has(racer)
+
+func _global_pickup_locked(body: Node) -> bool:
+	var until_msec: int = int(body.get_meta(PICKUP_LOCK_META, 0))
 	return Time.get_ticks_msec() < until_msec
 
 func _is_human_player(body: Node) -> bool:
 	return body is WildDashCharacterController and (body as WildDashCharacterController).is_player
+
+func _flash_party_visual() -> void:
+	if _visual_root == null:
+		return
+	_visual_root.scale = Vector3(0.72, 0.72, 0.72)
+	_flash_until_msec = Time.get_ticks_msec() + PARTY_FLASH_MSEC
+
+func _cleanup_party_cooldowns() -> void:
+	if _picked_racer_until_msec.is_empty():
+		return
+	var now_msec: int = Time.get_ticks_msec()
+	for id_value: Variant in _picked_racer_until_msec.keys():
+		var racer_id: int = int(id_value)
+		if int(_picked_racer_until_msec.get(racer_id, 0)) <= now_msec:
+			_picked_racer_until_msec.erase(racer_id)
 
 func _deactivate() -> void:
 	if not _active:
@@ -158,28 +239,29 @@ func _respawn_later() -> void:
 		_collision.disabled = false
 	if _visual_root != null:
 		_visual_root.visible = true
+		_visual_root.scale = Vector3.ONE
 	call_deferred("_try_overlapping_pickup")
 
 func _try_overlapping_pickup() -> void:
 	if not _active or not monitoring:
 		return
-	for body in get_overlapping_bodies():
+	for body: Node3D in get_overlapping_bodies():
 		if _try_pickup(body):
 			return
 
 func _player_swept_pickup_hit(point: Vector3, a: Vector3, b: Vector3, radius: float) -> bool:
-	var point_xz := Vector2(point.x, point.z)
-	var a_xz := Vector2(a.x, a.z)
-	var b_xz := Vector2(b.x, b.z)
-	var segment := b_xz - a_xz
-	var length_squared := segment.length_squared()
-	var t := 1.0
+	var point_xz: Vector2 = Vector2(point.x, point.z)
+	var a_xz: Vector2 = Vector2(a.x, a.z)
+	var b_xz: Vector2 = Vector2(b.x, b.z)
+	var segment: Vector2 = b_xz - a_xz
+	var length_squared: float = segment.length_squared()
+	var t: float = 1.0
 	if length_squared > 0.0001:
 		t = clampf((point_xz - a_xz).dot(segment) / length_squared, 0.0, 1.0)
-	var closest_xz := a_xz.lerp(b_xz, t)
+	var closest_xz: Vector2 = a_xz.lerp(b_xz, t)
 	if point_xz.distance_to(closest_xz) > radius:
 		return false
-	var closest_y := lerpf(a.y, b.y, t)
+	var closest_y: float = lerpf(a.y, b.y, t)
 	return absf(point.y - closest_y) <= PLAYER_VERTICAL_TOLERANCE
 
 func _build_visual() -> void:
@@ -187,11 +269,11 @@ func _build_visual() -> void:
 	_visual_root.name = "Visual"
 	add_child(_visual_root)
 
-	var mesh_instance := MeshInstance3D.new()
-	var mesh := BoxMesh.new()
+	var mesh_instance: MeshInstance3D = MeshInstance3D.new()
+	var mesh: BoxMesh = BoxMesh.new()
 	mesh.size = Vector3(1.45, 1.45, 1.45)
 	mesh_instance.mesh = mesh
-	var material := StandardMaterial3D.new()
+	var material: StandardMaterial3D = StandardMaterial3D.new()
 	material.albedo_color = Color(0.96, 0.78, 0.16)
 	material.emission_enabled = true
 	material.emission = Color(0.24, 0.18, 0.02)
@@ -201,13 +283,13 @@ func _build_visual() -> void:
 	mesh_instance.material_override = material
 	_visual_root.add_child(mesh_instance)
 
-	var ring := MeshInstance3D.new()
-	var torus := TorusMesh.new()
+	var ring: MeshInstance3D = MeshInstance3D.new()
+	var torus: TorusMesh = TorusMesh.new()
 	torus.inner_radius = 0.76
 	torus.outer_radius = 0.92
 	ring.mesh = torus
 	ring.rotation_degrees.x = 90.0
-	var ring_material := StandardMaterial3D.new()
+	var ring_material: StandardMaterial3D = StandardMaterial3D.new()
 	ring_material.albedo_color = Color(0.2, 0.86, 1.0)
 	ring_material.emission_enabled = true
 	ring_material.emission = Color(0.05, 0.35, 0.55)
@@ -216,7 +298,7 @@ func _build_visual() -> void:
 	_visual_root.add_child(ring)
 
 	_collision = CollisionShape3D.new()
-	var shape := SphereShape3D.new()
+	var shape: SphereShape3D = SphereShape3D.new()
 	shape.radius = 2.0
 	_collision.shape = shape
 	add_child(_collision)
