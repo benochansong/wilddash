@@ -1,12 +1,16 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=12 format=3]
 
-[ext_resource type="Script" path="res://modes/neon_harbor_race/neon_harbor_race_v3_pace_balance.gd" id="1_mode"]
+[ext_resource type="Script" path="res://modes/neon_harbor_race/neon_harbor_race_v4_wild_tide.gd" id="1_mode"]
 [ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="3_feel"]
 [ext_resource type="Script" path="res://items/item_combat_expansion_long_bomb.gd" id="5_items"]
 [ext_resource type="Script" path="res://systems/racing_action_controller.gd" id="8_actions"]
 [ext_resource type="Script" path="res://systems/elephant_trunk_lunge_controller.gd" id="9_lunge"]
 [ext_resource type="Script" path="res://systems/race_combat_core_v2.gd" id="10_combat_v2"]
 [ext_resource type="Script" path="res://systems/bear_combat_v2_controller.gd" id="11_bear_combat"]
+[ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_world_controller.gd" id="12_world"]
+[ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_canopy_controller.gd" id="13_canopy"]
+[ext_resource type="Script" path="res://modes/neon_harbor_race/mangrove_titan_controller.gd" id="14_titan"]
+[ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_breakthrough_route.gd" id="15_breakthrough"]
 
 [node name="NeonHarborRace" type="Node3D"]
 script = ExtResource("1_mode")
@@ -32,3 +36,15 @@ boost_slip_multiplier = 1.2
 
 [node name="ItemCombatExpansionController" type="Node" parent="."]
 script = ExtResource("5_items")
+
+[node name="WildTideWorldController" type="Node3D" parent="."]
+script = ExtResource("12_world")
+
+[node name="WildTideCanopyController" type="Node3D" parent="."]
+script = ExtResource("13_canopy")
+
+[node name="MangroveTitanController" type="Node3D" parent="."]
+script = ExtResource("14_titan")
+
+[node name="WildTideBreakthroughRoute" type="Node3D" parent="."]
+script = ExtResource("15_breakthrough")
