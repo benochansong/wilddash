@@ -180,6 +180,13 @@ func _build_procedural_audio() -> void:
 	_sfx_library["hit"] = _make_sweep(180.0, 95.0, 0.09, 0.30)
 	_sfx_library["finish"] = _make_sweep(440.0, 880.0, 0.22, 0.34)
 	_sfx_library["fart"] = _make_cartoon_fart()
+	# Wild Tide event IDs stay inside the shared AudioManager pool. Final WAV/OGG
+	# assets can replace these procedural placeholders without changing gameplay.
+	_sfx_library["monster_roar"] = _make_sweep(108.0, 46.0, 0.56, 0.36)
+	_sfx_library["wave"] = _make_sweep(210.0, 72.0, 0.42, 0.27)
+	_sfx_library["splash"] = _make_sweep(390.0, 105.0, 0.28, 0.30)
+	_sfx_library["tree_break"] = _make_sweep(155.0, 52.0, 0.22, 0.34)
+	_sfx_library["bomb_explosion"] = _make_sweep(132.0, 44.0, 0.24, 0.38)
 
 func _make_theme(frequencies: Array, duration: float, amplitude: float) -> AudioStreamWAV:
 	var sample_rate := 22050
