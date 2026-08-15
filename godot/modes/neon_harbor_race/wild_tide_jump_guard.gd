@@ -21,7 +21,7 @@ func _ready() -> void:
 	# Lower values run first. Lock jump_velocity before CharacterController and
 	# AIController evaluate normal jump/obstacle-hop inputs in the same tick.
 	process_physics_priority = -200
-	print("WILD TIDE JUMP GUARD READY normal_jump_water=false player=true ai=true special_impulse_preserved=true")
+	print("WILD TIDE JUMP GUARD READY normal_jump_water=false player=true ai=true direct_vertical_impulse_preserved=true")
 
 func _physics_process(_delta: float) -> void:
 	if not RaceManager.active:
@@ -52,10 +52,14 @@ func _update_racer_jump_state(racer: WildDashCharacterController) -> void:
 				String(racer.animal_id), String(terrain).to_upper(),
 				float(racer.get_meta(&"wild_tide_speed_multiplier", 1.0)),
 			])
+			if racer.is_player:
+				_show_hud("%s · NORMAL JUMP DISABLED · LANE EVADE ACTIVE" % String(terrain).replace("_", " ").to_upper())
 	else:
 		_restore_racer_jump(racer)
 		if was_water:
 			print("WILD TIDE TERRAIN animal=%s terrain=LAND jump_allowed=true" % String(racer.animal_id))
+			if racer.is_player:
+				_show_hud("LAND ROUTE · NORMAL JUMP RESTORED")
 	_water_state_by_id[racer_id] = water
 
 func _restore_racer_jump(racer: WildDashCharacterController) -> void:
@@ -87,3 +91,12 @@ func _terrain_for(racer: WildDashCharacterController) -> StringName:
 		return WildDashTerrainAbilitySystem.TERRAIN_LAND
 	var value: Variant = racer.get_meta(TERRAIN_META, WildDashTerrainAbilitySystem.TERRAIN_LAND)
 	return StringName(String(value))
+
+func _show_hud(text: String) -> void:
+	var parent_node: Node = get_parent()
+	if parent_node == null:
+		return
+	var hud_value: Variant = parent_node.get("hud")
+	var mode_hud: WildDashModeHUD = hud_value as WildDashModeHUD
+	if mode_hud != null:
+		mode_hud.set_message(text)
