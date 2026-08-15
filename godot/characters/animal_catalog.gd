@@ -56,10 +56,7 @@ static func race_roster_ids() -> Array[StringName]:
 	return RACE_ROSTER_IDS.duplicate()
 
 static func all_known_ids() -> Array[StringName]:
-	var ids := PLAYABLE_IDS.duplicate()
-	if not ids.has(&"panda"):
-		ids.append(&"panda")
-	return ids
+	return PLAYABLE_IDS.duplicate()
 
 static func get_race_npc_id(index: int) -> StringName:
 	if RACE_ROSTER_IDS.is_empty():
