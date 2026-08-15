@@ -31,7 +31,7 @@ func _spawn_item_boxes() -> void:
 	var cumulative: PackedFloat32Array = _build_route_cumulative_distance()
 	if cumulative.is_empty():
 		return
-	var total_distance: float = cumulative[cumulative.size() - 1]
+	var total_distance: float = float(cumulative[cumulative.size() - 1])
 	if total_distance <= 0.01:
 		return
 
@@ -39,10 +39,16 @@ func _spawn_item_boxes() -> void:
 		var pose: Dictionary = _sample_route_by_distance_progress(station_progress, cumulative, total_distance)
 		if pose.is_empty():
 			continue
-		var point: Vector3 = pose.get("position", Vector3.ZERO)
-		var tangent: Vector3 = pose.get("tangent", Vector3.FORWARD)
+		var point_value: Variant = pose.get("position", Vector3.ZERO)
+		var tangent_value: Variant = pose.get("tangent", Vector3.FORWARD)
+		var point: Vector3 = point_value as Vector3
+		var tangent: Vector3 = tangent_value as Vector3
 		var right: Vector3 = Vector3(-tangent.z, 0.0, tangent.x)
-		var lane_offsets: Array[float] = ITEM_BOX_WIDE_LANE_OFFSETS if _is_wide_station(station_progress) else ITEM_BOX_LANE_OFFSETS
+		var lane_offsets: Array[float]
+		if _is_wide_station(station_progress):
+			lane_offsets = ITEM_BOX_WIDE_LANE_OFFSETS
+		else:
+			lane_offsets = ITEM_BOX_LANE_OFFSETS
 		for lane_offset: float in lane_offsets:
 			var box: WildDashItemBox = ITEM_BOX_SCENE.instantiate() as WildDashItemBox
 			if box == null:
@@ -106,14 +112,14 @@ func _sample_route_by_distance_progress(
 	var segment_index: int = _route_points.size() - 2
 	var found_segment: bool = false
 	for i: int in range(1, cumulative.size()):
-		if cumulative[i] >= target_distance:
+		if float(cumulative[i]) >= target_distance:
 			segment_index = i - 1
 			found_segment = true
 			break
 	if not found_segment:
 		segment_index = _route_points.size() - 2
-	var start_distance: float = cumulative[segment_index]
-	var end_distance: float = cumulative[segment_index + 1]
+	var start_distance: float = float(cumulative[segment_index])
+	var end_distance: float = float(cumulative[segment_index + 1])
 	var segment_distance: float = maxf(0.001, end_distance - start_distance)
 	var t: float = clampf((target_distance - start_distance) / segment_distance, 0.0, 1.0)
 	var a: Vector3 = _route_points[segment_index]
