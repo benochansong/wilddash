@@ -4,6 +4,8 @@ extends RefCounted
 ## Arc-based fake swing used by Monkey. This deliberately avoids rope joints and
 ## RigidBody feedback loops: the route is deterministic, visually readable and
 ## can later be driven from authoritative network state using progress + speed.
+## While attached, this controller temporarily owns the racer's physics tick so
+## CharacterBody arena movement cannot overwrite the deterministic swing path.
 
 const DEFAULT_GRAB_DISTANCE: float = 3.4
 const MIN_SWING_SPEED: float = 4.2
@@ -20,7 +22,7 @@ var _speed_ratio: float = 0.0
 func set_routes(routes: Array[WildDashCanopyVineRoute]) -> void:
 	_routes = routes.duplicate()
 	if _active_route != null and not _routes.has(_active_route):
-		clear_active_vine()
+		_reset_state()
 
 func get_routes() -> Array[WildDashCanopyVineRoute]:
 	return _routes.duplicate()
@@ -69,13 +71,17 @@ func grab_vine(racer: WildDashCharacterController, route: WildDashCanopyVineRout
 	var inherited_speed: float = planar_velocity.length()
 	_speed = clampf(maxf(MIN_SWING_SPEED, inherited_speed), MIN_SWING_SPEED, route.max_swing_speed)
 	_speed_ratio = clampf(_speed / route.max_swing_speed, 0.0, 1.0)
+	racer.set_physics_process(false)
 	racer.global_position = route.sample(_progress)
 	racer.velocity = route.tangent(_progress) * _direction * _speed
 	return true
 
 func update_swing(racer: WildDashCharacterController, delta: float, input_axis: float) -> bool:
-	if racer == null or _active_route == null or not _active_route.enabled:
-		clear_active_vine()
+	if racer == null:
+		_reset_state()
+		return true
+	if _active_route == null or not _active_route.enabled:
+		cancel_vine(racer)
 		return true
 	var route_length: float = _active_route.approximate_length()
 	var center_pull: float = sin(clampf(_progress, 0.0, 1.0) * PI)
@@ -95,14 +101,22 @@ func update_swing(racer: WildDashCharacterController, delta: float, input_axis: 
 
 func release_vine(racer: WildDashCharacterController, jump_release: bool = true) -> Vector3:
 	if racer == null or _active_route == null:
-		clear_active_vine()
+		if racer != null:
+			racer.set_physics_process(true)
+		_reset_state()
 		return Vector3.ZERO
 	var tangent: Vector3 = _active_route.tangent(_progress) * _direction
 	var release_velocity: Vector3 = tangent * maxf(_speed, MIN_SWING_SPEED)
 	if jump_release:
 		release_velocity += Vector3.UP * _active_route.release_boost
-	clear_active_vine()
+	racer.set_physics_process(true)
+	_reset_state()
 	return release_velocity
+
+func cancel_vine(racer: WildDashCharacterController) -> void:
+	if racer != null:
+		racer.set_physics_process(true)
+	_reset_state()
 
 func get_swing_speed_ratio() -> float:
 	return _speed_ratio
@@ -116,6 +130,11 @@ func perform_swing_attack() -> float:
 	return lerpf(0.75, 1.35, clampf(_speed_ratio, 0.0, 1.0))
 
 func clear_active_vine() -> void:
+	## State-only reset for tests/non-character setup. Runtime mode code should use
+	## cancel_vine(racer) so the CharacterBody physics callback is restored.
+	_reset_state()
+
+func _reset_state() -> void:
 	_active_route = null
 	_progress = 0.0
 	_direction = 1.0
