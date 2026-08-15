@@ -75,7 +75,8 @@ func _physics_process(delta: float) -> void:
 		query.exclude = [owner_racer.get_rid()]
 	var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(query)
 	if not hit.is_empty():
-		global_position = Vector3(hit.get("position", next))
+		var hit_position: Vector3 = hit.get("position", next)
+		global_position = hit_position
 		_explode()
 		return
 	global_position = next
