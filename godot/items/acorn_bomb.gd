@@ -1,17 +1,15 @@
 class_name WildDashAcornBomb
 extends Node3D
 
-## Pack Buster Bomb V2.
-##
-## This is a committed ballistic throw, not a homing missile. Target selection is
-## handled by LongBombItemSupport using race rank. The bomb samples the rival once,
-## predicts a short lead point, then follows a fast cinematic parabola with an
-## explicit apex. If no racer is available it still throws to a fallback point;
-## there is no slow straight-flight mode anymore.
+## Pack Buster Bomb V3.
+## Fast committed ballistic throw with a strong inner blast, readable outer blast,
+## and a restrained multi-hit Pack Break bonus. It remains a catch-up disruption
+## item rather than a homing missile or long hard-stun weapon.
 
 const LIFE_SECONDS: float = 3.0
 const HIT_RADIUS: float = 1.55
-const EXPLOSION_RADIUS: float = 5.5
+const EXPLOSION_RADIUS: float = 6.4
+const INNER_EXPLOSION_RADIUS: float = 2.8
 const MIN_FLIGHT_SECONDS: float = 0.78
 const MAX_FLIGHT_SECONDS: float = 1.35
 const MIN_APEX_HEIGHT: float = 5.5
@@ -32,6 +30,7 @@ var _visual: Node3D
 var _planned_target_point: Vector3 = Vector3.ZERO
 var _planned_flight_seconds: float = 1.0
 var _planned_apex_height: float = 7.0
+var _pack_break_scale: float = 1.0
 
 func configure(
 	racer: WildDashCharacterController,
@@ -173,47 +172,60 @@ func _calculate_ballistic_velocity(
 	var root_sum: float = maxf(0.001, rise_root + fall_root)
 	var time_up: float = maxf(0.05, flight_seconds * rise_root / root_sum)
 	_gravity = clampf(2.0 * rise / (time_up * time_up), MIN_DYNAMIC_GRAVITY, MAX_DYNAMIC_GRAVITY)
-
-	# If gravity was clamped, recompute the true rise/fall times so the horizontal
-	# component still lands close to the authored target point.
 	time_up = sqrt(2.0 * rise / _gravity)
 	var time_down: float = sqrt(2.0 * fall / _gravity)
 	var actual_flight: float = maxf(0.10, time_up + time_down)
 	_planned_flight_seconds = actual_flight
 
 	var delta: Vector3 = target_point - origin
-	var result: Vector3 = Vector3(delta.x / actual_flight, _gravity * time_up, delta.z / actual_flight)
-	return result
+	return Vector3(delta.x / actual_flight, _gravity * time_up, delta.z / actual_flight)
 
 func _explode() -> void:
 	if _exploded:
 		return
 	_exploded = true
 	_resolve_explosion_environment()
-	var water_impact: bool = explosion_environment == &"water"
-	var hits: int = 0
+	var candidates: Array[WildDashCharacterController] = []
 	for racer_value: Variant in RaceManager.racers:
 		var racer: WildDashCharacterController = racer_value as WildDashCharacterController
 		if racer == null or racer == owner_racer or not is_instance_valid(racer) or RaceManager.finish_order.has(racer):
 			continue
 		if global_position.distance_to(racer.global_position) <= EXPLOSION_RADIUS:
-			var slow_multiplier: float = 0.78 if water_impact else 0.74
-			var knockback: float = 4.6 if water_impact else 4.3
-			# Use the bomb node as attack source so knockback radiates from the actual
-			# impact point instead of from the thrower's current position.
-			if ItemSystem.apply_attack(racer, self, &"acorn_bomb", 1.0, slow_multiplier, knockback):
-				hits += 1
+			candidates.append(racer)
+
+	_pack_break_scale = 1.0
+	if candidates.size() >= 4:
+		_pack_break_scale = 1.12
+	elif candidates.size() >= 3:
+		_pack_break_scale = 1.09
+
+	var hits: int = 0
+	var inner_hits: int = 0
+	for racer: WildDashCharacterController in candidates:
+		var distance: float = global_position.distance_to(racer.global_position)
+		var inner: bool = distance <= INNER_EXPLOSION_RADIUS
+		var profile: WildDashRaceImpactProfile = WildDashRaceImpactProfile.pack_buster_inner() if inner else WildDashRaceImpactProfile.pack_buster_outer()
+		profile.knockback = minf(7.2, profile.knockback * _pack_break_scale)
+		profile.impact_strength *= _pack_break_scale
+		var attack_source: Node = owner_racer if owner_racer != null else self
+		if WildDashRaceCombatCoreV3.apply_race_impact(attack_source, racer, &"acorn_bomb", profile, global_position):
+			hits += 1
+			if inner:
+				inner_hits += 1
 
 	_spawn_explosion_fx()
 	AudioManager.play_sfx_id("bomb_explosion", 1.0)
-	if water_impact:
-		AudioManager.play_sfx_id("splash", 0.92)
+	if explosion_environment == &"water":
+		AudioManager.play_sfx_id("splash", 0.95)
 	else:
-		AudioManager.play_sfx_id("hit", 0.82)
+		AudioManager.play_sfx_id("hit", 0.86)
 	_try_camera_shake()
-	print("PACK BUSTER EXPLOSION position=%s hits=%d radius=%.1f environment=%s radial=true" % [
-		str(global_position), hits, EXPLOSION_RADIUS, String(explosion_environment),
+	var pack_break: bool = hits >= 3
+	print("PACK BUSTER EXPLOSION position=%s hits=%d inner=%d radius=%.1f pack_break=%s pack_scale=%.2f environment=%s radial=true" % [
+		str(global_position), hits, inner_hits, EXPLOSION_RADIUS, str(pack_break), _pack_break_scale, String(explosion_environment),
 	])
+	if pack_break:
+		print("PACK BREAK! MULTI HIT x%d" % hits)
 	queue_free()
 
 func _resolve_explosion_environment() -> void:
@@ -236,8 +248,8 @@ func _build_visual() -> void:
 
 	var body: MeshInstance3D = MeshInstance3D.new()
 	var sphere: SphereMesh = SphereMesh.new()
-	sphere.radius = 0.62
-	sphere.height = 1.02
+	sphere.radius = 0.66
+	sphere.height = 1.08
 	sphere.radial_segments = 12
 	sphere.rings = 7
 	body.mesh = sphere
@@ -245,7 +257,7 @@ func _build_visual() -> void:
 	material.albedo_color = Color(0.42, 0.16, 0.025)
 	material.roughness = 0.62
 	material.emission_enabled = true
-	material.emission = Color(1.0, 0.20, 0.015) * 0.85
+	material.emission = Color(1.0, 0.20, 0.015) * 0.95
 	body.material_override = material
 	_visual.add_child(body)
 
@@ -255,7 +267,7 @@ func _build_visual() -> void:
 	cap_mesh.bottom_radius = 0.36
 	cap_mesh.height = 0.26
 	cap.mesh = cap_mesh
-	cap.position.y = 0.57
+	cap.position.y = 0.60
 	cap.material_override = material
 	_visual.add_child(cap)
 
@@ -264,7 +276,7 @@ func _spawn_explosion_fx() -> void:
 	if parent_node == null:
 		return
 	var fx_root: Node3D = Node3D.new()
-	fx_root.name = "PackBusterExplosionFX"
+	fx_root.name = "PackBusterExplosionV3FX"
 	parent_node.add_child(fx_root)
 	fx_root.global_position = global_position + Vector3.UP * 0.28
 
@@ -272,11 +284,11 @@ func _spawn_explosion_fx() -> void:
 	var flash_color: Color = Color(0.20, 0.86, 1.0) if water_impact else Color(1.0, 0.42, 0.035)
 	var flash: MeshInstance3D = MeshInstance3D.new()
 	var flash_mesh: SphereMesh = SphereMesh.new()
-	flash_mesh.radius = 0.72
-	flash_mesh.height = 1.35
+	flash_mesh.radius = 0.80
+	flash_mesh.height = 1.48
 	flash.mesh = flash_mesh
 	flash.scale = Vector3.ONE * 0.25
-	flash.material_override = _make_emissive_material(flash_color, 2.8)
+	flash.material_override = _make_emissive_material(flash_color, 3.2)
 	fx_root.add_child(flash)
 
 	var shock: MeshInstance3D = MeshInstance3D.new()
@@ -287,10 +299,10 @@ func _spawn_explosion_fx() -> void:
 	shock.mesh = shock_mesh
 	shock.position.y = -0.18
 	shock.scale = Vector3(0.35, 1.0, 0.35)
-	shock.material_override = _make_emissive_material(flash_color.lightened(0.18), 1.8)
+	shock.material_override = _make_emissive_material(flash_color.lightened(0.18), 2.0)
 	fx_root.add_child(shock)
 
-	var puff_count: int = 8 if water_impact else 5
+	var puff_count: int = 10 if water_impact else 7
 	for i: int in range(puff_count):
 		var puff: MeshInstance3D = MeshInstance3D.new()
 		var puff_mesh: SphereMesh = SphereMesh.new()
@@ -298,22 +310,24 @@ func _spawn_explosion_fx() -> void:
 		puff_mesh.height = puff_mesh.radius * 1.7
 		puff.mesh = puff_mesh
 		var angle: float = float(i) / float(puff_count) * TAU
-		var radial_distance: float = 1.05 if water_impact else 0.75
+		var radial_distance: float = 1.18 if water_impact else 0.88
 		puff.position = Vector3(cos(angle) * radial_distance, 0.15 + float(i % 3) * 0.18, sin(angle) * radial_distance)
 		var puff_color: Color = Color(0.16, 0.58, 0.76) if water_impact else Color(0.32, 0.24, 0.18)
-		puff.material_override = _make_emissive_material(puff_color, 0.42 if water_impact else 0.35)
+		puff.material_override = _make_emissive_material(puff_color, 0.48 if water_impact else 0.40)
 		fx_root.add_child(puff)
 
 	var tween: Tween = fx_root.create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(flash, "scale", Vector3.ONE * (4.0 if water_impact else 3.3), 0.22)
-	tween.tween_property(shock, "scale", Vector3(6.8, 1.0, 6.8) if water_impact else Vector3(5.8, 1.0, 5.8), 0.34)
+	var flash_scale: float = (4.8 if water_impact else 4.1) * _pack_break_scale
+	var ring_scale: float = (7.8 if water_impact else 6.8) * _pack_break_scale
+	tween.tween_property(flash, "scale", Vector3.ONE * flash_scale, 0.22)
+	tween.tween_property(shock, "scale", Vector3(ring_scale, 1.0, ring_scale), 0.36)
 	for child: Node in fx_root.get_children():
 		if child == flash or child == shock or not (child is MeshInstance3D):
 			continue
 		var puff_node: MeshInstance3D = child as MeshInstance3D
 		puff_node.scale = Vector3.ONE * 0.65
-		tween.tween_property(puff_node, "scale", Vector3.ONE * (2.0 if water_impact else 1.65), 0.38)
+		tween.tween_property(puff_node, "scale", Vector3.ONE * (2.2 if water_impact else 1.85), 0.40)
 	tween.chain().tween_callback(Callable(fx_root, "queue_free"))
 
 func _make_emissive_material(color: Color, energy: float) -> StandardMaterial3D:
@@ -329,6 +343,6 @@ func _try_camera_shake() -> void:
 	if camera == null:
 		return
 	if camera.has_method("add_trauma"):
-		camera.call("add_trauma", 0.20)
+		camera.call("add_trauma", 0.24)
 	elif camera.has_method("shake"):
-		camera.call("shake", 0.16)
+		camera.call("shake", 0.20)
