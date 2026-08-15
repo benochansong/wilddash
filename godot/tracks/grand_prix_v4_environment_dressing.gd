@@ -1,10 +1,12 @@
 class_name WildDashGrandPrixV4EnvironmentDressing
 extends Node3D
 
-## Round 1 V4.2 environment dressing.
+## Round 1 V4.3 environment dressing.
 ## Adds batched low-poly biome landmarks outside playable terrain so the course
 ## reads as a real countryside / forest / river / mountain world instead of a
 ## road surrounded by empty sky. Gameplay collision remains owned by V3.x land.
+## Mountain/canyon hero silhouettes deliberately live far outside the chase
+## camera corridor so visual-only props can never become giant foreground masks.
 
 const TREE_SECTIONS: Array[StringName] = [
 	&"meadow_start",
@@ -52,7 +54,7 @@ func _build_when_ready() -> void:
 		return
 
 	_root = Node3D.new()
-	_root.name = "V42EnvironmentDressing"
+	_root.name = "V43EnvironmentDressing"
 	add_child(_root)
 
 	_build_tree_batches()
@@ -60,7 +62,7 @@ func _build_when_ready() -> void:
 	_build_mountain_batches()
 	_build_canyon_spires()
 
-	print("GRAND PRIX V4.2 ENVIRONMENT DRESSING READY trees=%d houses=%d mountain_peaks=%d canyon_spires=%d collision=false multimesh=true roadside_clear=true" % [
+	print("GRAND PRIX V4.3 ENVIRONMENT DRESSING READY trees=%d houses=%d mountain_peaks=%d canyon_spires=%d collision=false multimesh=true mountain_min_lateral=70m canyon_min_lateral=48m camera_corridor_safe=true" % [
 		_tree_count,
 		_house_count,
 		_mountain_count,
@@ -148,7 +150,9 @@ func _build_mountain_batches() -> void:
 		for i: int in range(count):
 			var t: float = (float(i) + 0.45) / float(count)
 			var side: float = -1.0 if i % 2 == 0 else 1.0
-			var lateral: float = 43.0 + float((i * 13) % 5) * 6.0
+			# These are skyline landmarks, not roadside geometry. Keep them far beyond
+			# the 9.5m chase camera and the 16..20m playable mountain mantle.
+			var lateral: float = 70.0 + float((i * 13) % 5) * 7.0
 			var pose: Dictionary = _sample_section_pose(section_id, t, side * lateral)
 			if pose.is_empty():
 				continue
@@ -172,7 +176,7 @@ func _build_canyon_spires() -> void:
 	for i: int in range(count):
 		var t: float = (float(i) + 0.5) / float(count)
 		var side: float = -1.0 if i % 2 == 0 else 1.0
-		var lateral: float = 30.0 + float((i * 9) % 6) * 3.5
+		var lateral: float = 48.0 + float((i * 9) % 6) * 4.5
 		var pose: Dictionary = _sample_section_pose(&"canyon_obstacle", t, side * lateral)
 		if pose.is_empty():
 			continue
