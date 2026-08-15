@@ -21,7 +21,7 @@ script = ExtResource("1_mode")
 [node name="RacingActionController" type="Node" parent="."]
 script = ExtResource("8_actions")
 
-[node name="RaceCombatCoreV3" type="Node" parent="."]
+[node name="RaceCombatCoreV2" type="Node" parent="."]
 script = ExtResource("10_combat_v3")
 
 [node name="ElephantTrunkLungeController" type="Node" parent="."]
