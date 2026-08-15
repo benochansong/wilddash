@@ -18,13 +18,15 @@ func _ready() -> void:
 	for i: int in range(1, station_progress.size()):
 		max_gap = maxf(max_gap, float(station_progress[i]) - float(station_progress[i - 1]))
 	assert(max_gap <= 0.14)
+	var high_indices: Array = ROUND2.V12_HIGH_INDICES
+	var tree_indices: Array = ROUND2.V12_TREE_INDICES
+	var tree_heights: Array = ROUND2.V12_TREE_TOP_HEIGHTS
 	assert(int(ROUND2.V12_FRUIT_COUNT) == 30)
-	assert((ROUND2.V12_HIGH_INDICES as Array).size() == 6)
-	assert((ROUND2.V12_TREE_INDICES as Array).size() == 7)
-	assert((ROUND2.V12_TREE_TOP_HEIGHTS as Array).size() == 6)
+	assert(high_indices.size() == 6)
+	assert(tree_indices.size() == 7)
+	assert(tree_heights.size() == 6)
 	print("RC9 DISTRIBUTION VERTICAL SMOKE PASS stations=%d max_gap=%.3f fruit=%d high=%d tree=%d trees=%d" % [
 		station_progress.size(), max_gap, int(ROUND2.V12_FRUIT_COUNT),
-		(ROUND2.V12_HIGH_INDICES as Array).size(), (ROUND2.V12_TREE_INDICES as Array).size(),
-		(ROUND2.V12_TREE_TOP_HEIGHTS as Array).size(),
+		high_indices.size(), tree_indices.size(), tree_heights.size(),
 	])
 	get_tree().quit()
