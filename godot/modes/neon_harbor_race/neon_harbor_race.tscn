@@ -1,6 +1,6 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=15 format=3]
 
-[ext_resource type="Script" path="res://modes/neon_harbor_race/neon_harbor_race_v4_wild_tide.gd" id="1_mode"]
+[ext_resource type="Script" path="res://modes/neon_harbor_race/neon_harbor_race_v5_rebuild.gd" id="1_mode"]
 [ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="3_feel"]
 [ext_resource type="Script" path="res://items/item_combat_expansion_long_bomb.gd" id="5_items"]
 [ext_resource type="Script" path="res://systems/racing_action_controller.gd" id="8_actions"]
@@ -12,6 +12,8 @@
 [ext_resource type="Script" path="res://modes/neon_harbor_race/mangrove_titan_controller.gd" id="14_titan"]
 [ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_breakthrough_route.gd" id="15_breakthrough"]
 [ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_respawn_guard.gd" id="16_respawn"]
+[ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_route_network.gd" id="17_routes"]
+[ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_route_guidance.gd" id="18_guidance"]
 
 [node name="NeonHarborRace" type="Node3D"]
 script = ExtResource("1_mode")
@@ -52,3 +54,9 @@ script = ExtResource("15_breakthrough")
 
 [node name="WildTideRespawnGuard" type="Node" parent="."]
 script = ExtResource("16_respawn")
+
+[node name="WildTideRouteNetwork" type="Node3D" parent="."]
+script = ExtResource("17_routes")
+
+[node name="WildTideRouteGuidance" type="Node3D" parent="."]
+script = ExtResource("18_guidance")
