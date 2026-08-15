@@ -1,0 +1,1 @@
+Temporary files to remove before final report: ability_profile_version.txt, ability_profile_scope.txt, ability_profile_status.txt, ability_profile_warning.txt, ability_profile_source.txt, ability_profile_sync.txt, ability_profile_complete.marker, ability_profile_no_merge.txt, ability_profile_cleanup_pending.txt, ability_profile_cleanup_target.txt, this manifest.
