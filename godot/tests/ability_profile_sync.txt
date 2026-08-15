@@ -1,0 +1,1 @@
+Terrain, combat, and selection presentation must stay synchronized to the canonical profile.
