@@ -1,29 +1,38 @@
 class_name WildDashGrandPrixV3WorldFoundation
 extends Node3D
 
-## Grand Prix V3.7 continuous land mantle.
+## Grand Prix V3.9 continuous land mantle.
 ##
-## V3.6 replaced the old lower-floor safety slab with route-height land outside
-## both shoulders. V3.7 also makes this mantle the AUTHORITATIVE offroad physics
-## surface. The older V2 near-terrain collision used a different height profile;
-## keeping both active could create overlapping floors/steps that trapped racers
-## when they tried to return to the road. Visual terrain may remain, but its old
-## side collision is disabled after the continuous mantle is ready.
+## The route-height mantle is the authoritative off-road physics surface. Flat
+## meadow/forest/river land stays broad and recoverable, while mountain/highland
+## sections rise away from both shoulders as low-poly embankments so the road
+## reads as a real hill road instead of a ribbon suspended over the sky.
+## Visual and collision are generated from the same mesh.
 
 const SHOULDER_OVERLAP: float = 0.35
 const OUTER_DROP: float = 0.14
 const SURFACE_LIFT: float = 0.01
+const MID_DISTANCE_RATIO: float = 0.46
+const MID_HEIGHT_RATIO: float = 0.36
 
 const SECTION_LAND_WIDTHS: Dictionary = {
 	&"meadow_start": 18.0,
 	&"forest_obstacle": 15.0,
 	&"long_river": 14.0,
-	&"mountain_approach": 8.0,
-	&"mountain_ascent": 7.0,
-	&"summit_ridge": 6.5,
-	&"rough_descent": 7.5,
-	&"canyon_obstacle": 5.5,
+	&"mountain_approach": 18.0,
+	&"mountain_ascent": 20.0,
+	&"summit_ridge": 16.0,
+	&"rough_descent": 18.0,
+	&"canyon_obstacle": 14.0,
 	&"final_sprint": 18.0,
+}
+
+const SECTION_EMBANKMENT_HEIGHTS: Dictionary = {
+	&"mountain_approach": 6.0,
+	&"mountain_ascent": 8.0,
+	&"summit_ridge": 4.5,
+	&"rough_descent": 6.0,
+	&"canyon_obstacle": 8.0,
 }
 
 var _track: WildDashGrandPrixV2Track
@@ -55,7 +64,7 @@ func _build_when_ready() -> void:
 		return
 
 	_mantle_root = Node3D.new()
-	_mantle_root.name = "V37ContinuousLandMantle"
+	_mantle_root.name = "V39ContinuousLandMantle"
 	add_child(_mantle_root)
 
 	_mantle_visual = MeshInstance3D.new()
@@ -63,7 +72,7 @@ func _build_when_ready() -> void:
 	_mantle_visual.mesh = mesh
 	_mantle_visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var material: StandardMaterial3D = StandardMaterial3D.new()
-	material.albedo_color = Color(0.23, 0.31, 0.20, 1.0)
+	material.albedo_color = Color(0.27, 0.31, 0.20, 1.0)
 	material.roughness = 1.0
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_mantle_visual.material_override = material
@@ -77,7 +86,7 @@ func _build_when_ready() -> void:
 		(shape as ConcavePolygonShape3D).backface_collision = true
 
 	_mantle_body = StaticBody3D.new()
-	_mantle_body.name = "V37ContinuousLandCollision"
+	_mantle_body.name = "V39ContinuousLandCollision"
 	_mantle_body.collision_layer = 1
 	_mantle_body.collision_mask = 0
 	_mantle_root.add_child(_mantle_body)
@@ -86,13 +95,11 @@ func _build_when_ready() -> void:
 	collision.shape = shape
 	_mantle_body.add_child(collision)
 
-	# The legacy V2 near terrain is useful visually, but its collision follows a
-	# separate procedural height profile. Two overlapping side-ground colliders
-	# can form hidden ledges/steps. Keep the road collision, disable only the old
-	# side-terrain collision once the V3.7 mantle exists.
+	# The old V2 side collider follows a different height profile. Keeping it
+	# together with the authoritative V3 mantle can form hidden lips at re-entry.
 	_legacy_collision_shapes_disabled = _disable_legacy_near_terrain_collision()
 
-	print("GRAND PRIX V3.7 CONTINUOUS LAND READY route_points=%d segments=%d low_floor=false stacked_floor=false two_sided=true authoritative_offroad_collision=true legacy_side_shapes_disabled=%d meadow_width=18.0m mountain_width=6.5..8.0m canyon_width=5.5m" % [
+	print("GRAND PRIX V3.9 CONTINUOUS MOUNTAIN LAND READY route_points=%d segments=%d authoritative_offroad_collision=true legacy_side_shapes_disabled=%d mountain_width=16..20m mountain_height=4.5..8.0m visual_collision_same_mesh=true open_edge_return_preserved=true" % [
 		_route.size(),
 		_route.size() - 1,
 		_legacy_collision_shapes_disabled,
@@ -105,6 +112,8 @@ func _build_land_mantle_mesh() -> ArrayMesh:
 	var indices: PackedInt32Array = PackedInt32Array()
 	var distance_along: float = 0.0
 
+	# Six vertices per route point: three rings on each side. Keeping left/right
+	# separate means no terrain triangle can span over the road on a switchback.
 	for point_index: int in range(_route.size()):
 		if point_index > 0:
 			distance_along += _route[point_index - 1].distance_to(_route[point_index])
@@ -113,34 +122,52 @@ func _build_land_mantle_mesh() -> ArrayMesh:
 			segment_index = _route.size() - 2
 		var section_id: StringName = _track.get_v2_section_id_for_segment(segment_index)
 		var land_width: float = float(SECTION_LAND_WIDTHS.get(section_id, 12.0))
+		var embankment_height: float = float(SECTION_EMBANKMENT_HEIGHTS.get(section_id, 0.0))
 		var right: Vector3 = _right_at(point_index)
 		var left_edge: Vector3 = _track.get_v2_shoulder_edge_point(point_index, -1.0)
 		var right_edge: Vector3 = _track.get_v2_shoulder_edge_point(point_index, 1.0)
 
+		var mid_distance: float = land_width * MID_DISTANCE_RATIO
+		var mid_height: float = embankment_height * MID_HEIGHT_RATIO
+		var outer_height: float = embankment_height
+		if embankment_height <= 0.001:
+			mid_height = -OUTER_DROP * MID_DISTANCE_RATIO
+			outer_height = -OUTER_DROP
+
 		var left_inner: Vector3 = left_edge + right * SHOULDER_OVERLAP + Vector3.UP * SURFACE_LIFT
-		var left_outer: Vector3 = left_edge - right * land_width - Vector3.UP * OUTER_DROP
+		var left_mid: Vector3 = left_edge - right * mid_distance + Vector3.UP * mid_height
+		var left_outer: Vector3 = left_edge - right * land_width + Vector3.UP * outer_height
 		var right_inner: Vector3 = right_edge - right * SHOULDER_OVERLAP + Vector3.UP * SURFACE_LIFT
-		var right_outer: Vector3 = right_edge + right * land_width - Vector3.UP * OUTER_DROP
+		var right_mid: Vector3 = right_edge + right * mid_distance + Vector3.UP * mid_height
+		var right_outer: Vector3 = right_edge + right * land_width + Vector3.UP * outer_height
 
 		vertices.append(left_outer)
+		vertices.append(left_mid)
 		vertices.append(left_inner)
 		vertices.append(right_inner)
+		vertices.append(right_mid)
 		vertices.append(right_outer)
-		for _normal_index: int in range(4):
+		for _normal_index: int in range(6):
 			normals.append(Vector3.UP)
 		uvs.append(Vector2(0.0, distance_along / 18.0))
-		uvs.append(Vector2(0.35, distance_along / 18.0))
-		uvs.append(Vector2(0.65, distance_along / 18.0))
+		uvs.append(Vector2(0.20, distance_along / 18.0))
+		uvs.append(Vector2(0.42, distance_along / 18.0))
+		uvs.append(Vector2(0.58, distance_along / 18.0))
+		uvs.append(Vector2(0.80, distance_along / 18.0))
 		uvs.append(Vector2(1.0, distance_along / 18.0))
 
 	for point_index: int in range(_route.size() - 1):
-		var base: int = point_index * 4
-		var next: int = base + 4
+		var base: int = point_index * 6
+		var next: int = base + 6
 		indices.append_array(PackedInt32Array([
 			base, base + 1, next,
 			base + 1, next + 1, next,
-			base + 2, base + 3, next + 2,
-			base + 3, next + 3, next + 2,
+			base + 1, base + 2, next + 1,
+			base + 2, next + 2, next + 1,
+			base + 3, base + 4, next + 3,
+			base + 4, next + 4, next + 3,
+			base + 4, base + 5, next + 4,
+			base + 5, next + 5, next + 4,
 		]))
 
 	var mesh: ArrayMesh = ArrayMesh.new()
