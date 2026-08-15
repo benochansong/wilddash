@@ -27,6 +27,24 @@ func _ready() -> void:
 		ai_racers.size(),
 	])
 
+# Production Round 4 guard for the role-AI state machine. Re-selecting the same
+# state every 0.2s must not refill its hold timer forever; otherwise a light AI
+# that begins EVADE/RETREAT can become permanently stuck in escape behavior.
+# Only a fresh transition starts the hold timer, while an expired same-state
+# decision may start one new bounded hold window.
+func _set_phase2_ai_state(racer: WildDashCharacterController, state: int, hold_seconds: float) -> void:
+	if racer == null:
+		return
+	var id := racer.get_instance_id()
+	var current := int(_phase2_ai_state.get(id, state))
+	var current_timer := float(_phase2_ai_state_timer.get(id, 0.0))
+	if current == state:
+		if current_timer <= 0.0 and hold_seconds > 0.0:
+			_phase2_ai_state_timer[id] = hold_seconds
+		return
+	_phase2_ai_state[id] = state
+	_phase2_ai_state_timer[id] = maxf(0.0, hold_seconds)
+
 func _round4_index() -> int:
 	return GameManager.ROUND_IDS.find(ROUND4_ID)
 
