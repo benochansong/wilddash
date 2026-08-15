@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="Script" path="res://modes/neon_harbor_race/neon_harbor_race_v5_rebuild.gd" id="1_mode"]
 [ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="3_feel"]
@@ -14,6 +14,7 @@
 [ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_respawn_guard.gd" id="16_respawn"]
 [ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_route_network.gd" id="17_routes"]
 [ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_route_guidance.gd" id="18_guidance"]
+[ext_resource type="Script" path="res://systems/race_combat_ai_director.gd" id="19_combat_ai"]
 
 [node name="NeonHarborRace" type="Node3D"]
 script = ExtResource("1_mode")
@@ -23,6 +24,10 @@ script = ExtResource("8_actions")
 
 [node name="RaceCombatCoreV2" type="Node" parent="."]
 script = ExtResource("10_combat_v3")
+
+[node name="RaceCombatAIDirector" type="Node" parent="."]
+script = ExtResource("19_combat_ai")
+round_id = &"neon_harbor_race"
 
 [node name="ElephantTrunkLungeController" type="Node" parent="."]
 script = ExtResource("9_lunge")
