@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3]
 
-[ext_resource type="Script" path="res://modes/push_out/wild_rumble_round4_combat_v2_ai_polish.gd" id="1_mode"]
+[ext_resource type="Script" path="res://modes/push_out/wild_rumble_round4_combat_v2_runtime_fix.gd" id="1_mode"]
 
 [node name="WildRumble" type="Node3D"]
 script = ExtResource("1_mode")
