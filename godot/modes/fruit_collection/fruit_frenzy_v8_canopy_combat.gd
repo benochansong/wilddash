@@ -116,20 +116,20 @@ func _perform_round2_profile_attack(spec: WildDashCombatAbilitySpec, heavy: bool
 	var is_ambush: bool = player.animal_id == &"cat" and _combat_v2_is_back_attack(player, target)
 	if is_ambush:
 		result.knockback *= 1.18
-	\	result.stagger *= 1.24
+		result.stagger *= 1.24
 	target.apply_knockback(offset.normalized(), result.knockback)
 
 	var spill_count: int = result.fruit_spill
 	if is_ambush:
 		spill_count = maxi(1, spill_count)
-	_combat_v2_try_spill(target, spill_count, spec.display_name)
+	var spilled: int = _combat_v2_try_spill(target, spill_count, spec.display_name)
 	_apply_power_stun(player, target)
 	AudioManager.play_sfx_id("hit", 0.90 if not heavy else 1.0)
 
 	if is_ambush:
 		_set_round2_speed_bonus(CAT_AMBUSH_SPEED_SCALE, CAT_AMBUSH_SPEED_SECONDS)
 		if hud != null:
-			hud.set_message("AMBUSH! · FRUIT SPILL %d" % mini(spill_count, _get_carry(target) + spill_count))
+			hud.set_message("AMBUSH! · FRUIT SPILL %d" % spilled)
 	elif player.animal_id == &"fox":
 		_set_round2_speed_bonus(FOX_ESCAPE_SPEED_SCALE, FOX_ESCAPE_SPEED_SECONDS)
 		if hud != null:
@@ -172,7 +172,7 @@ func _update_round2_aerial_combat() -> void:
 	if offset.length_squared() <= 0.001:
 		offset = -player.global_transform.basis.z
 	target.apply_knockback(offset.normalized(), result.knockback)
-	_combat_v2_try_spill(target, maxi(1, result.fruit_spill), spec.display_name)
+	var spilled: int = _combat_v2_try_spill(target, maxi(1, result.fruit_spill), spec.display_name)
 	player.velocity.y = maxf(player.velocity.y, player.jump_velocity * WildDashAerialCombatSystem.get_bounce_scale(player.animal_id))
 	AudioManager.play_sfx_id("hit", 0.92)
 	_spawn_round2_attack_puff(target.global_position + Vector3.UP * 0.5, 0.75)
@@ -181,7 +181,7 @@ func _update_round2_aerial_combat() -> void:
 		_rabbit_chain_count = mini(3, _rabbit_chain_count + 1) if _rabbit_chain_remaining > 0.0 else 1
 		_rabbit_chain_remaining = WildDashAerialCombatSystem.get_chain_window(&"rabbit")
 		if hud != null:
-			hud.set_message("CHAIN STOMP x%d!" % _rabbit_chain_count)
+			hud.set_message("CHAIN STOMP x%d! · SPILL %d" % [_rabbit_chain_count, spilled])
 	elif player.animal_id == &"monkey":
 		_set_round2_speed_bonus(MONKEY_AIR_FLOW_SPEED_SCALE, MONKEY_AIR_FLOW_SECONDS)
 		if hud != null:
@@ -283,11 +283,11 @@ func _perform_monkey_swing_kick_round2() -> void:
 	if offset.length_squared() <= 0.001:
 		return
 	target.apply_knockback(offset.normalized(), result.knockback)
-	_combat_v2_try_spill(target, 1, "MONKEY SWING KICK")
+	var spilled: int = _combat_v2_try_spill(target, 1, "MONKEY SWING KICK")
 	AudioManager.play_sfx_id("hit", 0.94)
 	_spawn_round2_attack_puff(target.global_position + Vector3.UP * 0.75, 0.95)
 	if hud != null:
-		hud.set_message("SWING KICK! · MOMENTUM %.0f%%" % (impact_scale * 100.0))
+		hud.set_message("SWING KICK! · MOMENTUM %.0f%% · SPILL %d" % [impact_scale * 100.0, spilled])
 	print("MONKEY SWING KICK mode=fruit_collection ratio=%.2f impact=%.2f" % [swing_ratio, impact_scale])
 
 func _nearest_round2_target(source: WildDashCharacterController, radius: float) -> WildDashCharacterController:
