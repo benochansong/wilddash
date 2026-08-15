@@ -29,6 +29,8 @@ func _ready() -> void:
 		return
 	if not _test_dash():
 		return
+	if not _test_wild_turbo_definition_and_use():
+		return
 	if not _test_shield():
 		return
 	if not _test_trap():
@@ -42,13 +44,13 @@ func _ready() -> void:
 	if not _test_ai_item_use():
 		return
 
-	print("ITEM SYSTEM SMOKE PASS items=6 inventory=1 hit_immunity=true")
+	print("ITEM SYSTEM SMOKE PASS items=%d inventory=1 hit_immunity=true wild_turbo=true party_box=true" % ItemSystem.get_item_count())
 	get_tree().quit(0)
 
 func _test_input_binding() -> bool:
-	var has_q := false
-	var has_b := false
-	for event in InputMap.action_get_events(InputManager.ACTION_ITEM):
+	var has_q: bool = false
+	var has_b: bool = false
+	for event: InputEvent in InputMap.action_get_events(InputManager.ACTION_ITEM):
 		if event is InputEventKey and (event as InputEventKey).physical_keycode == KEY_Q:
 			has_q = true
 		if event is InputEventJoypadButton and (event as InputEventJoypadButton).button_index == JOY_BUTTON_B:
@@ -60,7 +62,7 @@ func _test_input_binding() -> bool:
 
 func _test_item_box_pickup() -> bool:
 	_clear_inventory(_racer_a)
-	var box := ITEM_BOX_SCENE.instantiate() as WildDashItemBox
+	var box: WildDashItemBox = ITEM_BOX_SCENE.instantiate() as WildDashItemBox
 	box.name = "SmokeItemBox"
 	box.respawn_seconds = 0.2
 	add_child(box)
@@ -70,7 +72,9 @@ func _test_item_box_pickup() -> bool:
 		return _fail("Item Box did not grant an item")
 	if _racer_a.get_held_item() == &"":
 		return _fail("Item Box pickup left inventory empty")
-	print("ITEM BOX PICKUP PASS item=%s" % ItemSystem.get_display_name(_racer_a.get_held_item()))
+	if not box.is_active():
+		return _fail("Race Item Box globally deactivated after one racer pickup")
+	print("ITEM BOX PICKUP PASS item=%s box_global_active=true" % ItemSystem.get_display_name(_racer_a.get_held_item()))
 	_clear_inventory(_racer_a)
 	box.queue_free()
 	return true
@@ -96,6 +100,46 @@ func _test_dash() -> bool:
 	print("DASH BERRY PASS duration=2.0")
 	return true
 
+func _test_wild_turbo_definition_and_use() -> bool:
+	ItemSystem.reset_runtime()
+	_clear_inventory(_racer_a)
+	if ItemSystem.get_item_count() != 13:
+		return _fail("RC9 item count must be 13 after WILD TURBO")
+	if not ItemSystem.is_valid_item(ItemSystem.WILD_TURBO):
+		return _fail("WILD TURBO is not registered as a valid item")
+	var definition: WildDashItemDefinition = ItemSystem.get_definition(ItemSystem.WILD_TURBO)
+	if definition == null:
+		return _fail("WILD TURBO definition missing")
+	if ItemSystem.get_display_name(ItemSystem.WILD_TURBO) != "WILD TURBO":
+		return _fail("WILD TURBO display name mismatch")
+	if ItemSystem.get_icon_text(ItemSystem.WILD_TURBO) != "WT":
+		return _fail("WILD TURBO icon mismatch")
+	if ItemSystem.get_role(ItemSystem.WILD_TURBO) != &"speed":
+		return _fail("WILD TURBO role must be speed")
+	if absf(definition.duration - 1.50) > 0.001:
+		return _fail("WILD TURBO duration mismatch")
+	if absf(definition.strength - 1.68) > 0.001:
+		return _fail("WILD TURBO sustained speed multiplier mismatch")
+	if absf(definition.secondary_strength - 1.50) > 0.001:
+		return _fail("WILD TURBO acceleration multiplier mismatch")
+	if absf(definition.front_weight - 2.0) > 0.001 or absf(definition.mid_weight - 6.0) > 0.001 or absf(definition.back_weight - 12.0) > 0.001:
+		return _fail("WILD TURBO front/mid/back weight mismatch")
+
+	_racer_a.current_speed = 0.0
+	var canonical_max: float = _racer_a.get_animal_definition().max_speed if _racer_a.get_animal_definition() != null else _racer_a.max_speed
+	if not ItemSystem.grant_item(_racer_a, ItemSystem.WILD_TURBO):
+		return _fail("Could not grant WILD TURBO")
+	if not ItemSystem.use_held_item(_racer_a):
+		return _fail("WILD TURBO could not be used")
+	if not ItemSystem.has_effect(_racer_a, &"wild_turbo"):
+		return _fail("WILD TURBO effect did not activate")
+	if _racer_a.current_speed < _racer_a.max_speed * 1.37:
+		return _fail("WILD TURBO initial burst is too weak")
+	if _racer_a.current_speed > canonical_max * 1.801:
+		return _fail("WILD TURBO exceeded canonical speed cap")
+	print("WILD TURBO PASS duration=1.50 initial=1.38 sustained=1.68 accel=1.50 cap=1.80 weights=2/6/12")
+	return true
+
 func _test_shield() -> bool:
 	ItemSystem.reset_runtime()
 	_clear_inventory(_racer_a)
@@ -117,8 +161,8 @@ func _test_trap() -> bool:
 	ItemSystem.grant_item(_racer_a, ItemSystem.STICKY_FRUIT)
 	if not ItemSystem.use_held_item(_racer_a):
 		return _fail("Sticky Fruit could not be used")
-	var found := false
-	for child in get_children():
+	var found: bool = false
+	for child: Node in get_children():
 		if child is WildDashStickyFruitTrap:
 			found = true
 			break
@@ -158,7 +202,7 @@ func _test_rocket() -> bool:
 	ItemSystem.grant_item(_racer_a, ItemSystem.ROCKET_NUT)
 	if not ItemSystem.use_held_item(_racer_a):
 		return _fail("Rocket Nut could not acquire target")
-	var timeout := 0.0
+	var timeout: float = 0.0
 	while timeout < 1.5 and not ItemSystem.has_effect(_racer_b, &"slow"):
 		await get_tree().physics_frame
 		timeout += 1.0 / 60.0
@@ -187,7 +231,7 @@ func _test_ai_item_use() -> bool:
 	_racer_b.global_position = Vector3(0, 0.2, 0)
 	_racer_b.rotation = Vector3.ZERO
 	ItemSystem.grant_item(_racer_b, ItemSystem.ROCKET_NUT)
-	var brain := AI_ITEM_BRAIN_SCRIPT.new() as WildDashAIItemBrain
+	var brain: WildDashAIItemBrain = AI_ITEM_BRAIN_SCRIPT.new() as WildDashAIItemBrain
 	if brain == null:
 		return _fail("AI item brain failed to instantiate")
 	brain.name = "SmokeAIItemBrain"
@@ -202,7 +246,7 @@ func _test_ai_item_use() -> bool:
 	return true
 
 func _spawn_static_racer(node_name: String, at: Vector3, animal: StringName) -> WildDashCharacterController:
-	var racer := RACER_SCENE.instantiate() as WildDashCharacterController
+	var racer: WildDashCharacterController = RACER_SCENE.instantiate() as WildDashCharacterController
 	racer.name = node_name
 	racer.is_player = false
 	racer.movement_mode = WildDashCharacterController.MovementMode.RACE
