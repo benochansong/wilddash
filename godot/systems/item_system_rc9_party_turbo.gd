@@ -40,9 +40,17 @@ func is_new_item(item_id: StringName) -> bool:
 	return item_id == WILD_TURBO or super.is_new_item(item_id)
 
 func get_item_count() -> int:
-	return super.get_item_count() + 1
+	return _rc9_item_ids().size()
+
+func get_all_item_ids() -> Array[StringName]:
+	return _rc9_item_ids()
 
 func get_definition(item_id: StringName) -> WildDashItemDefinition:
+	# Some smoke/editor calls can query a definition before this autoload's
+	# _ready(). Ensure the inherited 12 definitions are installed before adding
+	# Turbo so an early WILD_TURBO lookup cannot leave the dictionary half-built.
+	if _definitions.is_empty():
+		super._register_definitions()
 	if item_id == WILD_TURBO and not _definitions.has(WILD_TURBO):
 		_register_wild_turbo_definition()
 	return super.get_definition(item_id)
@@ -243,7 +251,9 @@ func _wild_turbo_speed_cap(controller: WildDashCharacterController) -> float:
 	var definition: WildDashAnimalDefinition = controller.get_animal_definition()
 	if definition != null and definition.max_speed > 0.01:
 		canonical_max = definition.max_speed
-	return maxf(controller.max_speed, canonical_max * WILD_TURBO_CANONICAL_SPEED_CAP)
+	# Strict canonical cap prevents Crocodile water multipliers and other runtime
+	# max-speed modifications from stacking Turbo into an unintended extreme.
+	return canonical_max * WILD_TURBO_CANONICAL_SPEED_CAP
 
 func _spawn_wild_turbo_vfx(controller: WildDashCharacterController) -> Node3D:
 	var root: Node3D = Node3D.new()
