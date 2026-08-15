@@ -1,6 +1,6 @@
 [gd_scene load_steps=5 format=3]
 
-[ext_resource type="Script" path="res://modes/fruit_collection/fruit_frenzy_v9_canopy_safety.gd" id="1_mode"]
+[ext_resource type="Script" path="res://modes/fruit_collection/fruit_frenzy_v10_combat_v2_final.gd" id="1_mode"]
 [ext_resource type="Script" path="res://modes/fruit_collection/fruit_frenzy_ci_bridge.gd" id="2_ci"]
 [ext_resource type="Script" path="res://modes/fruit_collection/fruit_frenzy_fx.gd" id="3_fx"]
 [ext_resource type="Script" path="res://modes/fruit_collection/fruit_frenzy_v2_visibility_guard.gd" id="4_visibility"]
