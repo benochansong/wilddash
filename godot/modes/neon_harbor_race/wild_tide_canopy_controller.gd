@@ -162,7 +162,7 @@ func _try_ai_grab(racer: WildDashCharacterController, traversal: WildDashCanopyT
 		return
 	if traversal.grab_vine(racer, route):
 		_ai_retry_by_racer[racer_id] = AI_RETRY_SECONDS
-		print("AI ROUTE animal=monkey route=CANOPY vine=%s score=high")
+		print("AI ROUTE animal=monkey route=CANOPY vine=%s score=high" % String(route.vine_id))
 
 func _perform_swing_kick(racer: WildDashCharacterController, traversal: WildDashCanopyTraversalSystem) -> void:
 	var impact_scale: float = traversal.perform_swing_attack()
