@@ -1,4 +1,4 @@
-[gd_scene load_steps=32 format=3]
+[gd_scene load_steps=33 format=3]
 
 [ext_resource type="Script" path="res://modes/grand_prix/grand_prix_v5_item_chaos.gd" id="1_mode"]
 [ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="2_feel"]
@@ -31,6 +31,7 @@
 [ext_resource type="Script" path="res://tracks/grand_prix_v4_environment_dressing.gd" id="34_environment_dressing"]
 [ext_resource type="Script" path="res://tracks/grand_prix_v4_direction_guidance.gd" id="35_direction_guidance"]
 [ext_resource type="Script" path="res://tracks/grand_prix_v4_route_signage.gd" id="36_route_signage"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v5_road_corridor_clearance.gd" id="37_road_clearance"]
 
 [node name="GrandPrix" type="Node3D"]
 script = ExtResource("1_mode")
@@ -52,6 +53,9 @@ script = ExtResource("31_landscape_shell")
 
 [node name="V42EnvironmentDressing" type="Node3D" parent="."]
 script = ExtResource("34_environment_dressing")
+
+[node name="V5RoadCorridorClearance" type="Node" parent="."]
+script = ExtResource("37_road_clearance")
 
 [node name="V44DirectionGuidance" type="Node3D" parent="."]
 script = ExtResource("35_direction_guidance")
