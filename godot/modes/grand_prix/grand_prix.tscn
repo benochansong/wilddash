@@ -1,8 +1,8 @@
 [gd_scene load_steps=32 format=3]
 
-[ext_resource type="Script" path="res://modes/grand_prix/grand_prix_v2_mode.gd" id="1_mode"]
+[ext_resource type="Script" path="res://modes/grand_prix/grand_prix_v5_item_chaos.gd" id="1_mode"]
 [ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="2_feel"]
-[ext_resource type="Script" path="res://items/item_combat_expansion_controller.gd" id="4_items"]
+[ext_resource type="Script" path="res://items/item_combat_expansion_v2.gd" id="4_items"]
 [ext_resource type="Script" path="res://tracks/grand_prix_v2_course_guidance.gd" id="6_art"]
 [ext_resource type="Script" path="res://modes/grand_prix/grand_prix_rival_pressure.gd" id="7_rival"]
 [ext_resource type="Script" path="res://network/network_race_sync.gd" id="9_network"]
