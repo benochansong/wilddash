@@ -14,7 +14,7 @@ var stun_remaining_by_id: Dictionary = {}
 var stun_immunity_by_id: Dictionary = {}
 
 func _ready() -> void:
-	super()
+	await super()
 	print("FRUIT FRENZY V2 POLISH READY fruit_shapes=true power_stun=true defense_resists=true heavy_carry=true max_stun=%.2fs" % POWER_STUN_MAX_SECONDS)
 
 func _register_racer_state(racer: WildDashCharacterController) -> void:
@@ -186,8 +186,7 @@ func _configure_fruit_visual(fruit: MeshInstance3D, fruit_type: StringName) -> v
 	fruit.mesh = null
 	fruit.scale = Vector3.ONE
 	fruit.rotation = Vector3.ZERO
-	for child: Node in fruit.get_children():
-		child.visible = false
+	for child in fruit.get_children():
 		child.queue_free()
 
 	match fruit_type:
