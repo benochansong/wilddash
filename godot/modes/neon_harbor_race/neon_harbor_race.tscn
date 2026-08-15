@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://modes/neon_harbor_race/neon_harbor_race_v4_wild_tide.gd" id="1_mode"]
 [ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="3_feel"]
@@ -11,6 +11,7 @@
 [ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_canopy_controller.gd" id="13_canopy"]
 [ext_resource type="Script" path="res://modes/neon_harbor_race/mangrove_titan_controller.gd" id="14_titan"]
 [ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_breakthrough_route.gd" id="15_breakthrough"]
+[ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_respawn_guard.gd" id="16_respawn"]
 
 [node name="NeonHarborRace" type="Node3D"]
 script = ExtResource("1_mode")
@@ -48,3 +49,6 @@ script = ExtResource("14_titan")
 
 [node name="WildTideBreakthroughRoute" type="Node3D" parent="."]
 script = ExtResource("15_breakthrough")
+
+[node name="WildTideRespawnGuard" type="Node" parent="."]
+script = ExtResource("16_respawn")
