@@ -3,7 +3,7 @@ extends Control
 const LOBBY_SCENE := "res://scenes/lobby.tscn"
 const ANIMALS: Array[StringName] = [
 	&"dog", &"wolf", &"boar", &"rabbit", &"deer", &"monkey",
-	&"elephant", &"bear", &"panda", &"cat", &"fox", &"raccoon",
+	&"elephant", &"bear", &"crocodile", &"cat", &"fox", &"raccoon",
 ]
 
 var _name_edit: LineEdit
