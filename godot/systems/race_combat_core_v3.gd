@@ -8,6 +8,7 @@ extends WildDashRaceCombatCoreV2
 
 const BODY_CHECK_QUERY_RANGE: float = 3.45
 const SHOCKWAVE_REINFORCE_RADIUS: float = 9.0
+const SHOCKWAVE_INNER_EXTRA_PUSH: float = 1.05
 const SHOCKWAVE_OUTER_PUSH: float = 1.65
 const CONTROL_META_UNTIL: StringName = &"race_v3_control_until"
 const CONTROL_META_YAW: StringName = &"race_v3_yaw_instability"
@@ -35,9 +36,9 @@ func _on_race_combat_action_resolved(action: Dictionary) -> void:
 	_resolve_player()
 	if _racer == null or _racer.finished or not RaceManager.active:
 		return
-	# Elephant already owns a multi-target trunk sweep in RacingActionController;
-	# do not double-apply another full body hit on the same input.
-	if _racer.animal_id == &"elephant":
+	# Bear and Elephant already own dedicated V2 heavy controllers. Their existing
+	# attacks remain authoritative so V3 does not double-hit the same F/Y command.
+	if _racer.animal_id == &"elephant" or _racer.animal_id == &"bear":
 		return
 	var now_seconds: float = Time.get_ticks_msec() * 0.001
 	var next_value: Variant = _racer.get_meta(BODY_META_NEXT, 0.0)
@@ -67,6 +68,7 @@ static func apply_race_impact(
 		return false
 	if attacker == victim:
 		return false
+	var shielded_before: bool = ItemSystem.has_shield(victim)
 	var effective_speed_multiplier: float = minf(
 		profile.slow_multiplier,
 		1.0 - clampf(profile.speed_loss_ratio, 0.0, 0.48)
@@ -81,6 +83,11 @@ static func apply_race_impact(
 	)
 	if not applied:
 		return false
+	# apply_attack() returns true when Bubble Shield consumes the hit. Do not add
+	# V3 knockback/control after a successful block.
+	if shielded_before:
+		print("RACE IMPACT BLOCKED victim=%s source=%s shield=true" % [RaceManager.get_racer_label(victim), String(source_id)])
+		return true
 
 	var push_direction: Vector3 = victim.global_position - impact_origin
 	push_direction.y = 0.0
@@ -193,8 +200,6 @@ static func can_body_check_target(
 static func get_recent_hit_protection(racer: WildDashCharacterController) -> bool:
 	if racer == null:
 		return false
-	# ItemSystem owns the authoritative 0.75 s immunity. A currently active slow/
-	# spin is a safe public proxy for Phase-2 target selection.
 	return ItemSystem.has_effect(racer, &"slow") or ItemSystem.has_effect(racer, &"spin")
 
 static func can_use_race_item(racer: WildDashCharacterController) -> bool:
@@ -212,19 +217,21 @@ func _on_item_used_v3(character: Node, item_id: StringName) -> void:
 	if item_id != ItemSystem.SHOCKWAVE or not character is WildDashCharacterController:
 		return
 	var source: WildDashCharacterController = character as WildDashCharacterController
-	# The base ItemSystem resolves the inner 7.5 m blast. V3 extends the readable
-	# escape ring to 9 m with a light outer push rather than double-stunning hits.
+	# Base ItemSystem resolves the inner 7.5 m blast. V3 adds a small force boost
+	# inside and extends the readable escape ring to 9 m without another stagger.
 	for racer: WildDashCharacterController in get_nearby_racers(source, SHOCKWAVE_REINFORCE_RADIUS):
 		var distance: float = source.global_position.distance_to(racer.global_position)
-		if distance <= 7.5:
-			continue
 		var direction: Vector3 = racer.global_position - source.global_position
 		direction.y = 0.0
 		if direction.length_squared() <= 0.001:
 			continue
-		racer.apply_knockback(direction.normalized(), SHOCKWAVE_OUTER_PUSH)
-		racer.current_speed *= 0.92
+		var extra_push: float = SHOCKWAVE_INNER_EXTRA_PUSH if distance <= 7.5 else SHOCKWAVE_OUTER_PUSH
+		racer.apply_knockback(direction.normalized(), extra_push)
+		racer.current_speed *= 0.95 if distance <= 7.5 else 0.92
 	_spawn_shockwave_ring(source.global_position)
+	print("SHOCKWAVE V3 REINFORCE radius=%.1f inner_extra=%.2f outer_push=%.2f" % [
+		SHOCKWAVE_REINFORCE_RADIUS, SHOCKWAVE_INNER_EXTRA_PUSH, SHOCKWAVE_OUTER_PUSH,
+	])
 
 func _update_control_reactions(delta: float) -> void:
 	if not RaceManager.active:
@@ -242,14 +249,14 @@ func _update_control_reactions(delta: float) -> void:
 			racer.remove_meta(CONTROL_META_HANDLING)
 			continue
 		var yaw_value: Variant = racer.get_meta(CONTROL_META_YAW, 0.0)
-		var yaw_strength: float = float(yaw_value)
+		var handling_value: Variant = racer.get_meta(CONTROL_META_HANDLING, 1.0)
+		var yaw_strength: float = float(yaw_value) + (1.0 - float(handling_value)) * 0.18
 		if yaw_strength > 0.001:
 			var phase: float = now_seconds * 20.0 + float(racer.get_instance_id() % 11)
 			racer.rotation.y += sin(phase) * yaw_strength * delta
 		var accel_value: Variant = racer.get_meta(CONTROL_META_ACCEL, 1.0)
 		if float(accel_value) < 0.99:
-			# Effective acceleration loss without mutating the canonical animal stat:
-			# trim a little of each frame's recovery while the sticky window is active.
+			# Effective acceleration loss without mutating canonical/water-adjusted stats.
 			var recovery_drag: float = (1.0 - float(accel_value)) * racer.acceleration * delta * 0.35
 			racer.current_speed = maxf(0.0, racer.current_speed - recovery_drag)
 
