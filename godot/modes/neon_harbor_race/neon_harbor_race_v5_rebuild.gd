@@ -8,15 +8,40 @@ extends "res://modes/neon_harbor_race/neon_harbor_race_v4_wild_tide.gd"
 ## one route, producing the visible slow clump. V5 makes Round 3 pace + branch
 ## assignment authoritative and disables only the legacy Round-3 pack-tactics
 ## process. Other rounds retain AIPackTactics unchanged.
+##
+## Pace hotfix: canonical ai_race_speed values are intentionally conservative
+## (roughly 10-11 m/s), while the Round 3 player is allowed to run near the
+## character's max_speed and receives the inherited 1.18 player pace scale. Using
+## ai_race_speed as the V5 source therefore left the entire field visibly behind.
+## Round 3 now derives AI race pace from each animal's canonical max_speed, then
+## applies restrained species tiers, terrain identity and gap correction.
 
 const FAST_IDS: Array[StringName] = [&"rabbit", &"fox", &"cat"]
 const MID_IDS: Array[StringName] = [&"dog", &"wolf", &"deer", &"monkey"]
 const POWER_IDS: Array[StringName] = [&"bear", &"boar", &"elephant", &"crocodile", &"raccoon"]
-const FAST_PACE_SCALE: float = 1.10
-const MID_PACE_SCALE: float = 1.05
-const POWER_PACE_SCALE: float = 1.015
-const OPENING_LEAD_BONUS: float = 1.025
+
+# Player Round 3 max speed is max_speed * 1.18 in the inherited mode. AI uses
+# 1.14 as its neutral chassis scale so a clean-running player still has a small
+# skill advantage, while fast AI can genuinely contest the lead.
+const AI_MAX_SPEED_BASE_SCALE: float = 1.14
+const FAST_PACE_SCALE: float = 1.045
+const MID_PACE_SCALE: float = 1.00
+const POWER_PACE_SCALE: float = 0.99
+const OPENING_LEAD_BONUS: float = 1.035
 const OPENING_LEAD_SECONDS: float = 12.0
+
+# Gap correction is intentionally asymmetric. Small gaps are left alone. Racers
+# that fall substantially behind the player receive enough pace to re-enter the
+# race instead of spending the whole round off-camera; leaders are only softened
+# when their lead is genuinely large.
+const TRAILING_GAP_SOFT: float = -20.0
+const TRAILING_GAP_MEDIUM: float = -35.0
+const TRAILING_GAP_LARGE: float = -55.0
+const TRAILING_GAP_EXTREME: float = -80.0
+const LEADING_GAP_SOFT: float = 45.0
+const LEADING_GAP_MEDIUM: float = 70.0
+const LEADING_GAP_LARGE: float = 100.0
+
 const SEPARATION_NEAR: float = 2.5
 const SEPARATION_FAR: float = 5.0
 const MAX_SEPARATION_LANE: float = 2.6
@@ -57,7 +82,7 @@ func _bootstrap_v5() -> void:
 	_assign_branch_routes()
 	_apply_start_spread_profiles()
 	_v5_initialized = true
-	print("ROUND3 REBUILD V5 READY daytime=true fast_lead=%d multi_route=true legacy_pack_tactics=false separation=true pace_tiers=true" % _v5_lead_ids.size())
+	print("ROUND3 REBUILD V5 READY daytime=true fast_lead=%d multi_route=true legacy_pack_tactics=false separation=true pace_tiers=true competitive_pace=true" % _v5_lead_ids.size())
 
 func _process(delta: float) -> void:
 	super(delta)
@@ -142,23 +167,36 @@ func _get_start_grid_offset(slot: int) -> Vector3:
 	var stagger: float = 0.55 if row % 2 == 1 else 0.0
 	return Vector3((float(column) - center) * 2.85 + stagger, 0.1, float(row) * 4.15)
 
+func _round3_get_canonical_ai_speed(racer: WildDashCharacterController) -> float:
+	# Round 3 must race against the player's max-speed-based controller, not the
+	# conservative generic ai_race_speed values used by older modes.
+	if racer == null:
+		return 14.0
+	var definition: WildDashAnimalDefinition = WildDashAnimalCatalog.get_definition(racer.animal_id)
+	if definition != null and definition.max_speed > 0.01:
+		return definition.max_speed * AI_MAX_SPEED_BASE_SCALE
+	return maxf(12.5, racer.max_speed * 0.96)
+
 func _round3_desired_speed(racer: WildDashCharacterController, base_speed: float) -> float:
 	if racer == null:
 		return base_speed
 	return base_speed * _v5_pace_tier_scale(racer) * _round3_difficulty_scale()
 
 func _round3_gap_scale(progress_gap: float) -> float:
-	# V3 started slowing leaders at only 20 m and reached 0.90x by 90 m. Combined
-	# with AIController's own gentle rubber band this made the whole field wait.
-	# V5 leaves normal racing alone until the lead is genuinely large.
-	if progress_gap >= 105.0:
-		return 0.955
-	if progress_gap >= 80.0:
-		return 0.970
-	if progress_gap >= 55.0:
-		return 0.985
-	if progress_gap <= -75.0:
-		return 1.020
+	if progress_gap <= TRAILING_GAP_EXTREME:
+		return 1.09
+	if progress_gap <= TRAILING_GAP_LARGE:
+		return 1.065
+	if progress_gap <= TRAILING_GAP_MEDIUM:
+		return 1.04
+	if progress_gap <= TRAILING_GAP_SOFT:
+		return 1.02
+	if progress_gap >= LEADING_GAP_LARGE:
+		return 0.965
+	if progress_gap >= LEADING_GAP_MEDIUM:
+		return 0.98
+	if progress_gap >= LEADING_GAP_SOFT:
+		return 0.99
 	return 1.0
 
 func _round3_update_ai_pace(_elapsed: float) -> void:
@@ -201,8 +239,8 @@ func _update_v5_pace_and_dispersion() -> void:
 			tier_scale *= OPENING_LEAD_BONUS
 		var terrain_scale: float = float(racer.get_meta(&"wild_tide_speed_multiplier", 1.0))
 		var desired: float = base_speed * tier_scale * _round3_difficulty_scale() * gap_scale * terrain_scale
-		var min_scale: float = 0.82 if terrain_scale < 0.95 else 0.92
-		var max_scale: float = 1.48 if racer.animal_id == &"crocodile" else 1.24
+		var min_scale: float = 0.80 if terrain_scale < 0.95 else 0.94
+		var max_scale: float = 1.52 if racer.animal_id == &"crocodile" else 1.30
 		driver.target_speed = clampf(desired, base_speed * min_scale, base_speed * max_scale)
 
 		var dodge_until: float = float(_hazard_dodge_until_by_id.get(racer_id, 0.0))
@@ -222,7 +260,7 @@ func _v5_pace_tier_scale(racer: WildDashCharacterController) -> float:
 		return MID_PACE_SCALE
 	if POWER_IDS.has(racer.animal_id):
 		return POWER_PACE_SCALE
-	return 1.03
+	return 1.0
 
 func _calculate_local_separation(racer: WildDashCharacterController) -> float:
 	var right: Vector3 = racer.global_transform.basis.x
@@ -273,6 +311,9 @@ func _log_v5_pack_state() -> void:
 	var main_pack: int = 0
 	var chase_pack: int = 0
 	var max_cluster: int = 0
+	var target_speed_sum: float = 0.0
+	var target_speed_count: int = 0
+	var fastest_target: float = 0.0
 	for racer_value: Variant in RaceManager.racers:
 		var racer: WildDashCharacterController = racer_value as WildDashCharacterController
 		if racer == null or racer.finished:
@@ -292,6 +333,23 @@ func _log_v5_pack_state() -> void:
 			if racer.global_position.distance_to(other.global_position) <= 5.0:
 				cluster += 1
 		max_cluster = maxi(max_cluster, cluster)
-	print("ROUND3 AI PACK STATE lead_pack=%d main_pack=%d chase_pack=%d max_cluster=%d fast_lead_target=%d routes=%d" % [
-		lead_pack, main_pack, chase_pack, max_cluster, _v5_lead_ids.size(), _route_network.get_route_count() if _route_network != null else 0,
+
+	for driver: WildDashAIController in ai_drivers:
+		if driver == null:
+			continue
+		target_speed_sum += driver.target_speed
+		target_speed_count += 1
+		fastest_target = maxf(fastest_target, driver.target_speed)
+	var average_target: float = 0.0 if target_speed_count <= 0 else target_speed_sum / float(target_speed_count)
+	var player_speed: float = 0.0 if player == null else player.current_speed
+	print("ROUND3 AI PACK STATE lead_pack=%d main_pack=%d chase_pack=%d max_cluster=%d fast_lead_target=%d routes=%d player_speed=%.1f ai_target_avg=%.1f ai_target_fast=%.1f" % [
+		lead_pack,
+		main_pack,
+		chase_pack,
+		max_cluster,
+		_v5_lead_ids.size(),
+		_route_network.get_route_count() if _route_network != null else 0,
+		player_speed,
+		average_target,
+		fastest_target,
 	])
