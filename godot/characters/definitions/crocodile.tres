@@ -30,7 +30,9 @@ camera_follow_height = 5.4
 camera_look_ahead = 4.4
 camera_smoothing = 6.5
 camera_fov = 69.0
-skill_id = &"bite_lunge"
+# Use the proven Stampede runtime for E/X while Round 2/4 F/Y is overridden as
+# the dedicated Bite Lunge/Tail Sweep combat kit.
+skill_id = &"stampede"
 skill_name = "BITE LUNGE"
 skill_description = "육지에서는 묵직하고 느리지만 물에서는 폭발적으로 빨라지는 WATER BRUISER."
 skill_cooldown = 8.0
