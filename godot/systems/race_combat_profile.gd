@@ -8,18 +8,19 @@ extends RefCounted
 const DEFAULT_ANIMAL_ID: StringName = &"dog"
 
 const COMBAT_TRAITS: Dictionary = {
-	&"elephant": {"stability": 10.0, "cooldown": 1.90, "range": 8.50, "launch": 10.0},
-	&"bear":     {"stability": 9.0,  "cooldown": 1.75, "range": 5.20, "launch": 8.2},
-	&"boar":     {"stability": 7.5,  "cooldown": 2.15, "range": 4.80, "launch": 6.8},
-	&"panda":    {"stability": 8.5,  "cooldown": 2.35, "range": 3.80, "launch": 5.2},
-	&"wolf":     {"stability": 7.0,  "cooldown": 1.70, "range": 5.20, "launch": 4.8},
-	&"dog":      {"stability": 7.5,  "cooldown": 1.85, "range": 4.00, "launch": 4.0},
-	&"deer":     {"stability": 8.0,  "cooldown": 1.90, "range": 5.50, "launch": 4.2},
-	&"monkey":   {"stability": 7.8,  "cooldown": 1.65, "range": 4.00, "launch": 3.0},
-	&"rabbit":   {"stability": 8.5,  "cooldown": 1.60, "range": 3.80, "launch": 8.0},
-	&"fox":      {"stability": 8.5,  "cooldown": 1.55, "range": 4.80, "launch": 4.0},
-	&"cat":      {"stability": 9.5,  "cooldown": 1.45, "range": 4.20, "launch": 3.8},
-	&"raccoon":  {"stability": 8.8,  "cooldown": 1.60, "range": 4.00, "launch": 2.8},
+	&"elephant":  {"stability": 10.0, "cooldown": 1.90, "range": 8.50, "launch": 10.0},
+	&"bear":      {"stability": 9.0,  "cooldown": 1.75, "range": 5.20, "launch": 8.2},
+	&"boar":      {"stability": 7.5,  "cooldown": 2.15, "range": 4.80, "launch": 6.8},
+	&"panda":     {"stability": 8.5,  "cooldown": 2.35, "range": 3.80, "launch": 5.2},
+	&"crocodile": {"stability": 8.7,  "cooldown": 1.95, "range": 5.10, "launch": 7.2},
+	&"wolf":      {"stability": 7.0,  "cooldown": 1.70, "range": 5.20, "launch": 4.8},
+	&"dog":       {"stability": 7.5,  "cooldown": 1.85, "range": 4.00, "launch": 4.0},
+	&"deer":      {"stability": 8.0,  "cooldown": 1.90, "range": 5.50, "launch": 4.2},
+	&"monkey":    {"stability": 7.8,  "cooldown": 1.65, "range": 4.00, "launch": 3.0},
+	&"rabbit":    {"stability": 8.5,  "cooldown": 1.60, "range": 3.80, "launch": 8.0},
+	&"fox":       {"stability": 8.5,  "cooldown": 1.55, "range": 4.80, "launch": 4.0},
+	&"cat":       {"stability": 9.5,  "cooldown": 1.45, "range": 4.20, "launch": 3.8},
+	&"raccoon":   {"stability": 8.8,  "cooldown": 1.60, "range": 4.00, "launch": 2.8},
 }
 
 const DEFAULT_TRAITS: Dictionary = {
