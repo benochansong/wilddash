@@ -82,8 +82,6 @@ func _try_player_body_check() -> void:
 		return
 	var target := _find_crocodile_bite_target(player)
 	if target == null:
-		# Bite still gives a tiny forward lunge, so the character feels distinct
-		# without granting free long-distance mobility.
 		player.apply_knockback(-player.global_transform.basis.z, 1.15)
 		hud.set_message("BITE LUNGE · NO TARGET")
 		_player_body_check_cooldown = 0.62
@@ -165,7 +163,7 @@ func _try_use_round2_special(racer: WildDashCharacterController) -> bool:
 	_special_cooldown_by_id[id] = float(spec.get("cooldown", 6.0))
 	_spawn_cartoon_gas(racer, StringName(spec.get("id", &"special")))
 	_apply_round2_special_effect(racer, spec)
-	AudioManager.play_sfx_id("skill", 0.72)
+	AudioManager.play_sfx_id("fart", 0.68)
 	if racer.is_player:
 		hud.set_message("%s! · Q SPECIAL" % str(spec.get("name", "SPECIAL")))
 	print("ANIMAL SPECIAL animal=%s ability=%s mode=fruit_collection cooldown=%.1f" % [
@@ -256,7 +254,8 @@ func _spawn_cartoon_gas(source: WildDashCharacterController, special_id: StringN
 		puff.material_override = material
 		puff.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		root.add_child(puff)
-	_expire_effect_node(root, 0.72)
+	var lifetime := 2.0 if special_id == &"stink_cloud" else 0.72
+	_expire_effect_node(root, lifetime)
 
 func _expire_effect_node(node: Node, seconds: float) -> void:
 	await get_tree().create_timer(seconds).timeout
