@@ -187,6 +187,16 @@ func apply_hit(
 	var recoil_scale := lerpf(1.0, 0.42, clampf((power + source_defense) / 20.0, 0.0, 1.0))
 	source.apply_knockback(-launch_direction, (1.10 if kind == &"hold" else 0.62) * recoil_scale)
 
+	# Round 4 combat must read as an actual brawl, not invisible stat math.
+	# These states are supported by both production animation rigs and the
+	# procedural placeholders, so every resolved hit visibly shows attack/recoil.
+	var source_visual := source.get_visual()
+	if source_visual != null:
+		source_visual.play_action(&"Skill", 0.42 if kind == &"hold" else 0.28)
+	var target_visual := target.get_visual()
+	if target_visual != null:
+		target_visual.play_action(&"Hit", 0.48 if kind == &"hold" else 0.32)
+
 	_since_hit[target_id] = 0.0
 	var next_stagger := minf(MAX_STAGGER, float(_stagger.get(target_id, 0.0)) + stagger_gain)
 	var broke := false
