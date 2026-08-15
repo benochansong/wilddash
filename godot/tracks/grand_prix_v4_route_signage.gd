@@ -155,6 +155,9 @@ func _make_sign_root(world_position: Vector3, incoming: Vector3, base_name: Stri
 	sign.global_position = world_position
 	var look_target: Vector3 = world_position - incoming.normalized() * 10.0
 	look_target.y = world_position.y
+	# Node3D.look_at() points local -Z at the approaching racer. The sign artwork
+	# is therefore authored on the local -Z face so every roadside board faces the
+	# race direction consistently.
 	sign.look_at(look_target, Vector3.UP)
 	return sign
 
@@ -186,6 +189,11 @@ func _add_label(parent: Node3D, text: String, position: Vector3, font_size: int,
 	var label := Label3D.new()
 	label.text = text
 	label.position = position
+	# Label3D's readable/front face is +Z, while the board's racer-facing surface
+	# is local -Z. Without this half-turn every arrow/text panel is seen from its
+	# back side and appears reversed. Rotate once here so ALL Round 1 roadside
+	# chevrons, turn arrows, SHARP warnings and ROUTE OK boards read correctly.
+	label.rotation.y = PI
 	label.font_size = font_size
 	label.pixel_size = 0.010
 	label.modulate = color
