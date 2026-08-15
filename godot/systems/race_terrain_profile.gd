@@ -48,9 +48,14 @@ static func get_rough(animal_id: StringName) -> float:
 	return float(_profile(animal_id).get("rough", 5.0))
 
 static func get_swim_speed_ratio(animal_id: StringName) -> float:
-	# 9-10 point water specialists retain a small real advantage while weak
-	# swimmers still suffer a meaningful pace loss.
-	return lerpf(0.68, 1.05, clampf(get_swim(animal_id) / 10.0, 0.0, 1.0))
+	# Base pace still comes from Swim, then the shared terrain identity adds a
+	# restrained species layer. Crocodile therefore becomes the clear water king
+	# in Round 1 without duplicating the stronger ~10.0 arena-water tuning used in
+	# Fruit Frenzy. Existing strong swimmers remain good; weak swimmers remain weak.
+	var base_ratio := lerpf(0.68, 1.05, clampf(get_swim(animal_id) / 10.0, 0.0, 1.0))
+	var identity := WildDashTerrainAbilitySystem.get_terrain_speed_multiplier(animal_id, WildDashTerrainAbilitySystem.TERRAIN_WATER)
+	var identity_blend := lerpf(1.0, identity, 0.55)
+	return base_ratio * identity_blend
 
 static func get_swim_acceleration_scale(animal_id: StringName) -> float:
 	return lerpf(0.72, 1.18, clampf(get_swim(animal_id) / 10.0, 0.0, 1.0))
