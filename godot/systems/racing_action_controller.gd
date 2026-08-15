@@ -20,6 +20,7 @@ const BODY_CHECK_RANGE: float = 3.35
 const BODY_CHECK_FORWARD_DOT: float = -0.20
 const BODY_CHECK_MAX_VERTICAL_DELTA: float = 1.80
 const BODY_CHECK_FEEDBACK_SECONDS: float = 0.80
+const BODY_CHECK_POWER_SCALE: float = 0.84
 const ATTACKER_SPEED_RETENTION: float = 0.97
 
 const ELEPHANT_OPENING_SECONDS: float = 6.0
@@ -125,20 +126,9 @@ static func get_normal_race_target(max_speed: float, cruise_speed: float) -> flo
 	return maxf(cruise_speed, max_speed * BASE_RACE_SPEED_RATIO)
 
 static func get_body_check_power(animal_id: StringName) -> float:
-	match animal_id:
-		&"elephant": return 8.40
-		&"bear": return 7.50
-		&"boar": return 7.05
-		&"panda": return 6.55
-		&"wolf": return 5.80
-		&"dog": return 5.45
-		&"deer": return 5.10
-		&"rabbit": return 4.70
-		&"monkey": return 4.65
-		&"fox": return 4.55
-		&"cat": return 4.35
-		&"raccoon": return 4.15
-		_: return 4.70
+	# Keep the historical Elephant baseline (10.0 ability -> 8.4 body-check)
+	# while making the player-facing Power stat the authoritative ordering.
+	return WildDashRaceCombatProfile.get_attack_power(animal_id) * BODY_CHECK_POWER_SCALE
 
 static func get_body_check_resistance(animal_id: StringName) -> float:
 	match animal_id:
