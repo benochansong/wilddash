@@ -5,6 +5,8 @@ extends RefCounted
 ## animal ability profile; the remaining combat traits stay independently tuned
 ## so range/cooldown/launch/stability can preserve species identity.
 
+const DEFAULT_ANIMAL_ID: StringName = &"dog"
+
 const COMBAT_TRAITS: Dictionary = {
 	&"elephant": {"stability": 10.0, "cooldown": 1.90, "range": 8.50, "launch": 10.0},
 	&"bear":     {"stability": 9.0,  "cooldown": 1.75, "range": 5.20, "launch": 8.2},
@@ -27,11 +29,15 @@ const DEFAULT_TRAITS: Dictionary = {
 	"launch": 4.0,
 }
 
+static func get_default_profile() -> Dictionary:
+	return get_profile(DEFAULT_ANIMAL_ID)
+
 static func get_profile(animal_id: StringName) -> Dictionary:
-	var traits: Dictionary = COMBAT_TRAITS.get(animal_id, DEFAULT_TRAITS)
+	var resolved_animal_id: StringName = animal_id if animal_id != &"" else DEFAULT_ANIMAL_ID
+	var traits: Dictionary = COMBAT_TRAITS.get(resolved_animal_id, DEFAULT_TRAITS)
 	return {
-		"attack_power": get_attack_power(animal_id),
-		"defense": get_defense(animal_id),
+		"attack_power": get_attack_power(resolved_animal_id),
+		"defense": get_defense(resolved_animal_id),
 		"stability": float(traits.get("stability", 5.0)),
 		"cooldown": float(traits.get("cooldown", 2.0)),
 		"range": float(traits.get("range", 4.0)),
@@ -39,13 +45,16 @@ static func get_profile(animal_id: StringName) -> Dictionary:
 	}
 
 static func _traits(animal_id: StringName) -> Dictionary:
-	return COMBAT_TRAITS.get(animal_id, DEFAULT_TRAITS)
+	var resolved_animal_id: StringName = animal_id if animal_id != &"" else DEFAULT_ANIMAL_ID
+	return COMBAT_TRAITS.get(resolved_animal_id, DEFAULT_TRAITS)
 
 static func get_attack_power(animal_id: StringName) -> float:
-	return WildDashAnimalAbilityProfile.get_stat(animal_id, &"power")
+	var resolved_animal_id: StringName = animal_id if animal_id != &"" else DEFAULT_ANIMAL_ID
+	return WildDashAnimalAbilityProfile.get_stat(resolved_animal_id, &"power")
 
 static func get_defense(animal_id: StringName) -> float:
-	return WildDashAnimalAbilityProfile.get_stat(animal_id, &"defense")
+	var resolved_animal_id: StringName = animal_id if animal_id != &"" else DEFAULT_ANIMAL_ID
+	return WildDashAnimalAbilityProfile.get_stat(resolved_animal_id, &"defense")
 
 static func get_stability(animal_id: StringName) -> float:
 	return float(_traits(animal_id).get("stability", 5.0))
