@@ -41,6 +41,15 @@ var _break_vulnerability: Dictionary = {}
 var _since_hit: Dictionary = {}
 var _break_count: Dictionary = {}
 
+# Per-racer balance knobs. Defaults preserve the normal simulation; Round 4 can
+# opt the human player into a small survival assist without weakening outgoing
+# attacks or changing AI-vs-AI combat.
+var _incoming_knockback_scale: Dictionary = {}
+var _stagger_recovery_scale: Dictionary = {}
+var _combo_guard_seconds: Dictionary = {}
+var _combo_guard_knockback_scale: Dictionary = {}
+var _combo_guard_stagger_scale: Dictionary = {}
+
 func register_racer(racer: WildDashCharacterController) -> void:
 	if racer == null:
 		return
@@ -54,6 +63,16 @@ func register_racer(racer: WildDashCharacterController) -> void:
 	_break_vulnerability[id] = 0.0
 	_since_hit[id] = 999.0
 	_break_count[id] = 0
+	if not _incoming_knockback_scale.has(id):
+		_incoming_knockback_scale[id] = 1.0
+	if not _stagger_recovery_scale.has(id):
+		_stagger_recovery_scale[id] = 1.0
+	if not _combo_guard_seconds.has(id):
+		_combo_guard_seconds[id] = 0.0
+	if not _combo_guard_knockback_scale.has(id):
+		_combo_guard_knockback_scale[id] = 1.0
+	if not _combo_guard_stagger_scale.has(id):
+		_combo_guard_stagger_scale[id] = 1.0
 
 func reset_racer(racer: WildDashCharacterController) -> void:
 	if racer == null:
@@ -69,6 +88,25 @@ func reset_racer(racer: WildDashCharacterController) -> void:
 	_stun_immunity[id] = 0.0
 	_break_vulnerability[id] = 0.0
 	_since_hit[id] = 999.0
+
+func configure_survival_assist(
+	racer: WildDashCharacterController,
+	incoming_knockback_scale: float = 1.0,
+	stagger_recovery_scale: float = 1.0,
+	combo_guard_seconds: float = 0.0,
+	combo_guard_knockback_scale: float = 1.0,
+	combo_guard_stagger_scale: float = 1.0,
+) -> void:
+	if racer == null or not is_instance_valid(racer):
+		return
+	var id := racer.get_instance_id()
+	if not _racers.has(id):
+		register_racer(racer)
+	_incoming_knockback_scale[id] = clampf(incoming_knockback_scale, 0.35, 1.25)
+	_stagger_recovery_scale[id] = clampf(stagger_recovery_scale, 0.50, 2.0)
+	_combo_guard_seconds[id] = clampf(combo_guard_seconds, 0.0, 1.2)
+	_combo_guard_knockback_scale[id] = clampf(combo_guard_knockback_scale, 0.30, 1.0)
+	_combo_guard_stagger_scale[id] = clampf(combo_guard_stagger_scale, 0.50, 1.0)
 
 func _physics_process(delta: float) -> void:
 	var stale: Array[int] = []
@@ -87,6 +125,7 @@ func _physics_process(delta: float) -> void:
 		if float(_since_hit[id]) >= STAGGER_RECOVERY_DELAY and float(_stagger.get(id, 0.0)) > 0.0:
 			var stability := WildDashRaceCombatProfile.get_stability(racer.animal_id)
 			var recovery_per_second := lerpf(9.0, 17.0, clampf(stability / 10.0, 0.0, 1.0))
+			recovery_per_second *= float(_stagger_recovery_scale.get(id, 1.0))
 			_stagger[id] = maxf(0.0, float(_stagger[id]) - recovery_per_second * delta)
 	for id in stale:
 		_racers.erase(id)
@@ -98,6 +137,11 @@ func _physics_process(delta: float) -> void:
 		_break_vulnerability.erase(id)
 		_since_hit.erase(id)
 		_break_count.erase(id)
+		_incoming_knockback_scale.erase(id)
+		_stagger_recovery_scale.erase(id)
+		_combo_guard_seconds.erase(id)
+		_combo_guard_knockback_scale.erase(id)
+		_combo_guard_stagger_scale.erase(id)
 
 func can_attack(racer: WildDashCharacterController) -> bool:
 	if racer == null:
@@ -174,6 +218,8 @@ func apply_hit(
 		"stagger_knockback_scale": 1.0,
 		"back_attack": false,
 		"stomp": kind == &"stomp",
+		"survival_assist": false,
+		"combo_guard": false,
 	}
 	if source == null or target == null or source == target:
 		return result
@@ -183,6 +229,8 @@ func apply_hit(
 	if planar.length_squared() <= 0.001:
 		return result
 
+	var target_id := target.get_instance_id()
+	var previous_hit_age := float(_since_hit.get(target_id, 999.0))
 	var source_profile := WildDashRaceCombatProfile.get_profile(source.animal_id)
 	var target_profile := WildDashRaceCombatProfile.get_profile(target.animal_id)
 	var power := float(source_profile.get("attack_power", 5.0))
@@ -252,7 +300,6 @@ func apply_hit(
 
 	# Smash-style pressure curve: the more stagger a target is already carrying,
 	# the farther the next successful hit launches them.
-	var target_id := target.get_instance_id()
 	var stagger_before := float(_stagger.get(target_id, 0.0))
 	var stagger_ratio := clampf(stagger_before / MAX_STAGGER, 0.0, 1.0)
 	var stagger_knockback_scale := lerpf(1.0, 1.72, pow(stagger_ratio, 1.35))
@@ -266,6 +313,18 @@ func apply_hit(
 		knockback *= BREAK_FINISHER_KNOCKBACK
 		_break_vulnerability[target_id] = 0.0
 		result["finisher"] = true
+
+	# Optional survival assist applies to incoming damage only. It never changes
+	# the attacker's Power, outgoing knockback, Back Attack or Stomp bonuses.
+	var incoming_scale := float(_incoming_knockback_scale.get(target_id, 1.0))
+	knockback *= incoming_scale
+	var guard_seconds := float(_combo_guard_seconds.get(target_id, 0.0))
+	var combo_guard_active := guard_seconds > 0.0 and previous_hit_age <= guard_seconds
+	if combo_guard_active:
+		knockback *= float(_combo_guard_knockback_scale.get(target_id, 1.0))
+		stagger_gain *= float(_combo_guard_stagger_scale.get(target_id, 1.0))
+	result["survival_assist"] = incoming_scale < 0.999 or guard_seconds > 0.0
+	result["combo_guard"] = combo_guard_active
 
 	var launch_direction := planar.normalized()
 	if directional != 0 and kind != &"stomp":
@@ -320,8 +379,8 @@ func apply_hit(
 	hit_resolved.emit(source, target, result.duplicate(true))
 	if broke:
 		stagger_break.emit(source, target, result.duplicate(true))
-		print("WILD RUMBLE BREAK source=%s target=%s power=%.1f defense=%.1f stagger_gain=%.1f kb_scale=%.2f back=%s stomp=%s stun=%.2f" % [
-			source.get_display_name(), target.get_display_name(), power, target_defense, stagger_gain, stagger_knockback_scale, str(back_attack), str(kind == &"stomp"), stun_seconds,
+		print("WILD RUMBLE BREAK source=%s target=%s power=%.1f defense=%.1f stagger_gain=%.1f kb_scale=%.2f back=%s stomp=%s combo_guard=%s stun=%.2f" % [
+			source.get_display_name(), target.get_display_name(), power, target_defense, stagger_gain, stagger_knockback_scale, str(back_attack), str(kind == &"stomp"), str(combo_guard_active), stun_seconds,
 		])
 	return result
 
