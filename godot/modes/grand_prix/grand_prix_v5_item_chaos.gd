@@ -39,8 +39,8 @@ func _spawn_item_boxes() -> void:
 		var pose: Dictionary = _sample_route_by_distance_progress(station_progress, cumulative, total_distance)
 		if pose.is_empty():
 			continue
-		var point: Vector3 = pose.get("position", Vector3.ZERO) as Vector3
-		var tangent: Vector3 = pose.get("tangent", Vector3.FORWARD) as Vector3
+		var point: Vector3 = pose.get("position", Vector3.ZERO)
+		var tangent: Vector3 = pose.get("tangent", Vector3.FORWARD)
 		var right: Vector3 = Vector3(-tangent.z, 0.0, tangent.x)
 		var lane_offsets: Array[float] = ITEM_BOX_WIDE_LANE_OFFSETS if _is_wide_station(station_progress) else ITEM_BOX_LANE_OFFSETS
 		for lane_offset: float in lane_offsets:
@@ -103,12 +103,14 @@ func _sample_route_by_distance_progress(
 	if _route_points.size() < 2 or cumulative.size() != _route_points.size():
 		return {}
 	var target_distance: float = clampf(progress, 0.0, 1.0) * total_distance
-	var segment_index: int = 0
+	var segment_index: int = _route_points.size() - 2
+	var found_segment: bool = false
 	for i: int in range(1, cumulative.size()):
 		if cumulative[i] >= target_distance:
 			segment_index = i - 1
+			found_segment = true
 			break
-	else:
+	if not found_segment:
 		segment_index = _route_points.size() - 2
 	var start_distance: float = cumulative[segment_index]
 	var end_distance: float = cumulative[segment_index + 1]
