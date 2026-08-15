@@ -1,1 +1,0 @@
-Do not claim graphical PASS until Godot 4.7.1 manual Character Select playtest is completed.
