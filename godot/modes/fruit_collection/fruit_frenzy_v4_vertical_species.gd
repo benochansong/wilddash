@@ -1,9 +1,10 @@
 extends "res://modes/fruit_collection/fruit_frenzy_v3_ai_dispersion.gd"
 
-## Round 2 V4: vertical collection + species terrain identity.
+## Round 2 V4.1: vertical collection + species terrain identity + river fruit.
 ## Keeps the existing Harvest Heist loop but turns Climb/Agility/Swim into
 ## visible route choices rather than selection-screen-only numbers.
 
+const WATER_FRUIT_INDICES: Array[int] = [14, 15]
 const LOW_FRUIT_INDICES: Array[int] = [16, 17, 18]
 const HIGH_FRUIT_INDICES: Array[int] = [19, 20, 21]
 const TREE_FRUIT_INDICES: Array[int] = [22, 23]
@@ -13,6 +14,10 @@ const ORCHARD_TREE_CENTERS: Array[Vector3] = [
 	Vector3(-20.0, 0.0, -11.0), Vector3(-15.0, 0.0, -11.0), Vector3(-10.0, 0.0, -11.0),
 ]
 
+const WATER_FRUIT_POSITIONS: Array[Vector3] = [
+	Vector3(11.0, 0.46, -14.8),
+	Vector3(18.2, 0.46, -13.2),
+]
 const LOW_FRUIT_POSITIONS: Array[Vector3] = [
 	Vector3(9.0, 1.70, 9.0),
 	Vector3(-20.0, 1.65, 18.5),
@@ -30,14 +35,14 @@ const TREE_FRUIT_POSITIONS: Array[Vector3] = [
 
 var _terrain_state_by_id: Dictionary = {}
 var _access_denied_reported: Dictionary = {}
-var _climb_assist_cooldown := 0.0
+var _climb_assist_cooldown: float = 0.0
 
 func _ready() -> void:
 	await super()
 	_configure_vertical_fruit_metadata()
-	for i in range(fruits.size()):
+	for i: int in range(fruits.size()):
 		fruits[i].position = _fruit_position(i, fruit_cycles[i] if i < fruit_cycles.size() else 0)
-	print("FRUIT FRENZY V4 VERTICAL READY distribution=GROUND_16 LOW_3 HIGH_3 TREE_2 percentages=66.7/12.5/12.5/8.3 water_traits=true full_roster_ai=true")
+	print("FRUIT FRENZY V4.1 VERTICAL READY distribution=GROUND_14 WATER_2 LOW_3 HIGH_3 TREE_2 percentages=58.3/8.3/12.5/12.5/8.3 crocodile_river_route=true water_traits=true full_roster_ai=true")
 
 func _physics_process(delta: float) -> void:
 	super(delta)
@@ -52,14 +57,14 @@ func _spawn_field() -> void:
 	player = spawn_racer("Player", &"dog", Vector3(0.0, 0.15, 19.0), true, WildDashCharacterController.MovementMode.ARENA)
 	_register_racer_state(player)
 
-	var animals := WildDashAnimalCatalog.playable_ids()
+	var animals: Array[StringName] = WildDashAnimalCatalog.playable_ids()
 	var total_ai: int = GameManager.ai_count
-	for i in range(total_ai):
+	for i: int in range(total_ai):
 		var angle: float = TAU * float(i) / maxf(1.0, float(total_ai))
 		var radius: float = 10.0 + float(i % 3) * 3.4
-		var spawn := Vector3(cos(angle) * radius, 0.15, sin(angle) * radius)
-		var animal := animals[i % animals.size()]
-		var racer := spawn_racer(
+		var spawn: Vector3 = Vector3(cos(angle) * radius, 0.15, sin(angle) * radius)
+		var animal: StringName = animals[i % animals.size()]
+		var racer: WildDashCharacterController = spawn_racer(
 			"AI_%02d" % (i + 1),
 			animal,
 			spawn,
@@ -73,9 +78,9 @@ func _spawn_field() -> void:
 		ai_base_target_speeds.append(base_target_speed)
 
 	ai_scores.resize(ai_racers.size())
-	for i in range(ai_scores.size()):
+	for i: int in range(ai_scores.size()):
 		ai_scores[i] = 0
-	print("FRUIT FRENZY FIELD V4 total=%d ai=%d roster=12 crocodile=true" % [racers.size(), ai_racers.size()])
+	print("FRUIT FRENZY FIELD V4.1 total=%d ai=%d roster=12 crocodile=true river_fruit=2" % [racers.size(), ai_racers.size()])
 
 func _build_vertical_collection_geometry() -> void:
 	# Low platforms: readable stepping targets that most animals can reach.
@@ -100,6 +105,8 @@ func _create_branch_set(prefix: String, center: Vector3, scale_factor: float) ->
 	create_box(prefix + "HighBranch", center + Vector3(0.65, 3.75 * scale_factor, -0.25), Vector3(2.2, 0.24, 0.9), Color(0.32, 0.17, 0.065), true)
 
 func _fruit_position(index: int, cycle: int) -> Vector3:
+	if WATER_FRUIT_INDICES.has(index):
+		return WATER_FRUIT_POSITIONS[WATER_FRUIT_INDICES.find(index)]
 	if LOW_FRUIT_INDICES.has(index):
 		return LOW_FRUIT_POSITIONS[LOW_FRUIT_INDICES.find(index)]
 	if HIGH_FRUIT_INDICES.has(index):
@@ -109,12 +116,12 @@ func _fruit_position(index: int, cycle: int) -> Vector3:
 	return super(index, cycle)
 
 func _configure_vertical_fruit_metadata() -> void:
-	for i in range(fruits.size()):
-		var fruit := fruits[i]
+	for i: int in range(fruits.size()):
+		var fruit: MeshInstance3D = fruits[i]
 		if TREE_FRUIT_INDICES.has(i):
-			var tree_slot := TREE_FRUIT_INDICES.find(i)
-			var tier := 2 if tree_slot == 0 else 3
-			var required_climb := 8.5 if tier == 2 else 9.5
+			var tree_slot: int = TREE_FRUIT_INDICES.find(i)
+			var tier: int = 2 if tree_slot == 0 else 3
+			var required_climb: float = 8.5 if tier == 2 else 9.5
 			WildDashFruitAccessSystem.configure_fruit(fruit, WildDashFruitAccessSystem.FruitAccessType.TREE, required_climb, 7.5, tier)
 			fruit.set_meta(&"wilddash_preferred_traits", [&"climb", &"agility"])
 		elif HIGH_FRUIT_INDICES.has(i):
@@ -122,24 +129,28 @@ func _configure_vertical_fruit_metadata() -> void:
 			fruit.set_meta(&"wilddash_preferred_traits", [&"agility", &"climb"])
 		elif LOW_FRUIT_INDICES.has(i):
 			WildDashFruitAccessSystem.configure_fruit(fruit, WildDashFruitAccessSystem.FruitAccessType.LOW_PLATFORM, 5.5, 6.0, 0)
+		elif WATER_FRUIT_INDICES.has(i):
+			WildDashFruitAccessSystem.configure_fruit(fruit, WildDashFruitAccessSystem.FruitAccessType.WATER)
+			fruit.set_meta(&"wilddash_preferred_traits", [&"swim"])
+			fruit.set_meta(&"wilddash_river_fruit", true)
 		else:
 			WildDashFruitAccessSystem.configure_fruit(fruit, WildDashFruitAccessSystem.FruitAccessType.GROUND)
 
 func _try_pickup_regular_fruit(racer: WildDashCharacterController) -> void:
 	var radius: float = racer.get_interaction_radius(FRUIT_PICKUP_RADIUS)
-	var radius_sq := radius * radius
-	for i in range(fruits.size()):
+	var radius_sq: float = radius * radius
+	for i: int in range(fruits.size()):
 		if not fruit_active[i]:
 			continue
 		if racer.global_position.distance_squared_to(fruits[i].global_position) > radius_sq:
 			continue
 		if not WildDashFruitAccessSystem.can_racer_reach_fruit(racer, fruits[i]):
 			if racer.is_player:
-				var report_key := "%s:%d" % [String(racer.animal_id), i]
+				var report_key: String = "%s:%d" % [String(racer.animal_id), i]
 				if not _access_denied_reported.has(report_key):
 					_access_denied_reported[report_key] = true
-					var access_name := WildDashFruitAccessSystem.get_access_name(fruits[i])
-					var reason := WildDashFruitAccessSystem.access_reason(racer, fruits[i])
+					var access_name: String = WildDashFruitAccessSystem.get_access_name(fruits[i])
+					var reason: String = WildDashFruitAccessSystem.access_reason(racer, fruits[i])
 					hud.set_message("%s FRUIT · %s" % [access_name, reason.replace("_", " ")])
 					print("FRUIT ACCESS DENIED animal=%s access=%s reason=%s" % [String(racer.animal_id), access_name, reason])
 			return
@@ -147,37 +158,53 @@ func _try_pickup_regular_fruit(racer: WildDashCharacterController) -> void:
 			if racer.is_player:
 				hud.set_message("BAG FULL · BANK BEFORE PICKING %s" % String(fruit_types[i]).to_upper())
 			return
-		if racer.is_player and WildDashFruitAccessSystem.get_access_type(fruits[i]) != WildDashFruitAccessSystem.FruitAccessType.GROUND:
+		var access_type: int = WildDashFruitAccessSystem.get_access_type(fruits[i])
+		if racer.is_player and access_type != WildDashFruitAccessSystem.FruitAccessType.GROUND:
 			print("FRUIT ACCESS animal=%s access=%s result=true" % [String(racer.animal_id), WildDashFruitAccessSystem.get_access_name(fruits[i])])
+			if access_type == WildDashFruitAccessSystem.FruitAccessType.WATER and racer.animal_id == &"crocodile":
+				hud.set_message("RIVER FRUIT! · CROCODILE WATER ROUTE")
 		_collect_regular_fruit(racer, i)
 		return
 
 func _best_regular_fruit_index_for_ai(racer: WildDashCharacterController, ai_index: int, claims: Dictionary) -> int:
-	var best_index := -1
-	var best_score := INF
-	var home_zone := int(_ai_home_zone_by_id.get(racer.get_instance_id(), ai_index % 4))
-	for fruit_index in range(fruits.size()):
+	var best_index: int = -1
+	var best_score: float = INF
+	var home_zone: int = int(_ai_home_zone_by_id.get(racer.get_instance_id(), ai_index % 4))
+	for fruit_index: int in range(fruits.size()):
 		if claims.has(fruit_index):
 			continue
 		if not fruit_active[fruit_index] or not _can_carry_value(racer, fruit_values[fruit_index]):
 			continue
 		if not WildDashFruitAccessSystem.can_racer_reach_fruit(racer, fruits[fruit_index]):
 			continue
-		var score := racer.global_position.distance_squared_to(fruits[fruit_index].global_position)
-		if fruit_index < 16 and fruit_index % 4 != home_zone:
+		var access_type: int = WildDashFruitAccessSystem.get_access_type(fruits[fruit_index])
+		var score: float = racer.global_position.distance_squared_to(fruits[fruit_index].global_position)
+		if access_type == WildDashFruitAccessSystem.FruitAccessType.GROUND and fruit_index < 16 and fruit_index % 4 != home_zone:
 			score += HOME_ZONE_BIAS
-		var access_type := WildDashFruitAccessSystem.get_access_type(fruits[fruit_index])
+		if access_type == WildDashFruitAccessSystem.FruitAccessType.WATER:
+			var swim: float = WildDashAnimalAbilityProfile.get_stat(racer.animal_id, &"swim")
+			score -= swim * 2.6
 		match racer.animal_id:
 			&"monkey":
-				if access_type == WildDashFruitAccessSystem.FruitAccessType.TREE: score -= 42.0
+				if access_type == WildDashFruitAccessSystem.FruitAccessType.TREE:
+					score -= 42.0
 			&"cat":
-				if access_type in [WildDashFruitAccessSystem.FruitAccessType.TREE, WildDashFruitAccessSystem.FruitAccessType.HIGH_PLATFORM]: score -= 28.0
+				if access_type in [WildDashFruitAccessSystem.FruitAccessType.TREE, WildDashFruitAccessSystem.FruitAccessType.HIGH_PLATFORM]:
+					score -= 28.0
 			&"rabbit", &"deer":
-				if access_type == WildDashFruitAccessSystem.FruitAccessType.HIGH_PLATFORM: score -= 26.0
-			&"crocodile", &"raccoon", &"bear":
-				if _is_river_position(fruits[fruit_index].global_position): score -= 34.0
+				if access_type == WildDashFruitAccessSystem.FruitAccessType.HIGH_PLATFORM:
+					score -= 26.0
+			&"crocodile":
+				if access_type == WildDashFruitAccessSystem.FruitAccessType.WATER:
+					score -= 44.0
+				elif _is_river_position(fruits[fruit_index].global_position):
+					score -= 34.0
+			&"raccoon", &"bear":
+				if _is_river_position(fruits[fruit_index].global_position):
+					score -= 28.0
 			&"elephant", &"boar":
-				if access_type == WildDashFruitAccessSystem.FruitAccessType.GROUND: score -= 18.0
+				if access_type == WildDashFruitAccessSystem.FruitAccessType.GROUND:
+					score -= 18.0
 		score += float((fruit_index * 7 + ai_index * 11) % 9) * 0.17
 		if score < best_score:
 			best_score = score
@@ -189,13 +216,13 @@ func _update_speed_profiles() -> void:
 	for racer: WildDashCharacterController in racers:
 		if racer == null:
 			continue
-		var in_water := _is_river_position(racer.global_position)
-		var terrain := WildDashTerrainAbilitySystem.TERRAIN_WATER if in_water else WildDashTerrainAbilitySystem.TERRAIN_LAND
+		var in_water: bool = _is_river_position(racer.global_position)
+		var terrain: StringName = WildDashTerrainAbilitySystem.TERRAIN_WATER if in_water else WildDashTerrainAbilitySystem.TERRAIN_LAND
 		if in_water:
-			var scale := WildDashTerrainAbilitySystem.get_terrain_speed_multiplier(racer.animal_id, terrain)
+			var scale: float = WildDashTerrainAbilitySystem.get_terrain_speed_multiplier(racer.animal_id, terrain)
 			racer.arena_move_speed *= scale
-		var id := racer.get_instance_id()
-		var previous := StringName(_terrain_state_by_id.get(id, &""))
+		var id: int = racer.get_instance_id()
+		var previous: StringName = StringName(_terrain_state_by_id.get(id, &""))
 		if previous != terrain:
 			_terrain_state_by_id[id] = terrain
 			if racer.is_player or racer.animal_id == &"crocodile":
@@ -203,10 +230,10 @@ func _update_speed_profiles() -> void:
 					String(racer.animal_id), String(terrain), WildDashTerrainAbilitySystem.get_terrain_speed_multiplier(racer.animal_id, terrain),
 				])
 
-	for i in range(ai_drivers.size()):
+	for i: int in range(ai_drivers.size()):
 		if i >= ai_racers.size():
 			continue
-		var racer := ai_racers[i]
+		var racer: WildDashCharacterController = ai_racers[i]
 		if racer != null and _is_river_position(racer.global_position):
 			ai_drivers[i].target_speed *= WildDashTerrainAbilitySystem.get_terrain_speed_multiplier(racer.animal_id, WildDashTerrainAbilitySystem.TERRAIN_WATER)
 
@@ -218,18 +245,18 @@ func _update_player_climb_assist() -> void:
 		return
 	if not Input.is_action_pressed(&"jump"):
 		return
-	var climb := WildDashAnimalAbilityProfile.get_stat(player.animal_id, &"climb")
+	var climb: float = WildDashAnimalAbilityProfile.get_stat(player.animal_id, &"climb")
 	if climb < 7.0:
 		return
-	var near_tree := false
-	for center in ORCHARD_TREE_CENTERS:
-		var planar := Vector2(player.global_position.x - center.x, player.global_position.z - center.z)
+	var near_tree: bool = false
+	for center: Vector3 in ORCHARD_TREE_CENTERS:
+		var planar: Vector2 = Vector2(player.global_position.x - center.x, player.global_position.z - center.z)
 		if planar.length() <= 2.7 and player.global_position.y <= 5.8:
 			near_tree = true
 			break
 	if not near_tree:
 		return
-	var assist := 4.2 + (climb - 7.0) * 0.55
+	var assist: float = 4.2 + (climb - 7.0) * 0.55
 	if player.animal_id == &"monkey":
 		assist += 1.0
 	elif player.animal_id == &"cat":
