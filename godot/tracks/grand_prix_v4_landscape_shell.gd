@@ -1,12 +1,16 @@
 class_name WildDashGrandPrixV4LandscapeShell
 extends Node3D
 
-## Round 1 V4.0 mid/far landscape shell.
+## Round 1 V4.3 mid/far landscape shell.
 ##
 ## V3.9 owns playable/collidable terrain. This node only fills the camera-facing
 ## mid/far field with low-poly biome terrain. Each route segment contributes two
 ## disconnected side wedges, then wedges are batched by biome. Nothing here adds
 ## guardrails, invisible walls, or gameplay collision.
+##
+## V4.3 adds route-clearance clamping: on tight mountain switchbacks a far wedge
+## may not extend through a different nearby route corridor. This keeps scenery
+## visible without letting a huge visual-only polygon cover the chase camera.
 
 const SECTION_IDS: Array[StringName] = [
 	&"meadow_start",
@@ -22,6 +26,11 @@ const SECTION_IDS: Array[StringName] = [
 
 const SEGMENT_OVERLAP: float = 0.85
 const MID_DISTANCE_RATIO: float = 0.52
+const ROUTE_CLEARANCE_BUFFER: float = 12.0
+const ROUTE_CLEARANCE_ALONG: float = 32.0
+const ROUTE_CLEARANCE_VERTICAL: float = 20.0
+const ROUTE_INDEX_SKIP_RADIUS: int = 5
+const MIN_FAR_BAND_DEPTH: float = 7.0
 
 var _track: WildDashGrandPrixV2Track
 var _route: Array[Vector3] = []
@@ -29,6 +38,7 @@ var _playable_land: Node
 var _landscape_root: Node3D
 var _section_mesh_count: int = 0
 var _triangle_count: int = 0
+var _route_clearance_clamps: int = 0
 
 func _ready() -> void:
 	process_priority = 129
@@ -48,7 +58,7 @@ func _build_when_ready() -> void:
 	_playable_land = _find_named_recursive(get_parent(), "V36ContinuousLand")
 
 	_landscape_root = Node3D.new()
-	_landscape_root.name = "V40BiomeLandscapeShell"
+	_landscape_root.name = "V43BiomeLandscapeShell"
 	add_child(_landscape_root)
 
 	for section_id: StringName in SECTION_IDS:
@@ -58,9 +68,10 @@ func _build_when_ready() -> void:
 		_add_section_visual(section_id, mesh)
 		_section_mesh_count += 1
 
-	print("GRAND PRIX V4.0 LANDSCAPE SHELL READY section_meshes=%d triangles=%d collision=false guardrail=false near_field_owner=V39ContinuousLand water_reentry_preserved=true full_round_sky_fill=true" % [
+	print("GRAND PRIX V4.3 LANDSCAPE SHELL READY section_meshes=%d triangles=%d collision=false route_clearance_clamps=%d guardrail=false water_reentry_preserved=true camera_corridor_safe=true" % [
 		_section_mesh_count,
 		_triangle_count,
+		_route_clearance_clamps,
 	])
 
 func _build_section_mesh(section_id: StringName) -> ArrayMesh:
@@ -105,18 +116,32 @@ func _append_segment_landscape(
 
 	var playable_width: float = _playable_width(section_id)
 	var start_offset: float = maxf(4.0, playable_width + _inner_offset(section_id))
-	var far_offset: float = maxf(start_offset + 8.0, _far_width(section_id))
-	var mid_offset: float = lerpf(start_offset, far_offset, MID_DISTANCE_RATIO)
-	var profile: Vector3 = _height_profile(section_id)
-	var variation: float = _height_variation(section_id)
-	var side_phase: float = 0.9 if side > 0.0 else 2.1
-	var wave0: float = sin(float(segment_index) * 0.53 + side_phase) * variation
-	var wave1: float = sin(float(segment_index + 1) * 0.53 + side_phase) * variation
-
+	var desired_far_offset: float = maxf(start_offset + 8.0, _far_width(section_id))
 	var edge0: Vector3 = _track.get_v2_shoulder_edge_point(segment_index, side)
 	var edge1: Vector3 = _track.get_v2_shoulder_edge_point(segment_index + 1, side)
 	edge0 -= tangent_planar * SEGMENT_OVERLAP
 	edge1 += tangent_planar * SEGMENT_OVERLAP
+
+	var far_offset: float = _camera_safe_far_offset(
+		segment_index,
+		edge0.lerp(edge1, 0.5),
+		outward,
+		tangent_planar,
+		start_offset,
+		desired_far_offset
+	)
+	var mid_offset: float = lerpf(start_offset, far_offset, MID_DISTANCE_RATIO)
+	var profile: Vector3 = _height_profile(section_id)
+	var available_depth: float = maxf(0.1, far_offset - start_offset)
+	var desired_depth: float = maxf(0.1, desired_far_offset - start_offset)
+	var clearance_scale: float = clampf(available_depth / desired_depth, 0.28, 1.0)
+	profile.y *= lerpf(0.55, 1.0, clearance_scale)
+	profile.z *= clearance_scale
+
+	var variation: float = _height_variation(section_id) * clearance_scale
+	var side_phase: float = 0.9 if side > 0.0 else 2.1
+	var wave0: float = sin(float(segment_index) * 0.53 + side_phase) * variation
+	var wave1: float = sin(float(segment_index + 1) * 0.53 + side_phase) * variation
 
 	var inner0: Vector3 = edge0 + outward * start_offset + Vector3.UP * profile.x
 	var mid0: Vector3 = edge0 + outward * mid_offset + Vector3.UP * (profile.y + wave0 * 0.45)
@@ -140,6 +165,36 @@ func _append_segment_landscape(
 		base + 1, base + 2, base + 4,
 		base + 2, base + 5, base + 4,
 	]))
+
+func _camera_safe_far_offset(
+	segment_index: int,
+	edge_mid: Vector3,
+	outward: Vector3,
+	tangent: Vector3,
+	start_offset: float,
+	desired_far: float
+) -> float:
+	var safe_far: float = desired_far
+	for other_index: int in range(_route.size()):
+		if absi(other_index - segment_index) <= ROUTE_INDEX_SKIP_RADIUS:
+			continue
+		var delta: Vector3 = _route[other_index] - edge_mid
+		if absf(delta.y) > ROUTE_CLEARANCE_VERTICAL:
+			continue
+		var along: float = delta.dot(tangent)
+		if absf(along) > ROUTE_CLEARANCE_ALONG:
+			continue
+		var outward_distance: float = delta.dot(outward)
+		if outward_distance <= start_offset + 2.0:
+			continue
+		if outward_distance >= safe_far + ROUTE_CLEARANCE_BUFFER:
+			continue
+		var candidate: float = maxf(start_offset + MIN_FAR_BAND_DEPTH, outward_distance - ROUTE_CLEARANCE_BUFFER)
+		if candidate < safe_far - 0.1:
+			safe_far = candidate
+	if safe_far < desired_far - 0.1:
+		_route_clearance_clamps += 1
+	return safe_far
 
 func _playable_width(section_id: StringName) -> float:
 	if _playable_land != null and _playable_land.has_method("get_land_width_for_section"):
