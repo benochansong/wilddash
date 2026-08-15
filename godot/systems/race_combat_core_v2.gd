@@ -34,7 +34,7 @@ func get_last_command() -> Dictionary:
 func get_player_profile() -> Dictionary:
 	_resolve_player()
 	if _racer == null:
-		return WildDashRaceCombatProfile.DEFAULT_PROFILE.duplicate(true)
+		return WildDashRaceCombatProfile.get_default_profile()
 	return WildDashRaceCombatProfile.get_profile(_racer.animal_id)
 
 func get_player_profile_text() -> String:
