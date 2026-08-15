@@ -2,7 +2,7 @@ extends SceneTree
 
 const ANIMALS: Array[StringName] = [
 	&"dog", &"wolf", &"boar", &"rabbit", &"deer", &"monkey",
-	&"elephant", &"bear", &"panda", &"cat", &"fox", &"raccoon",
+	&"elephant", &"bear", &"crocodile", &"cat", &"fox", &"raccoon",
 ]
 
 func _init() -> void:
@@ -28,11 +28,14 @@ func _init() -> void:
 
 	var elephant: Dictionary = WildDashAnimalSelectionPresentation.get_profile(&"elephant")
 	var bear: Dictionary = WildDashAnimalSelectionPresentation.get_profile(&"bear")
+	var crocodile: Dictionary = WildDashAnimalSelectionPresentation.get_profile(&"crocodile")
 	var cat: Dictionary = WildDashAnimalSelectionPresentation.get_profile(&"cat")
 	if float(elephant["defense"]) != 10.0:
 		failures.append("Elephant lobby Defense must display 10.0")
 	if float(bear["defense"]) != 9.0:
 		failures.append("Bear lobby Defense must display 9.0")
+	if float(crocodile["swim"]) != 10.0 or float(crocodile["power"]) != 8.5:
+		failures.append("Crocodile lobby must display Swim 10.0 and Power 8.5")
 	if float(cat["defense"]) >= float(bear["defense"]):
 		failures.append("lobby must clearly communicate Bear > Cat Defense")
 
@@ -44,7 +47,7 @@ func _init() -> void:
 		failures.append("Cat lobby weakness tags should expose Swim and Defense")
 
 	if failures.is_empty():
-		print("RC9 CHARACTER SELECT STATS PASS animals=12 stats=6 defense=true layout=A")
+		print("RC9 CHARACTER SELECT STATS PASS animals=12 stats=6 defense=true crocodile=true layout=A")
 		quit(0)
 		return
 
