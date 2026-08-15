@@ -41,11 +41,8 @@ static func target_score(
 		if animal_id == &"elephant" and edge_ratio >= 0.72:
 			score -= 24.0
 
-	# Agile/ambush species prefer targets that are not looking at them. Heavy
-	# species care less about facing and simply contest the shortest safe route.
 	if animal_id in [&"cat", &"wolf", &"fox", &"raccoon"] and is_behind_target(source, target):
 		score -= 18.0 if animal_id != &"cat" else 34.0
-
 	return score
 
 static func preferred_attack_kind(
@@ -66,6 +63,8 @@ static func preferred_attack_kind(
 			return &"hold" if is_behind or target_stagger >= 58.0 else &"tap"
 		&"raccoon":
 			return &"hold" if is_behind else &"tap"
+		&"crocodile":
+			return &"hold" if distance <= 3.9 and (target_stagger >= 42.0 or phase_tick % 3 == 0) else &"tap"
 		&"dog":
 			return &"hold" if target_stagger >= 70.0 else &"tap"
 		&"deer", &"fox":
