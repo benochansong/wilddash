@@ -32,7 +32,6 @@ func _on_phase1_combat_action(action: Dictionary) -> void:
 	if player == null or player.animal_id != &"crocodile":
 		super(action)
 		return
-	# Recovery Brake owns F while knockback recovery is active.
 	if _round4_brace_consumed_press or _round4_brace_signal_suppress_remaining > 0.0:
 		return
 	var kind := StringName(action.get("kind", &"tap"))
@@ -82,8 +81,6 @@ func _do_round4_crocodile_tail_sweep() -> void:
 		offset.y = 0.0
 		if offset.length_squared() <= 0.001 or offset.length() > CROCODILE_TAIL_RADIUS:
 			continue
-		# Tail Sweep spends Heavy cooldown but uses Quick damage math so its value is
-		# broad control, not a full-strength multi-target Heavy Smash.
 		var result := _combat_core.apply_hit(player, target, offset, &"tap", 0)
 		if not bool(result.get("applied", false)):
 			continue
@@ -155,7 +152,7 @@ func _try_use_round4_special(source: WildDashCharacterController) -> bool:
 	_round4_special_cooldown_by_id[id] = float(spec.get("cooldown", 6.0))
 	_spawn_round4_cartoon_gas(source, StringName(spec.get("id", &"special")))
 	_apply_round4_special_effect(source, spec)
-	AudioManager.play_sfx_id("skill", 0.74)
+	AudioManager.play_sfx_id("fart", 0.70)
 	if source == player and hud != null:
 		hud.set_message("%s! · Q SPECIAL" % str(spec.get("name", "SPECIAL")))
 	print("ANIMAL SPECIAL animal=%s ability=%s mode=push_out cooldown=%.1f" % [
@@ -248,7 +245,8 @@ func _spawn_round4_cartoon_gas(source: WildDashCharacterController, special_id: 
 		puff.material_override = material
 		puff.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		root.add_child(puff)
-	_expire_round4_effect_node(root, 0.72)
+	var lifetime := 2.0 if special_id == &"stink_cloud" else 0.72
+	_expire_round4_effect_node(root, lifetime)
 
 func _expire_round4_effect_node(node: Node, seconds: float) -> void:
 	await get_tree().create_timer(seconds).timeout
