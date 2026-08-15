@@ -1,9 +1,8 @@
 class_name WildDashAnimalSelectionPresentation
 extends RefCounted
 
-## Presentation adapter for the character-select A-layout.
-## Terrain values come from RaceTerrainProfile and Defense comes from
-## RaceCombatProfile so the lobby always reflects real gameplay tuning.
+## Character-select presentation adapter for the canonical six-stat profile.
+## UI values now come from the same source that terrain/combat adapters consume.
 
 const STAT_ORDER: Array[StringName] = [
 	&"swim", &"climb", &"agility", &"power", &"rough", &"defense",
@@ -28,15 +27,10 @@ const STAT_COLORS: Dictionary = {
 }
 
 static func get_profile(animal_id: StringName) -> Dictionary:
-	var terrain: Dictionary = WildDashRaceTerrainProfile.get_profile(animal_id)
-	return {
-		"swim": float(terrain.get("swim", 5.0)),
-		"climb": float(terrain.get("climb", 5.0)),
-		"agility": float(terrain.get("agility", 5.0)),
-		"power": float(terrain.get("power", 5.0)),
-		"rough": float(terrain.get("rough", 5.0)),
-		"defense": WildDashRaceCombatProfile.get_defense(animal_id),
-	}
+	return WildDashAnimalAbilityProfile.get_profile(animal_id)
+
+static func get_identity(animal_id: StringName) -> String:
+	return WildDashAnimalAbilityProfile.get_identity(animal_id)
 
 static func get_stat_label(stat_id: StringName) -> String:
 	return String(STAT_LABELS.get(stat_id, String(stat_id).capitalize()))
@@ -58,36 +52,10 @@ static func format_tags(stats: Array[StringName]) -> String:
 	return " · ".join(labels)
 
 static func get_recommended_style(animal_id: StringName) -> String:
-	var profile: Dictionary = get_profile(animal_id)
-	var swim: float = float(profile["swim"])
-	var climb: float = float(profile["climb"])
-	var agility: float = float(profile["agility"])
-	var power: float = float(profile["power"])
-	var defense: float = float(profile["defense"])
-	var rough: float = float(profile["rough"])
-
-	if power >= 9.0 and defense >= 8.0:
-		if swim >= 8.0:
-			return "몸싸움으로 길을 열고 강·험로에서 역전하는 헤비 돌파형"
-		return "강한 충돌과 장애물 돌파로 순위를 빼앗는 파워형"
-	if agility >= 9.5 and climb >= 9.0:
-		return "산악 지름길과 장애물 사이를 빠르게 파고드는 테크니컬형"
-	if swim >= 8.0:
-		return "강과 수영 지름길을 적극 활용하는 워터 루트 공략형"
-	if climb >= 8.5:
-		return "오르막과 산악 구간에서 페이스를 유지하는 클라이머형"
-	if agility >= 8.5:
-		return "좁은 길·점프·장애물 회피로 시간을 줄이는 민첩형"
-	if rough >= 8.5:
-		return "진흙·자갈·험로에서 속도 손실을 줄이는 안정형"
-	return "특정 지형에 치우치지 않고 모든 구간을 운영하는 밸런스형"
+	return WildDashAnimalAbilityProfile.get_playstyle(animal_id)
 
 static func has_complete_profile(animal_id: StringName) -> bool:
-	var profile: Dictionary = get_profile(animal_id)
-	for stat_id: StringName in STAT_ORDER:
-		if not profile.has(String(stat_id)):
-			return false
-	return true
+	return WildDashAnimalAbilityProfile.has_complete_profile(animal_id)
 
 static func _ranked_stats(profile: Dictionary, count: int, descending: bool) -> Array[StringName]:
 	var remaining: Array[StringName] = STAT_ORDER.duplicate()
