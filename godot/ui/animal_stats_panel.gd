@@ -1,8 +1,8 @@
 class_name WildDashAnimalStatsPanel
 extends PanelContainer
 
-## Character-select A-layout right-hand detail card.
-## Shows Terrain Adventure affinities plus Combat V2 Defense on one 0-10 scale.
+## Character-select right-hand detail card.
+## Shows the canonical six-stat profile on one 0-10 scale.
 
 const PANEL_WIDTH: float = 410.0
 const PANEL_HEIGHT: float = 830.0
@@ -28,9 +28,9 @@ func show_animal(animal_id: StringName, definition: WildDashAnimalDefinition, ch
 
 	var profile: Dictionary = WildDashAnimalSelectionPresentation.get_profile(animal_id)
 	_name_label.text = definition.display_name.to_upper()
-	_role_label.text = definition.role
+	_role_label.text = WildDashAnimalSelectionPresentation.get_identity(animal_id)
 	_description_label.text = definition.skill_description
-	_context_label.text = "CHIMERA BODY 기준 · 지형/방어 섀시" if chimera_body else "TERRAIN + COMBAT PROFILE"
+	_context_label.text = "CHIMERA BODY 기준 · 6-STAT PROFILE" if chimera_body else "ABILITY + COMBAT PROFILE"
 
 	for stat_id: StringName in WildDashAnimalSelectionPresentation.STAT_ORDER:
 		var value: float = float(profile.get(String(stat_id), 5.0))
@@ -49,7 +49,8 @@ func show_animal(animal_id: StringName, definition: WildDashAnimalDefinition, ch
 
 func _build_panel() -> void:
 	custom_minimum_size = Vector2(PANEL_WIDTH, PANEL_HEIGHT)
-	size = Vector2(PANEL_WIDTH, PANEL_HEIGHT)
+	size_flags_horizontal = Control.SIZE_SHRINK_END
+	size_flags_vertical = Control.SIZE_EXPAND_FILL
 
 	var panel_style := StyleBoxFlat.new()
 	panel_style.bg_color = Color(0.025, 0.045, 0.085, 0.95)
@@ -75,7 +76,7 @@ func _build_panel() -> void:
 	margin.add_child(box)
 
 	_context_label = Label.new()
-	_context_label.text = "TERRAIN + COMBAT PROFILE"
+	_context_label.text = "ABILITY + COMBAT PROFILE"
 	_context_label.add_theme_font_size_override("font_size", 13)
 	_context_label.add_theme_color_override("font_color", Color(0.38, 0.82, 1.0))
 	box.add_child(_context_label)
@@ -87,7 +88,7 @@ func _build_panel() -> void:
 	box.add_child(_name_label)
 
 	_role_label = Label.new()
-	_role_label.text = "Balanced Runner"
+	_role_label.text = "BALANCED RUNNER"
 	_role_label.add_theme_font_size_override("font_size", 17)
 	_role_label.add_theme_color_override("font_color", Color(0.67, 0.77, 0.88))
 	box.add_child(_role_label)
@@ -142,7 +143,7 @@ func _build_panel() -> void:
 	box.add_child(_playstyle_label)
 
 	var footer := Label.new()
-	footer.text = "지형 적성과 방어력은 실제 레이스 밸런스 수치를 반영합니다."
+	footer.text = "6개 능력치는 실제 지형·장애물 돌파·기본 공격·방어 밸런스와 동기화됩니다."
 	footer.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	footer.add_theme_font_size_override("font_size", 12)
 	footer.modulate = Color(0.55, 0.63, 0.73)
