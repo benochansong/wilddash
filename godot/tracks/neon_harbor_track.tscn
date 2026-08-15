@@ -1,10 +1,6 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=2 format=3]
 
-[ext_resource type="Script" path="res://tracks/neon_harbor_track.gd" id="1_track"]
-[ext_resource type="Script" path="res://tracks/neon_harbor_shortcut_safety.gd" id="2_safety"]
+[ext_resource type="Script" path="res://tracks/neon_harbor_ground_circuit.gd" id="1_track"]
 
 [node name="NeonHarborTrack" type="Node3D"]
 script = ExtResource("1_track")
-
-[node name="ShortcutSafety" type="Node3D" parent="."]
-script = ExtResource("2_safety")
