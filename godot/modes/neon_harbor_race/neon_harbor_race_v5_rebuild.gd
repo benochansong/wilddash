@@ -34,6 +34,14 @@ func _ready() -> void:
 	super._ready()
 	call_deferred("_bootstrap_v5")
 
+func _configure_night_sun() -> void:
+	# The inherited mode calls this old compatibility hook before it instantiates
+	# the track. Hide that blue night key light; WildTideDaylightTrack owns the
+	# authoritative warm sun and WorldEnvironment.
+	var legacy_sun: DirectionalLight3D = get_node_or_null("Sun") as DirectionalLight3D
+	if legacy_sun != null:
+		legacy_sun.visible = false
+
 func _bootstrap_v5() -> void:
 	for _attempt: int in range(90):
 		_route_network = get_node_or_null("WildTideRouteNetwork") as WildDashWildTideRouteNetwork
