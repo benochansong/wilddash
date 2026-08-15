@@ -95,7 +95,8 @@ func _update_phase1_ai(delta: float) -> void:
 			continue
 		var power := WildDashRaceCombatProfile.get_attack_power(racer.animal_id)
 		var target_stagger := _combat_core.get_stagger(target)
-		var heavy_window := power >= 8.5 and (target_stagger >= 48.0 or ((Time.get_ticks_msec() / 900 + i) % 3 == 0))
+		var phase_tick := int(Time.get_ticks_msec() / 900)
+		var heavy_window := power >= 8.5 and (target_stagger >= 48.0 or ((phase_tick + i) % 3 == 0))
 		var kind: StringName = &"hold" if heavy_window else &"tap"
 		if offset.length() > _combat_core.get_attack_radius(kind):
 			continue
