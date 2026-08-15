@@ -111,8 +111,11 @@ func _physics_process(delta: float) -> void:
 		query.exclude = [owner_racer.get_rid()]
 	var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(query)
 	if not hit.is_empty():
-		var hit_position: Vector3 = hit["position"]
-		global_position = hit_position
+		var hit_value: Variant = hit.get("position", next_position)
+		if hit_value is Vector3:
+			global_position = hit_value
+		else:
+			global_position = next_position
 		_explode()
 		return
 
@@ -186,23 +189,45 @@ func _explode() -> void:
 	if _exploded:
 		return
 	_exploded = true
+	_resolve_explosion_environment()
+	var water_impact: bool = explosion_environment == &"water"
 	var hits: int = 0
 	for racer_value: Variant in RaceManager.racers:
 		var racer: WildDashCharacterController = racer_value as WildDashCharacterController
 		if racer == null or racer == owner_racer or not is_instance_valid(racer) or RaceManager.finish_order.has(racer):
 			continue
 		if global_position.distance_to(racer.global_position) <= EXPLOSION_RADIUS:
-			if ItemSystem.apply_attack(racer, owner_racer, &"acorn_bomb", 1.0, 0.74, 4.3):
+			var slow_multiplier: float = 0.78 if water_impact else 0.74
+			var knockback: float = 4.6 if water_impact else 4.3
+			# Use the bomb node as attack source so knockback radiates from the actual
+			# impact point instead of from the thrower's current position.
+			if ItemSystem.apply_attack(racer, self, &"acorn_bomb", 1.0, slow_multiplier, knockback):
 				hits += 1
 
 	_spawn_explosion_fx()
-	AudioManager.play_sfx_id("hit", 1.0)
-	AudioManager.play_sfx_id("item", 0.72)
+	AudioManager.play_sfx_id("bomb_explosion", 1.0)
+	if water_impact:
+		AudioManager.play_sfx_id("splash", 0.92)
+	else:
+		AudioManager.play_sfx_id("hit", 0.82)
 	_try_camera_shake()
-	print("PACK BUSTER EXPLOSION position=%s hits=%d radius=%.1f environment=%s" % [
+	print("PACK BUSTER EXPLOSION position=%s hits=%d radius=%.1f environment=%s radial=true" % [
 		str(global_position), hits, EXPLOSION_RADIUS, String(explosion_environment),
 	])
 	queue_free()
+
+func _resolve_explosion_environment() -> void:
+	if explosion_environment == &"water":
+		return
+	var worlds: Array[Node] = get_tree().get_nodes_in_group("wild_tide_world")
+	for node: Node in worlds:
+		if node == null or not node.has_method("is_position_water"):
+			continue
+		var water_value: Variant = node.call("is_position_water", global_position)
+		if bool(water_value):
+			explosion_environment = &"water"
+			return
+	explosion_environment = &"land"
 
 func _build_visual() -> void:
 	_visual = Node3D.new()
@@ -265,28 +290,30 @@ func _spawn_explosion_fx() -> void:
 	shock.material_override = _make_emissive_material(flash_color.lightened(0.18), 1.8)
 	fx_root.add_child(shock)
 
-	for i: int in range(5):
+	var puff_count: int = 8 if water_impact else 5
+	for i: int in range(puff_count):
 		var puff: MeshInstance3D = MeshInstance3D.new()
 		var puff_mesh: SphereMesh = SphereMesh.new()
 		puff_mesh.radius = 0.38 + float(i % 2) * 0.12
 		puff_mesh.height = puff_mesh.radius * 1.7
 		puff.mesh = puff_mesh
-		var angle: float = float(i) / 5.0 * TAU
-		puff.position = Vector3(cos(angle) * 0.75, 0.15 + float(i % 3) * 0.18, sin(angle) * 0.75)
-		var puff_color: Color = Color(0.16, 0.52, 0.65) if water_impact else Color(0.32, 0.24, 0.18)
-		puff.material_override = _make_emissive_material(puff_color, 0.35)
+		var angle: float = float(i) / float(puff_count) * TAU
+		var radial_distance: float = 1.05 if water_impact else 0.75
+		puff.position = Vector3(cos(angle) * radial_distance, 0.15 + float(i % 3) * 0.18, sin(angle) * radial_distance)
+		var puff_color: Color = Color(0.16, 0.58, 0.76) if water_impact else Color(0.32, 0.24, 0.18)
+		puff.material_override = _make_emissive_material(puff_color, 0.42 if water_impact else 0.35)
 		fx_root.add_child(puff)
 
 	var tween: Tween = fx_root.create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(flash, "scale", Vector3.ONE * 3.3, 0.22)
-	tween.tween_property(shock, "scale", Vector3(5.8, 1.0, 5.8), 0.34)
+	tween.tween_property(flash, "scale", Vector3.ONE * (4.0 if water_impact else 3.3), 0.22)
+	tween.tween_property(shock, "scale", Vector3(6.8, 1.0, 6.8) if water_impact else Vector3(5.8, 1.0, 5.8), 0.34)
 	for child: Node in fx_root.get_children():
 		if child == flash or child == shock or not (child is MeshInstance3D):
 			continue
 		var puff_node: MeshInstance3D = child as MeshInstance3D
 		puff_node.scale = Vector3.ONE * 0.65
-		tween.tween_property(puff_node, "scale", Vector3.ONE * 1.65, 0.38)
+		tween.tween_property(puff_node, "scale", Vector3.ONE * (2.0 if water_impact else 1.65), 0.38)
 	tween.chain().tween_callback(Callable(fx_root, "queue_free"))
 
 func _make_emissive_material(color: Color, energy: float) -> StandardMaterial3D:
