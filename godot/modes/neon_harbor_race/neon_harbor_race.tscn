@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=3]
+[gd_scene load_steps=17 format=3]
 
 [ext_resource type="Script" path="res://modes/neon_harbor_race/neon_harbor_race_v5_rebuild.gd" id="1_mode"]
 [ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="3_feel"]
@@ -7,14 +7,15 @@
 [ext_resource type="Script" path="res://systems/elephant_trunk_lunge_controller.gd" id="9_lunge"]
 [ext_resource type="Script" path="res://systems/race_combat_core_v3_power.gd" id="10_combat_v3"]
 [ext_resource type="Script" path="res://systems/bear_combat_v2_controller.gd" id="11_bear_combat"]
-[ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_world_controller.gd" id="12_world"]
+[ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_world_controller_v3_visual_gameplay.gd" id="12_world"]
 [ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_canopy_controller.gd" id="13_canopy"]
 [ext_resource type="Script" path="res://modes/neon_harbor_race/mangrove_titan_controller.gd" id="14_titan"]
 [ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_breakthrough_route.gd" id="15_breakthrough"]
 [ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_respawn_guard.gd" id="16_respawn"]
 [ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_route_network.gd" id="17_routes"]
-[ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_route_guidance.gd" id="18_guidance"]
+[ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_route_guidance_v2.gd" id="18_guidance"]
 [ext_resource type="Script" path="res://systems/race_combat_ai_director_aggressive.gd" id="19_combat_ai"]
+[ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_jump_guard.gd" id="20_jump_guard"]
 
 [node name="NeonHarborRace" type="Node3D"]
 script = ExtResource("1_mode")
@@ -47,6 +48,9 @@ script = ExtResource("5_items")
 
 [node name="WildTideWorldController" type="Node3D" parent="."]
 script = ExtResource("12_world")
+
+[node name="WildTideJumpGuard" type="Node" parent="."]
+script = ExtResource("20_jump_guard")
 
 [node name="WildTideCanopyController" type="Node3D" parent="."]
 script = ExtResource("13_canopy")
