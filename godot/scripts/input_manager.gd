@@ -55,19 +55,38 @@ func _physics_process(delta: float) -> void:
 	_update_race_combat_gesture(delta)
 
 func get_steer_axis() -> float:
-	return Input.get_axis(ACTION_LEFT, ACTION_RIGHT)
+	var action_axis := Input.get_axis(ACTION_LEFT, ACTION_RIGHT)
+	var left_physical := Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT)
+	var right_physical := Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT)
+	# Canonical WASD/arrows win when physically held. This prevents stale or
+	# duplicated saved InputMap bindings from cancelling/reversing the axis.
+	if left_physical or right_physical:
+		return float(int(right_physical) - int(left_physical))
+	return action_axis
 
 func get_throttle_axis() -> float:
 	var accelerate_strength: float = Input.get_action_strength(ACTION_ACCELERATE)
 	var brake_strength: float = Input.get_action_strength(ACTION_BRAKE)
-	if Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP):
-		accelerate_strength = maxf(accelerate_strength, 1.0)
-	if Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN):
-		brake_strength = maxf(brake_strength, 1.0)
+	var forward_physical := Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP)
+	var back_physical := Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN)
+	# Same physical-key precedence as steering. Up/W must always mean forward and
+	# Down/S must always mean back even if an old custom binding overlaps them.
+	if forward_physical or back_physical:
+		return float(int(forward_physical) - int(back_physical))
 	return clampf(accelerate_strength - brake_strength, -1.0, 1.0)
 
 func get_move_vector() -> Vector2:
-	return Input.get_vector(ACTION_LEFT, ACTION_RIGHT, ACTION_ACCELERATE, ACTION_BRAKE, 0.2)
+	var move := Input.get_vector(ACTION_LEFT, ACTION_RIGHT, ACTION_ACCELERATE, ACTION_BRAKE, 0.2)
+	var left_physical := Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT)
+	var right_physical := Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT)
+	var forward_physical := Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP)
+	var back_physical := Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN)
+	if left_physical or right_physical:
+		move.x = float(int(right_physical) - int(left_physical))
+	if forward_physical or back_physical:
+		# Godot's arena convention is negative Y = world -Z = screen forward.
+		move.y = float(int(back_physical) - int(forward_physical))
+	return move.limit_length(1.0)
 
 func sample_racer_input_state() -> WildDashRacerInputState:
 	_input_sequence += 1
@@ -89,6 +108,7 @@ func get_input_debug_snapshot() -> Dictionary:
 		"accelerate_action": Input.get_action_strength(ACTION_ACCELERATE),
 		"brake_action": Input.get_action_strength(ACTION_BRAKE),
 		"throttle": get_throttle_axis(),
+		"arena_move": get_move_vector(),
 		"combat_hold_seconds": _race_combat_hold_seconds,
 		"combat_hold_emitted": _race_combat_hold_emitted,
 		"combat_last": _last_race_combat_action.duplicate(true),
