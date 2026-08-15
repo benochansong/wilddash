@@ -1,6 +1,6 @@
 [gd_scene load_steps=18 format=3]
 
-[ext_resource type="Script" path="res://modes/neon_harbor_race/neon_harbor_race_v6_long_water_runtime_verify.gd" id="1_mode"]
+[ext_resource type="Script" path="res://modes/neon_harbor_race/neon_harbor_race_v7_party_items.gd" id="1_mode"]
 [ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="3_feel"]
 [ext_resource type="Script" path="res://items/item_combat_expansion_long_bomb.gd" id="5_items"]
 [ext_resource type="Script" path="res://systems/racing_action_controller.gd" id="8_actions"]
@@ -14,7 +14,7 @@
 [ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_respawn_guard_v2_long_water.gd" id="16_respawn"]
 [ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_route_network_v2_long_water.gd" id="17_routes"]
 [ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_route_guidance_v3_long_water.gd" id="18_guidance"]
-[ext_resource type="Script" path="res://systems/race_combat_ai_director_aggressive.gd" id="19_combat_ai"]
+[ext_resource type="Script" path="res://systems/race_combat_ai_director_party_turbo.gd" id="19_combat_ai"]
 [ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_jump_guard.gd" id="20_jump_guard"]
 [ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_water_visibility_boost.gd" id="21_water_visibility"]
 
