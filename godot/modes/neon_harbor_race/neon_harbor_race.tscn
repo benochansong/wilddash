@@ -1,6 +1,6 @@
 [gd_scene load_steps=18 format=3]
 
-[ext_resource type="Script" path="res://modes/neon_harbor_race/neon_harbor_race_v5_rebuild.gd" id="1_mode"]
+[ext_resource type="Script" path="res://modes/neon_harbor_race/neon_harbor_race_v6_long_water_runtime_verify.gd" id="1_mode"]
 [ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="3_feel"]
 [ext_resource type="Script" path="res://items/item_combat_expansion_long_bomb.gd" id="5_items"]
 [ext_resource type="Script" path="res://systems/racing_action_controller.gd" id="8_actions"]
