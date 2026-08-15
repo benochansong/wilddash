@@ -33,8 +33,7 @@ func _bootstrap() -> void:
 	var route_value: Variant = track.call("get_route_points")
 	if not (route_value is Array):
 		return
-	var route_array: Array = route_value
-	for value: Variant in route_array:
+	for value: Variant in route_value:
 		if value is Vector3:
 			var point: Vector3 = value
 			_route_points.append(point)
