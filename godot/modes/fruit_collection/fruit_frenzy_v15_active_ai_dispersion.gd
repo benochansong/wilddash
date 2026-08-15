@@ -43,7 +43,8 @@ const V15_SCATTER_POINTS: Array[Vector3] = [
 ]
 
 var _v15_activity_elapsed: float = 0.0
-var _v15_last_position_by_id: Dictionary = {}
+var _v15_last_x_by_id: Dictionary = {}
+var _v15_last_z_by_id: Dictionary = {}
 var _v15_idle_seconds_by_id: Dictionary = {}
 var _v15_avoid_fruit_until: Dictionary = {}
 var _v15_watchdog_replans: int = 0
@@ -55,7 +56,8 @@ func _ready() -> void:
 		if racer == null:
 			continue
 		var id: int = racer.get_instance_id()
-		_v15_last_position_by_id[id] = racer.global_position
+		_v15_last_x_by_id[id] = racer.global_position.x
+		_v15_last_z_by_id[id] = racer.global_position.z
 		_v15_idle_seconds_by_id[id] = 0.0
 	print("FRUIT FRENZY V15 ACTIVE AI READY idle_replan=%.2fs crowd_radius=%.1fm separation=%.1fm combat_normal=%.1fm combat_hunter=%.1fm sector_preference=6" % [
 		V15_IDLE_REPLAN_SECONDS,
@@ -117,10 +119,9 @@ func _v12_best_collect_target(
 			best_score = score
 			best_index = fruit_index
 
-	# If every statistically reachable fruit is on a short per-racer avoid list,
-	# fall back to V12 rather than leaving the driver without a destination.
-	if best_index < 0:
-		return super(racer, ai_index, claims, sector_counts)
+	# If every candidate is temporarily avoided after a stall, return no fruit.
+	# The V12 planner will use its fallback zone target, which keeps this racer
+	# moving instead of immediately re-selecting the same bad vertical target.
 	return best_index
 
 func _v12_local_combat_target(
@@ -134,7 +135,7 @@ func _v12_local_combat_target(
 	var effective_range: float = minf(max_range, V15_HUNTER_COMBAT_RANGE if hunter else V15_NORMAL_COMBAT_RANGE)
 	var minimum_carry: int = 2 if hunter else 3
 	var max_range_sq: float = effective_range * effective_range
-	var best: WildDashCharacterController
+	var best: WildDashCharacterController = null
 	var best_score: float = -INF
 
 	for target: WildDashCharacterController in racers:
@@ -198,22 +199,21 @@ func _v15_update_activity_watchdog(sample_seconds: float) -> void:
 		var id: int = racer.get_instance_id()
 		var canopy: WildDashCanopyTraversalSystem = _phase3_ai_canopy_by_id.get(id, null) as WildDashCanopyTraversalSystem
 		if canopy != null and canopy.is_swinging():
-			_v15_last_position_by_id[id] = racer.global_position
+			_v15_store_activity_position(id, racer)
 			_v15_idle_seconds_by_id[id] = 0.0
 			moving_count += 1
 			continue
 		if _is_stunned(racer):
-			_v15_last_position_by_id[id] = racer.global_position
+			_v15_store_activity_position(id, racer)
 			_v15_idle_seconds_by_id[id] = 0.0
 			continue
 
-		var previous_value: Variant = _v15_last_position_by_id.get(id, racer.global_position)
-		var previous: Vector3 = previous_value as Vector3
-		var moved: float = Vector2(
-			racer.global_position.x - previous.x,
-			racer.global_position.z - previous.z
-		).length()
-		_v15_last_position_by_id[id] = racer.global_position
+		var previous_x: float = float(_v15_last_x_by_id.get(id, racer.global_position.x))
+		var previous_z: float = float(_v15_last_z_by_id.get(id, racer.global_position.z))
+		var dx: float = racer.global_position.x - previous_x
+		var dz: float = racer.global_position.z - previous_z
+		var moved: float = sqrt(dx * dx + dz * dz)
+		_v15_store_activity_position(id, racer)
 
 		var intent: StringName = StringName(_v12_intent_by_id.get(id, V12_INTENT_COLLECT))
 		var idle_seconds: float = float(_v15_idle_seconds_by_id.get(id, 0.0))
@@ -269,8 +269,9 @@ func _v15_recover_idle_ai(
 	direction.y = 0.0
 	if direction.length_squared() > 0.01:
 		direction = direction.normalized()
-		racer.velocity.x = direction.x * maxf(2.8, racer.arena_move_speed * 0.34)
-		racer.velocity.z = direction.z * maxf(2.8, racer.arena_move_speed * 0.34)
+		var wake_speed: float = maxf(2.8, racer.arena_move_speed * 0.34)
+		racer.velocity.x = direction.x * wake_speed
+		racer.velocity.z = direction.z * wake_speed
 		racer.current_speed = Vector2(racer.velocity.x, racer.velocity.z).length()
 
 	_v15_watchdog_replans += 1
@@ -282,6 +283,10 @@ func _v15_recover_idle_ai(
 		str(scatter),
 		V15_STALLED_FRUIT_AVOID_MSEC,
 	])
+
+func _v15_store_activity_position(id: int, racer: WildDashCharacterController) -> void:
+	_v15_last_x_by_id[id] = racer.global_position.x
+	_v15_last_z_by_id[id] = racer.global_position.z
 
 func _v15_is_fruit_temporarily_avoided(racer_id: int, fruit_index: int, now_msec: int) -> bool:
 	var key: String = _v15_avoid_key(racer_id, fruit_index)
