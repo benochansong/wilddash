@@ -10,6 +10,7 @@ const TURBO_MAX_GAP: float = 40.0
 const TURBO_ROUTE_LOOKAHEAD_DEGREES_STRAIGHT: float = 24.0
 const TURBO_ROUTE_LOOKAHEAD_DEGREES_MODERATE: float = 50.0
 const TURBO_OPEN_WATER_PROGRESS_MIN: float = 82.0
+const TURBO_NO_TARGET_DISTANCE: float = 100000.0
 
 func _try_utility_item(
 	racer: WildDashCharacterController,
@@ -28,7 +29,8 @@ func _try_utility_item(
 	var trailing_half: bool = rank > ceili(float(maxi(1, total)) * 0.5)
 	var max_hold_release: bool = age >= ITEM_MAX_HOLD_SECONDS
 	var gap: float = ItemSystem.get_nearest_racer_ahead_distance(racer, 48.0)
-	var useful_gap: bool = is_finite(gap) and gap >= TURBO_MIN_GAP and gap <= TURBO_MAX_GAP
+	var has_gap_target: bool = gap < TURBO_NO_TARGET_DISTANCE
+	var useful_gap: bool = has_gap_target and gap >= TURBO_MIN_GAP and gap <= TURBO_MAX_GAP
 	var progress_percent: float = RaceManager.get_progress_percent(racer)
 	var open_water: bool = (
 		round_id == &"neon_harbor_race"
@@ -72,7 +74,7 @@ func _try_utility_item(
 	print("AI ITEM animal=%s item=WILD_TURBO rank=%d gap=%s route=%s turn=%.1f progress=%.1f decision=CATCH_UP open_water=%s" % [
 		String(racer.animal_id),
 		rank,
-		"INF" if not is_finite(gap) else "%.1f" % gap,
+		"INF" if not has_gap_target else "%.1f" % gap,
 		route_band,
 		turn_angle,
 		progress_percent,
