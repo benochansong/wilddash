@@ -35,35 +35,35 @@ const DEFAULT_PROFILE: Dictionary = {
 }
 
 const IDENTITIES: Dictionary = {
-	&"dog": "BALANCED RUNNER",
-	&"wolf": "SPEED HUNTER",
-	&"boar": "OFFROAD BRUISER",
-	&"rabbit": "JUMP SPECIALIST",
-	&"deer": "MOUNTAIN RACER",
+	&"dog": "BALANCED FIGHTER",
+	&"wolf": "HUNTER",
+	&"boar": "CHARGE BRUISER",
+	&"rabbit": "AERIAL FIGHTER",
+	&"deer": "LEAP DUELIST",
 	&"monkey": "CANOPY TRICKSTER",
-	&"elephant": "HEAVY TANK",
-	&"bear": "ALL-TERRAIN BRUISER",
+	&"elephant": "PUSH KING",
+	&"bear": "CLOSE RANGE BRAWLER",
 	&"panda": "STABLE HEAVY",
 	&"crocodile": "WATER BRUISER",
-	&"cat": "PRECISION RACER",
-	&"fox": "BURST RACER",
-	&"raccoon": "UTILITY EXPLORER",
+	&"cat": "AMBUSH SPECIALIST",
+	&"fox": "HIT & RUN",
+	&"raccoon": "THIEF / CONTROL",
 }
 
 const PLAYSTYLES: Dictionary = {
-	&"dog": "모든 지형에서 큰 약점 없이 운영하는 초보자 친화적 올라운더.",
-	&"wolf": "산악과 직선 추격에서 강한 공격적 고속 레이서.",
-	&"boar": "진흙·잔디·눈을 버티며 장애물을 뚫고 전진하는 돌파형.",
-	&"rabbit": "장애물을 정면으로 상대하기보다 점프와 지름길로 시간을 줄이는 도약형.",
-	&"deer": "산악과 기술 구간에서 속도를 잃지 않는 레이스 중심 캐릭터.",
-	&"monkey": "Climb 10과 Agility 10을 살려 나무·가지·덩굴을 연속 이동하고 Swing Kick과 Stomp로 과일을 강탈하는 Canopy Trickster.",
-	&"elephant": "충돌을 피하지 않고 상대를 밀어내며 정면 돌파하는 최대 중량 Tank.",
-	&"bear": "다양한 자연 지형과 물에서 강하고 몸싸움까지 가능한 Heavy All-Terrain 캐릭터.",
+	&"dog": "넓고 단순한 Shoulder Push와 Running Tackle을 쓰는 초보자 친화적 밸런스 파이터.",
+	&"wolf": "도망가거나 등을 보이는 상대를 Lunge와 Rear Pounce로 추격하는 Hunter.",
+	&"boar": "높은 Power와 Rough를 살린 Headbutt와 Boar Charge로 정면을 뚫는 Charge Bruiser.",
+	&"rabbit": "높은 점프와 Chain Stomp를 이어가며 정면 힘싸움 대신 공중에서 Stagger를 쌓는 Aerial Fighter.",
+	&"deer": "이동 Momentum을 Antler Rush와 Hoof Drop으로 바꾸는 전진형 Leap Duelist.",
+	&"monkey": "Climb 10과 Agility 10을 살려 나무·가지·덩굴을 연속 이동하고 Swing Kick과 Stomp로 공격하는 Canopy Trickster.",
+	&"elephant": "Power 10과 Defense 10으로 Trunk Push와 Ground Stomp를 사용해 상대를 가장자리로 밀어내는 Push King.",
+	&"bear": "Paw Swipe, Body Slam, Belly Drop과 Heavy Gas로 근거리 난전을 장악하는 Close Range Brawler.",
 	&"panda": "향후 확장 캐릭터용으로 보존된 안정적인 Heavy 캐릭터.",
-	&"crocodile": "육지에서는 묵직하지만 물에 들어가면 최고 속도로 돌진하고 강한 Bite를 쓰는 Water Bruiser.",
-	&"cat": "좁은 길과 높은 지형을 정확하게 공략하는 고난도 Precision 캐릭터.",
-	&"fox": "Cat보다 정밀 회전은 낮지만 직선 Burst와 추월 성능이 높은 캐릭터.",
-	&"raccoon": "물·험로·수집 모드를 자유롭게 돌아다니는 고기동 Utility 캐릭터.",
+	&"crocodile": "물에서는 최고 수준의 이동과 Water Ambush를 쓰고 육지에서는 Bite Lunge와 Tail Sweep으로 버티는 Water Bruiser.",
+	&"cat": "정면 공격은 약하지만 Pounce와 Back Attack 보너스로 치고 빠지는 Ambush Specialist.",
+	&"fox": "Dash Hit과 Feint Strike 뒤 빠르게 거리를 다시 벌리는 Hit & Run 캐릭터.",
+	&"raccoon": "Stink Cloud로 상대를 느리게 만들고 뒤에서 과일을 직접 훔칠 수 있는 Thief / Control 캐릭터.",
 }
 
 static func get_profile(animal_id: StringName) -> Dictionary:
@@ -74,7 +74,7 @@ static func get_stat(animal_id: StringName, stat_id: StringName) -> float:
 	return clampf(float(get_profile(animal_id).get(String(stat_id), 5.0)), 0.0, 10.0)
 
 static func get_identity(animal_id: StringName) -> String:
-	return String(IDENTITIES.get(animal_id, "BALANCED RUNNER"))
+	return String(IDENTITIES.get(animal_id, "BALANCED FIGHTER"))
 
 static func get_playstyle(animal_id: StringName) -> String:
 	return String(PLAYSTYLES.get(animal_id, "특정 능력에 치우치지 않고 상황에 맞춰 운영하는 밸런스형."))
