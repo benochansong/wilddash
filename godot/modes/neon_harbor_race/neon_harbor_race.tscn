@@ -1,4 +1,4 @@
-[gd_scene load_steps=17 format=3]
+[gd_scene load_steps=18 format=3]
 
 [ext_resource type="Script" path="res://modes/neon_harbor_race/neon_harbor_race_v5_rebuild.gd" id="1_mode"]
 [ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="3_feel"]
@@ -16,6 +16,7 @@
 [ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_route_guidance_v2.gd" id="18_guidance"]
 [ext_resource type="Script" path="res://systems/race_combat_ai_director_aggressive.gd" id="19_combat_ai"]
 [ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_jump_guard.gd" id="20_jump_guard"]
+[ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_water_visibility_boost.gd" id="21_water_visibility"]
 
 [node name="NeonHarborRace" type="Node3D"]
 script = ExtResource("1_mode")
@@ -51,6 +52,9 @@ script = ExtResource("12_world")
 
 [node name="WildTideJumpGuard" type="Node" parent="."]
 script = ExtResource("20_jump_guard")
+
+[node name="WildTideWaterVisibilityBoost" type="Node" parent="."]
+script = ExtResource("21_water_visibility")
 
 [node name="WildTideCanopyController" type="Node3D" parent="."]
 script = ExtResource("13_canopy")
