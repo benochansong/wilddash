@@ -53,7 +53,8 @@ func _physics_process(delta: float) -> void:
 
 	if target_racer != null and is_instance_valid(target_racer) and not RaceManager.finish_order.has(target_racer):
 		if global_position.distance_to(target_racer.global_position + Vector3.UP * 0.6) <= 1.35:
-			_resolve_hit(target_racer)
+			if target_racer is WildDashCharacterController:
+				_resolve_hit(target_racer as WildDashCharacterController)
 
 func _on_body_entered(body: Node) -> void:
 	if body is WildDashCharacterController:
