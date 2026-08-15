@@ -153,7 +153,7 @@ func _load_external_theme(theme_id: String, path: String) -> void:
 		return
 	_set_stream_loop(stream, true)
 	_themes[theme_id] = stream
-	print("AUDIO external theme loaded id=%s path=%s" % [theme_id, path])
+	print("AUDIO external theme loaded id=%s path=%s" % theme_id)
 
 func _set_stream_loop(stream: AudioStream, loop: bool) -> void:
 	if stream is AudioStreamOggVorbis:
@@ -179,6 +179,7 @@ func _build_procedural_audio() -> void:
 	_sfx_library["item"] = _make_tone(880.0, 0.10, 0.26)
 	_sfx_library["hit"] = _make_sweep(180.0, 95.0, 0.09, 0.30)
 	_sfx_library["finish"] = _make_sweep(440.0, 880.0, 0.22, 0.34)
+	_sfx_library["fart"] = _make_cartoon_fart()
 
 func _make_theme(frequencies: Array, duration: float, amplitude: float) -> AudioStreamWAV:
 	var sample_rate := 22050
@@ -217,6 +218,30 @@ func _make_sweep(start_frequency: float, end_frequency: float, duration: float, 
 		phase += TAU * frequency / float(sample_rate)
 		var envelope := 1.0 - ratio
 		_write_sample_16(data, i, sin(phase) * amplitude * envelope)
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = sample_rate
+	stream.stereo = false
+	stream.data = data
+	return stream
+
+func _make_cartoon_fart() -> AudioStreamWAV:
+	# Deliberately synthetic/clean: a tiny low buzz + pitch wobble. This keeps the
+	# gag readable without adding external assets or creating a realistic sound.
+	var sample_rate := 22050
+	var duration := 0.22
+	var sample_count := maxi(1, int(duration * float(sample_rate)))
+	var data := PackedByteArray()
+	data.resize(sample_count * 2)
+	var phase := 0.0
+	for i in range(sample_count):
+		var ratio := float(i) / float(sample_count)
+		var wobble := sin(TAU * 17.0 * ratio) * 18.0
+		var frequency := lerpf(128.0, 72.0, ratio) + wobble
+		phase += TAU * frequency / float(sample_rate)
+		var envelope := pow(1.0 - ratio, 1.35)
+		var sample := (sin(phase) * 0.22 + sin(phase * 0.47) * 0.10) * envelope
+		_write_sample_16(data, i, sample)
 	var stream := AudioStreamWAV.new()
 	stream.format = AudioStreamWAV.FORMAT_16_BITS
 	stream.mix_rate = sample_rate
