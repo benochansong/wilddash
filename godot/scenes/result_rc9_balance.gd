@@ -3,7 +3,7 @@ extends "res://scenes/result.gd"
 ## RC9 result rules aligned with the active campaign contracts.
 ## Round 2 uses an explicit 8-point bank target and performance grades.
 ## Round 4 Titan Crown reports placement/finalist/champion instead of the retired
-## `rivals_remaining` Push Out summary.
+## `rivals_remaining` Push Out summary. Round 5 TIDAL CLASH uses race placement.
 
 func _calculate_campaign_score() -> int:
 	var total: int = 0
@@ -16,7 +16,7 @@ func _calculate_campaign_score() -> int:
 		var details_value: Variant = entry.get("details", {})
 		var details: Dictionary = details_value as Dictionary if typeof(details_value) == TYPE_DICTIONARY else {}
 		match mode_id:
-			&"grand_prix", &"neon_harbor_race", &"snowpeak_winter_rally":
+			&"grand_prix", &"neon_harbor_race", &"snowpeak_winter_rally", &"tidal_clash":
 				var rank: int = int(details.get("rank", raw_score))
 				var racers: int = maxi(1, int(details.get("racers", GameManager.ai_count + 1)))
 				if rank > 0 and rank <= racers:
@@ -68,4 +68,8 @@ func _format_round_result(entry: Dictionary) -> String:
 			var finalist: bool = bool(details.get("finalist", placement <= 3))
 			var accolade: String = "TITAN CHAMPION" if champion else ("FINALIST" if finalist else "ELIMINATED")
 			return "WILD RUMBLE   ·   #%d / %d   ·   %s   ·   %s" % [placement, racers, accolade, status]
+		&"tidal_clash":
+			return "TIDAL CLASH   ·   #%d / %d   ·   100%% WATER BATTLE RACE   ·   %s" % [
+				int(details.get("rank", raw_score)), int(details.get("racers", GameManager.ai_count + 1)), status,
+			]
 	return super._format_round_result(entry)

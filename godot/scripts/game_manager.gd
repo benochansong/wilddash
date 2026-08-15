@@ -16,20 +16,21 @@ enum GameState {
 	RESULT,
 }
 
-# RC9 campaign scope is intentionally four rounds for now. Snowpeak remains in
-# the repository as dormant work, but it is no longer loaded or counted by the
-# active campaign until Round 4 Wild Rumble is finished to production quality.
+# RC9 campaign now carries five production rounds. Snowpeak remains dormant and
+# Round 5 TIDAL CLASH follows the existing Round 4 arena without changing RC8.
 const ROUND_IDS: Array[StringName] = [
 	&"grand_prix",
 	&"fruit_collection",
 	&"neon_harbor_race",
 	&"push_out",
+	&"tidal_clash",
 ]
 const ROUND_SCENES: Array[String] = [
 	"res://modes/grand_prix/grand_prix.tscn",
 	"res://modes/fruit_collection/fruit_collection.tscn",
 	"res://modes/neon_harbor_race/neon_harbor_race.tscn",
 	"res://modes/push_out/push_out.tscn",
+	"res://modes/tidal_clash/tidal_clash.tscn",
 ]
 const LOBBY_SCENE := "res://scenes/lobby.tscn"
 const CHARACTER_SELECT_SCENE := "res://scenes/character_select.tscn"
@@ -171,10 +172,13 @@ func begin_round(mode_id: StringName) -> void:
 			set_state(GameState.ARENA)
 			print("RC_FLOW Floor Collapse Free Play")
 		&"push_out":
-			# Round 4 is the current campaign finale. Use FINAL so presentation,
-			# audio routing and end-of-run semantics all agree with the four-round scope.
+			# Keep the existing Round 4 arena state/presentation unchanged. The
+			# campaign transition now continues to Round 5 instead of Result.
 			set_state(GameState.FINAL)
 			print("RC_FLOW Round 4 Wild Rumble FINAL")
+		&"tidal_clash":
+			set_state(GameState.RACE)
+			print("RC_FLOW Round 5 TIDAL CLASH")
 		_:
 			set_state(GameState.ARENA)
 	round_changed.emit(current_round_index, mode_id)
