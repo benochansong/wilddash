@@ -1,45 +1,39 @@
 class_name WildDashWildTideCanopyController
 extends Node3D
 
-## Round 3 adapter for the proven deterministic Monkey canopy traversal.
-## Vines cross the mangrove route rather than replacing checkpoints, so a swing
-## is a mobility/attack shortcut while race progress remains authoritative.
+## Round 3 adapter for the deterministic Monkey canopy system.
+## Vines now connect authored gameplay-tree anchors instead of floating above the
+## centerline route. Checkpoint progress remains owned by the ground route.
 
-const GRAB_DISTANCE: float = 3.6
+const GRAB_DISTANCE: float = 4.0
 const SWING_ATTACK_RADIUS: float = 3.8
-const AI_GRAB_DISTANCE: float = 3.0
-const AI_RETRY_SECONDS: float = 1.1
+const AI_GRAB_DISTANCE: float = 3.7
+const AI_RETRY_SECONDS: float = 1.0
+const REQUIRED_ANCHORS: int = 5
 
 var _routes: Array[WildDashCanopyVineRoute] = []
 var _systems_by_racer: Dictionary = {}
 var _ai_retry_by_racer: Dictionary = {}
-var _route_points: Array[Vector3] = []
+var _anchors: Array[Marker3D] = []
 var _bootstrapped: bool = false
 
 func _ready() -> void:
 	call_deferred("_bootstrap")
 
 func _bootstrap() -> void:
-	var track: Node = null
-	for _attempt: int in range(40):
-		var parent_node: Node = get_parent()
-		if parent_node != null:
-			track = parent_node.get_node_or_null("NeonHarborWorldTrack")
-		if track != null and track.has_method("get_route_points"):
+	for _attempt: int in range(90):
+		_collect_anchors()
+		if _anchors.size() >= REQUIRED_ANCHORS:
 			break
 		await get_tree().physics_frame
-	if track == null or not track.has_method("get_route_points"):
-		return
-	var route_value: Variant = track.call("get_route_points")
-	if route_value is Array:
-		for value: Variant in route_value:
-			if value is Vector3:
-				_route_points.append(value)
-	if _route_points.size() < 14:
+	if _anchors.size() < REQUIRED_ANCHORS:
+		push_warning("WILD TIDE CANOPY missing gameplay-tree anchors count=%d" % _anchors.size())
 		return
 	_build_vines()
 	_bootstrapped = true
-	print("WILD TIDE CANOPY READY vines=%d monkey_arc_traversal=true checkpoint_safe=true" % _routes.size())
+	print("WILD TIDE CANOPY READY vines=%d anchors=%d gameplay_tree_linked=true monkey_arc_traversal=true checkpoint_safe=true" % [
+		_routes.size(), _anchors.size(),
+	])
 
 func _physics_process(delta: float) -> void:
 	if not _bootstrapped or not RaceManager.active:
@@ -67,57 +61,76 @@ func _physics_process(delta: float) -> void:
 		else:
 			_try_ai_grab(racer, traversal)
 
+func get_anchor_ground_positions() -> Array[Vector3]:
+	var result: Array[Vector3] = []
+	for anchor: Marker3D in _anchors:
+		if anchor == null or not is_instance_valid(anchor):
+			continue
+		result.append(Vector3(anchor.global_position.x, 0.1, anchor.global_position.z))
+	return result
+
+func _collect_anchors() -> void:
+	_anchors.clear()
+	for node: Node in get_tree().get_nodes_in_group("wild_tide_canopy_anchor"):
+		var anchor: Marker3D = node as Marker3D
+		if anchor != null:
+			_anchors.append(anchor)
+	_anchors.sort_custom(_sort_anchor)
+
+func _sort_anchor(a: Marker3D, b: Marker3D) -> bool:
+	var a_value: Variant = a.get_meta(&"wild_tide_canopy_index", 0)
+	var b_value: Variant = b.get_meta(&"wild_tide_canopy_index", 0)
+	return int(a_value) < int(b_value)
+
 func _build_vines() -> void:
-	var specs: Array[Dictionary] = [
-		{"a": 9, "b": 10, "height": 4.8, "drop": 2.25, "speed": 11.0},
-		{"a": 10, "b": 11, "height": 5.3, "drop": 2.55, "speed": 11.4},
-		{"a": 11, "b": 12, "height": 5.8, "drop": 2.80, "speed": 11.8},
-		{"a": 12, "b": 13, "height": 6.2, "drop": 3.10, "speed": 12.1},
-	]
-	for i: int in range(specs.size()):
-		var spec: Dictionary = specs[i]
-		var a_index: int = int(spec.get("a", 9))
-		var b_index: int = int(spec.get("b", 10))
-		var height: float = float(spec.get("height", 5.0))
+	_routes.clear()
+	var vine_count: int = mini(4, _anchors.size() - 1)
+	for index: int in range(vine_count):
+		var start_anchor: Marker3D = _anchors[index]
+		var end_anchor: Marker3D = _anchors[index + 1]
 		var route: WildDashCanopyVineRoute = WildDashCanopyVineRoute.new()
+		var drop: float = 2.1 + float(index) * 0.22
+		var speed: float = 11.0 + float(index) * 0.35
 		route.configure(
-			StringName("wild_tide_vine_%d" % i),
-			_route_points[a_index] + Vector3.UP * height,
-			_route_points[b_index] + Vector3.UP * height,
-			float(spec.get("drop", 2.4)),
-			float(spec.get("speed", 11.0)),
+			StringName("wild_tide_vine_%d" % index),
+			start_anchor.global_position,
+			end_anchor.global_position,
+			drop,
+			speed,
 			4.6
 		)
 		_routes.append(route)
-		_build_rope_visual(route, i)
+		_build_rope_visual(route, index)
 
 func _build_rope_visual(route: WildDashCanopyVineRoute, index: int) -> void:
 	var root: Node3D = Node3D.new()
 	root.name = "WildTideVineVisual_%02d" % index
 	add_child(root)
 	var material: StandardMaterial3D = StandardMaterial3D.new()
-	material.albedo_color = Color(0.25, 0.14, 0.055)
+	material.albedo_color = Color(0.34, 0.18, 0.055)
 	material.roughness = 0.92
 	material.emission_enabled = true
-	material.emission = Color(0.12, 0.48, 0.16) * 0.24
+	material.emission = Color(0.08, 0.34, 0.10)
+	material.emission_energy_multiplier = 0.18
 	var previous: Vector3 = route.sample(0.0)
-	for step: int in range(1, 13):
-		var point: Vector3 = route.sample(float(step) / 12.0)
+	for step: int in range(1, 15):
+		var point: Vector3 = route.sample(float(step) / 14.0)
 		var rope_piece: CSGBox3D = CSGBox3D.new()
 		rope_piece.name = "Rope_%02d" % step
-		rope_piece.size = Vector3(0.10, 0.10, maxf(0.1, previous.distance_to(point)))
+		rope_piece.size = Vector3(0.12, 0.12, maxf(0.1, previous.distance_to(point)))
 		rope_piece.use_collision = false
 		rope_piece.position = previous.lerp(point, 0.5)
 		rope_piece.material = material
-		rope_piece.look_at(point, Vector3.UP)
 		root.add_child(rope_piece)
+		rope_piece.look_at(point, Vector3.UP)
 		previous = point
 
 func _get_system(racer: WildDashCharacterController) -> WildDashCanopyTraversalSystem:
 	var racer_id: int = racer.get_instance_id()
 	var existing: Variant = _systems_by_racer.get(racer_id)
 	if existing is WildDashCanopyTraversalSystem:
-		return existing
+		var traversal_existing: WildDashCanopyTraversalSystem = existing
+		return traversal_existing
 	var traversal: WildDashCanopyTraversalSystem = WildDashCanopyTraversalSystem.new()
 	traversal.set_routes(_routes)
 	_systems_by_racer[racer_id] = traversal
@@ -142,14 +155,14 @@ func _try_ai_grab(racer: WildDashCharacterController, traversal: WildDashCanopyT
 	if float(_ai_retry_by_racer.get(racer_id, 0.0)) > 0.0:
 		return
 	var progress: float = RaceManager.get_progress_percent(racer) / 100.0
-	if progress < 0.32 or progress > 0.58:
+	if progress < 0.34 or progress > 0.61:
 		return
 	var route: WildDashCanopyVineRoute = traversal.find_nearest_vine(racer.global_position, AI_GRAB_DISTANCE)
 	if route == null:
 		return
 	if traversal.grab_vine(racer, route):
 		_ai_retry_by_racer[racer_id] = AI_RETRY_SECONDS
-		print("AI ROUTE animal=monkey route=CANOPY vine=%s score=high" % String(route.vine_id))
+		print("AI ROUTE animal=monkey route=CANOPY vine=%s score=high")
 
 func _perform_swing_kick(racer: WildDashCharacterController, traversal: WildDashCanopyTraversalSystem) -> void:
 	var impact_scale: float = traversal.perform_swing_attack()
