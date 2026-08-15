@@ -5,6 +5,7 @@ const LONG_TRACK_SCENE: PackedScene = preload("res://tracks/neon_harbor_track.ts
 const LONG_TRACK_SCRIPT: Script = preload("res://tracks/wild_tide_long_water_track.gd")
 const MODE_V5_SCRIPT: Script = preload("res://modes/neon_harbor_race/neon_harbor_race_v5_rebuild.gd")
 const MODE_V6_SCRIPT: Script = preload("res://modes/neon_harbor_race/neon_harbor_race_v6_long_water_runtime_verify.gd")
+const MODE_V7_SCRIPT: Script = preload("res://modes/neon_harbor_race/neon_harbor_race_v7_party_items.gd")
 const WORLD_V4_SCRIPT: Script = preload("res://modes/neon_harbor_race/wild_tide_world_controller_v4_long_water.gd")
 const JUMP_GUARD_SCRIPT: Script = preload("res://modes/neon_harbor_race/wild_tide_jump_guard.gd")
 const WATER_VISIBILITY_SCRIPT: Script = preload("res://modes/neon_harbor_race/wild_tide_water_visibility_boost.gd")
@@ -14,15 +15,20 @@ const GUIDANCE_V3_SCRIPT: Script = preload("res://modes/neon_harbor_race/wild_ti
 const TITAN_SCRIPT: Script = preload("res://modes/neon_harbor_race/mangrove_titan_controller.gd")
 const BREAKTHROUGH_SCRIPT: Script = preload("res://modes/neon_harbor_race/wild_tide_breakthrough_route.gd")
 const RESPAWN_V2_SCRIPT: Script = preload("res://modes/neon_harbor_race/wild_tide_respawn_guard_v2_long_water.gd")
+const PARTY_ITEM_SYSTEM_SCRIPT: Script = preload("res://systems/item_system_rc9_party_turbo.gd")
+const PARTY_TURBO_AI_SCRIPT: Script = preload("res://systems/race_combat_ai_director_party_turbo.gd")
+const PARTY_ITEM_BOX_SCRIPT: Script = preload("res://items/item_box.gd")
 
-const EXPECTED_ROUND3_MODE_SCRIPT: String = "res://modes/neon_harbor_race/neon_harbor_race_v6_long_water_runtime_verify.gd"
+const EXPECTED_ROUND3_MODE_SCRIPT: String = "res://modes/neon_harbor_race/neon_harbor_race_v7_party_items.gd"
 const EXPECTED_TRACK_SCRIPT: String = "res://tracks/wild_tide_long_water_track.gd"
+const EXPECTED_ITEM_STATIONS: int = 12
+const EXPECTED_LONG_WATER_ITEM_STATIONS: int = 4
 
 func _ready() -> void:
 	var failures: Array[String] = []
 	if ROUND3_SCENE == null or LONG_TRACK_SCENE == null:
 		failures.append("Round 3 production scene / track scene failed to preload")
-	if LONG_TRACK_SCRIPT == null or MODE_V5_SCRIPT == null or MODE_V6_SCRIPT == null:
+	if LONG_TRACK_SCRIPT == null or MODE_V5_SCRIPT == null or MODE_V6_SCRIPT == null or MODE_V7_SCRIPT == null:
 		failures.append("Wild Tide long-water track/mode scripts failed to preload")
 	if WORLD_V4_SCRIPT == null or JUMP_GUARD_SCRIPT == null or WATER_VISIBILITY_SCRIPT == null:
 		failures.append("Wild Tide long-water world/jump/visibility scripts failed to preload")
@@ -30,6 +36,8 @@ func _ready() -> void:
 		failures.append("Wild Tide long-water route/canopy/guidance scripts failed to preload")
 	if TITAN_SCRIPT == null or BREAKTHROUGH_SCRIPT == null or RESPAWN_V2_SCRIPT == null:
 		failures.append("Wild Tide hazard/safety scripts failed to preload")
+	if PARTY_ITEM_SYSTEM_SCRIPT == null or PARTY_TURBO_AI_SCRIPT == null or PARTY_ITEM_BOX_SCRIPT == null:
+		failures.append("RC9 party item / Wild Turbo scripts failed to preload")
 
 	if ROUND3_SCENE != null:
 		var round3_root: Node = ROUND3_SCENE.instantiate()
@@ -38,7 +46,21 @@ func _ready() -> void:
 		else:
 			var mode_path: String = _script_path(round3_root)
 			if mode_path != EXPECTED_ROUND3_MODE_SCRIPT:
-				failures.append("Round 3 production root is not V6 runtime verifier: %s" % mode_path)
+				failures.append("Round 3 production root is not V7 party-item mode: %s" % mode_path)
+			if not round3_root.has_method("get_round3_item_station_progresses"):
+				failures.append("Round 3 V7 distance-based item station API missing")
+			else:
+				var station_value: Variant = round3_root.call("get_round3_item_station_progresses")
+				if not (station_value is Array):
+					failures.append("Round 3 item station progress API returned invalid data")
+				else:
+					var stations: Array = station_value
+					if stations.size() != EXPECTED_ITEM_STATIONS:
+						failures.append("Round 3 must expose 12 distance-based item stations")
+			if not round3_root.has_method("get_round3_long_water_station_count"):
+				failures.append("Round 3 long-water item station count API missing")
+			elif int(round3_root.call("get_round3_long_water_station_count")) < EXPECTED_LONG_WATER_ITEM_STATIONS:
+				failures.append("Long-water finale must contain at least four item stations")
 			round3_root.free()
 
 	if LONG_TRACK_SCENE != null:
@@ -110,7 +132,7 @@ func _ready() -> void:
 		failures.append("Crocodile Titan-wave resistance missing")
 
 	if failures.is_empty():
-		print("WILD TIDE ROUND3 LONG WATER SMOKE PASS active_chain_v6=true production_track=long_water total=%.1fm added=%.1fm long_water=%.1fm water=%.1f%% shallow=%.1f%% deep=%.1f%% jungle=%.1f%% checkpoints=11 segments_29_35=true jump_guard=true routes=true arrows=true canopy=true titan=true respawn=true pack_buster=true" % [
+		print("WILD TIDE ROUND3 LONG WATER SMOKE PASS active_chain_v7=true production_track=long_water total=%.1fm added=%.1fm long_water=%.1fm water=%.1f%% shallow=%.1f%% deep=%.1f%% jungle=%.1f%% checkpoints=11 segments_29_35=true item_stations=12 long_water_item_stations=4 party_boxes=true wild_turbo=true turbo_ai=true jump_guard=true routes=true arrows=true canopy=true titan=true respawn=true pack_buster=true" % [
 			total_distance,
 			added_distance,
 			long_water_distance,
