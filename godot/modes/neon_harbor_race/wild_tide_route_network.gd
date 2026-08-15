@@ -46,8 +46,7 @@ func _bootstrap() -> void:
 	var route_value: Variant = _track.call("get_route_points")
 	if not (route_value is Array):
 		return
-	var route_array: Array = route_value
-	for value: Variant in route_array:
+	for value: Variant in route_value:
 		if value is Vector3:
 			var point: Vector3 = value
 			_main_route.append(point)
@@ -78,8 +77,7 @@ func get_route(route_id: StringName) -> Array[Vector3]:
 	var value: Variant = _routes.get(route_id)
 	if not (value is Array):
 		return result
-	var source: Array = value
-	for point_value: Variant in source:
+	for point_value: Variant in value:
 		if point_value is Vector3:
 			var point: Vector3 = point_value
 			result.append(point)
@@ -96,7 +94,8 @@ func choose_route(animal_id: StringName, slot: int, populations: Dictionary) -> 
 		if population >= capacity:
 			crowd_penalty += 8.0
 		var affinity: float = _species_affinity(animal_id, candidate)
-		var deterministic_bias: float = float((slot * 13 + int(String(animal_id).hash())) % 17) * 0.035
+		var hash_value: int = absi(String(animal_id).hash())
+		var deterministic_bias: float = float((slot * 13 + hash_value) % 17) * 0.035
 		var score: float = affinity - crowd_penalty + deterministic_bias
 		if score > best_score:
 			best_score = score
@@ -187,7 +186,9 @@ func _get_sorted_canopy_anchors() -> Array[Marker3D]:
 	return anchors
 
 func _sort_anchor(a: Marker3D, b: Marker3D) -> bool:
-	return int(a.get_meta(&"wild_tide_canopy_index", 0)) < int(b.get_meta(&"wild_tide_canopy_index", 0))
+	var a_value: Variant = a.get_meta(&"wild_tide_canopy_index", 0)
+	var b_value: Variant = b.get_meta(&"wild_tide_canopy_index", 0)
+	return int(a_value) < int(b_value)
 
 func _build_offset_branch(
 	source: Array[Vector3],
@@ -218,25 +219,15 @@ func _build_offset_branch(
 func _build_dry_dock_geometry() -> void:
 	var route: Array[Vector3] = get_route(ROUTE_DRY_DOCK)
 	_build_platform_chain(
-		"DryDockBranch",
-		route,
-		DRY_DOCK_START,
-		DRY_DOCK_END,
-		5.3,
-		Color(0.56, 0.47, 0.30),
-		Color(1.0, 0.72, 0.12)
+		"DryDockBranch", route, DRY_DOCK_START, DRY_DOCK_END, 5.3,
+		Color(0.56, 0.47, 0.30), Color(1.0, 0.72, 0.12)
 	)
 
 func _build_elevated_geometry() -> void:
 	var route: Array[Vector3] = get_route(ROUTE_ELEVATED)
 	_build_platform_chain(
-		"ElevatedDockBranch",
-		route,
-		ELEVATED_START,
-		ELEVATED_END,
-		4.6,
-		Color(0.36, 0.39, 0.37),
-		Color(1.0, 0.84, 0.16)
+		"ElevatedDockBranch", route, ELEVATED_START, ELEVATED_END, 4.6,
+		Color(0.36, 0.39, 0.37), Color(1.0, 0.84, 0.16)
 	)
 
 func _build_platform_chain(
@@ -286,10 +277,7 @@ func _build_platform_chain(
 			edge.look_at(b + right * side * (width * 0.5 - 0.16) + Vector3.UP * 0.12, Vector3.UP)
 
 func _build_water_split_beacons() -> void:
-	var points: Array[Vector3] = [
-		_main_route[5],
-		_main_route[17],
-	]
+	var points: Array[Vector3] = [_main_route[5], _main_route[17]]
 	for index: int in range(points.size()):
 		var beacon: CSGCylinder3D = CSGCylinder3D.new()
 		beacon.name = "WaterSplitBeacon_%02d" % index
