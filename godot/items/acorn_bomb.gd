@@ -282,12 +282,12 @@ func _spawn_explosion_fx() -> void:
 	tween.tween_property(flash, "scale", Vector3.ONE * 3.3, 0.22)
 	tween.tween_property(shock, "scale", Vector3(5.8, 1.0, 5.8), 0.34)
 	for child: Node in fx_root.get_children():
-		if child == flash or child == shock or not child is MeshInstance3D:
+		if child == flash or child == shock or not (child is MeshInstance3D):
 			continue
 		var puff_node: MeshInstance3D = child as MeshInstance3D
 		puff_node.scale = Vector3.ONE * 0.65
 		tween.tween_property(puff_node, "scale", Vector3.ONE * 1.65, 0.38)
-	tween.chain().tween_callback(fx_root.queue_free)
+	tween.chain().tween_callback(Callable(fx_root, "queue_free"))
 
 func _make_emissive_material(color: Color, energy: float) -> StandardMaterial3D:
 	var material: StandardMaterial3D = StandardMaterial3D.new()
