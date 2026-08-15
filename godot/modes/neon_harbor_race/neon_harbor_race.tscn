@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://modes/neon_harbor_race/neon_harbor_race_v2_mode.gd" id="1_mode"]
 [ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="3_feel"]
-[ext_resource type="Script" path="res://items/item_combat_expansion_controller.gd" id="5_items"]
+[ext_resource type="Script" path="res://items/item_combat_expansion_long_bomb.gd" id="5_items"]
 [ext_resource type="Script" path="res://systems/racing_action_controller.gd" id="8_actions"]
 [ext_resource type="Script" path="res://systems/elephant_trunk_lunge_controller.gd" id="9_lunge"]
 [ext_resource type="Script" path="res://systems/race_combat_core_v2.gd" id="10_combat_v2"]
