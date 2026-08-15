@@ -40,7 +40,7 @@ const IDENTITIES: Dictionary = {
 	&"boar": "OFFROAD BRUISER",
 	&"rabbit": "JUMP SPECIALIST",
 	&"deer": "MOUNTAIN RACER",
-	&"monkey": "TECHNICAL COLLECTOR",
+	&"monkey": "CANOPY TRICKSTER",
 	&"elephant": "HEAVY TANK",
 	&"bear": "ALL-TERRAIN BRUISER",
 	&"panda": "STABLE HEAVY",
@@ -56,7 +56,7 @@ const PLAYSTYLES: Dictionary = {
 	&"boar": "진흙·잔디·눈을 버티며 장애물을 뚫고 전진하는 돌파형.",
 	&"rabbit": "장애물을 정면으로 상대하기보다 점프와 지름길로 시간을 줄이는 도약형.",
 	&"deer": "산악과 기술 구간에서 속도를 잃지 않는 레이스 중심 캐릭터.",
-	&"monkey": "나무와 높은 지형의 과일을 선점하는 고기동 Technical Collector.",
+	&"monkey": "Climb 10과 Agility 10을 살려 나무·가지·덩굴을 연속 이동하고 Swing Kick과 Stomp로 과일을 강탈하는 Canopy Trickster.",
 	&"elephant": "충돌을 피하지 않고 상대를 밀어내며 정면 돌파하는 최대 중량 Tank.",
 	&"bear": "다양한 자연 지형과 물에서 강하고 몸싸움까지 가능한 Heavy All-Terrain 캐릭터.",
 	&"panda": "향후 확장 캐릭터용으로 보존된 안정적인 Heavy 캐릭터.",
@@ -84,10 +84,10 @@ static func has_complete_profile(animal_id: StringName) -> bool:
 		return false
 	var profile: Dictionary = PROFILES[animal_id]
 	for stat_id: StringName in STAT_ORDER:
-		var key := String(stat_id)
+		var key: String = String(stat_id)
 		if not profile.has(key):
 			return false
-		var value := float(profile[key])
+		var value: float = float(profile[key])
 		if value < 0.0 or value > 10.0:
 			return false
 	return true
