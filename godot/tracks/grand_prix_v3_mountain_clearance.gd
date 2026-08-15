@@ -1,14 +1,17 @@
 class_name WildDashGrandPrixV3MountainClearance
 extends Node
 
-## Grand Prix V3.9 mountain-route clearance pass.
+## Grand Prix V3.10 mountain-route clearance pass.
 ##
 ## V2's wide terrain ribbons can fold across switchbacks and cover the road, so
 ## those legacy ribbons remain suppressed in the tight highland chunks. The
-## authoritative V3.9 Continuous Land now supplies the visible/collidable hill
-## mass itself, so the old V3.4 narrow replacement apron is deliberately gone.
-## This avoids a second overlapping collider while keeping the mountain road
-## visually grounded.
+## authoritative V3.9 Continuous Land supplies the visible/collidable hill mass.
+##
+## V3.10 also removes the newer V4 visual-only landscape bands from mountain and
+## canyon switchbacks. Those meshes have no collision by design and could fold
+## across a nearby road, creating a giant visible wall that racers could drive
+## through. Hiding only those highland bands keeps the playable V3.9 terrain and
+## far skyline dressing while guaranteeing the actual road corridor stays clear.
 
 const TERRAIN_CHUNK_LENGTH: float = 100.0
 const PROBLEM_SECTIONS: Array[StringName] = [
@@ -24,8 +27,10 @@ var _route: Array[Vector3] = []
 var _section_ranges: Dictionary = {}
 var _terrain_shell: Node
 var _grounding_world: Node
+var _landscape_shell: Node
 var _sanitized_chunks: Array[int] = []
 var _backdrop_blockers_hidden: int = 0
+var _v4_ghost_landscape_hidden: int = 0
 
 func _ready() -> void:
 	process_priority = 127
@@ -42,15 +47,18 @@ func _configure_when_ready() -> void:
 	_section_ranges = _track.get_v2_section_ranges()
 	_terrain_shell = _find_named_recursive(get_parent(), "V2TerrainShell")
 	_grounding_world = _find_named_recursive(get_parent(), "V2GroundingWorld")
+	_landscape_shell = _find_named_recursive(get_parent(), "V4LandscapeShell")
 	if _route.size() < 2 or _section_ranges.is_empty():
 		push_warning("GrandPrixV3MountainClearance: route/section data unavailable")
 		return
 
 	var chunk_ranges: Array[Vector2i] = _build_chunk_ranges()
 	_sanitize_problem_chunks(chunk_ranges)
-	print("GRAND PRIX V3.9 MOUNTAIN CLEARANCE READY chunks=%s legacy_wide_terrain_hidden=true duplicate_apron_collision=false authoritative_embankment=V39ContinuousLand backdrop_blockers_hidden=%d camera_occlusion_source_reduced=true" % [
+	await _hide_v4_switchback_landscape_when_ready()
+	print("GRAND PRIX V3.10 MOUNTAIN CLEARANCE READY chunks=%s legacy_wide_terrain_hidden=true duplicate_apron_collision=false authoritative_embankment=V39ContinuousLand backdrop_blockers_hidden=%d v4_ghost_landscape_hidden=%d road_corridor_clear=true" % [
 		str(_sanitized_chunks),
 		_backdrop_blockers_hidden,
+		_v4_ghost_landscape_hidden,
 	])
 
 func _build_chunk_ranges() -> Array[Vector2i]:
@@ -155,6 +163,23 @@ func _hide_backdrop_recursive(root: Node) -> void:
 			_backdrop_blockers_hidden += 1
 			continue
 		_hide_backdrop_recursive(child)
+
+func _hide_v4_switchback_landscape_when_ready() -> void:
+	# V4LandscapeShell builds a few frames after this controller. Wait for its
+	# runtime root rather than relying on node process ordering.
+	for _frame: int in range(16):
+		if _landscape_shell == null:
+			_landscape_shell = _find_named_recursive(get_parent(), "V4LandscapeShell")
+		if _landscape_shell != null:
+			var landscape_root: Node = _landscape_shell.get_node_or_null("V43BiomeLandscapeShell")
+			if landscape_root != null:
+				for section_id: StringName in PROBLEM_SECTIONS:
+					var visual: Node = landscape_root.get_node_or_null("Landscape_%s" % String(section_id))
+					if visual is VisualInstance3D and (visual as VisualInstance3D).visible:
+						(visual as VisualInstance3D).visible = false
+						_v4_ghost_landscape_hidden += 1
+				return
+		await get_tree().process_frame
 
 func _find_v2_track(root: Node) -> WildDashGrandPrixV2Track:
 	if root == null:
