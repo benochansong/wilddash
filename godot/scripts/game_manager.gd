@@ -146,8 +146,11 @@ func begin_round(mode_id: StringName) -> void:
 			set_state(GameState.ARENA)
 			print("RC_FLOW Floor Collapse Free Play")
 		&"push_out":
-			set_state(GameState.FINAL)
-			print("RC_FLOW Round 4 Push Out")
+			# Round 4 is no longer the campaign final. Wild Rumble is a full arena
+			# combat round and Round 5 Snowpeak follows, so use the normal ARENA
+			# gameplay state rather than the legacy FINAL state.
+			set_state(GameState.ARENA)
+			print("RC_FLOW Round 4 Wild Rumble Arena")
 		&"snowpeak_winter_rally":
 			set_state(GameState.RACE)
 			print("RC_FLOW Round 5 Snowpeak Winter Rally")
