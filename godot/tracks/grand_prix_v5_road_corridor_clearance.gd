@@ -8,13 +8,17 @@ extends Node
 ## into the same footprint, making a collisionless mountain appear to sit on the
 ## road. This pass filters those large visual-only transforms against the entire
 ## authoritative route, using each prop's footprint radius plus road width.
+##
+## IMPORTANT: the authoritative track class is WildDashGrandPrixTrack. An earlier
+## revision accidentally referenced a nonexistent WildDashGrandPrixV2Track type,
+## which prevents Grand Prix from parsing/loading and makes Character Select START
+## appear dead for every racer. Keep this file dependent only on the real track API.
 
 const SAFETY_BUFFER: float = 7.0
 const MIN_SCENERY_RADIUS: float = 2.0
 const MAX_WAIT_FRAMES: int = 36
-const TARGET_MULTIMESH_NAMES: Array[String] = ["MountainPeaks", "CanyonRockSpires"]
 
-var _track: WildDashGrandPrixV2Track
+var _track: WildDashGrandPrixTrack
 var _route: Array[Vector3] = []
 var _checked: int = 0
 var _removed: int = 0
@@ -52,17 +56,15 @@ func is_scenery_safe_for_route(position: Vector3, footprint_radius: float, local
 	var radius: float = maxf(MIN_SCENERY_RADIUS, footprint_radius)
 	var nearest_distance: float = INF
 	var nearest_required: float = 0.0
-	var nearest_segment: int = -1
 	for segment_index: int in range(_route.size() - 1):
 		var distance: float = _planar_distance_to_segment(position, _route[segment_index], _route[segment_index + 1])
 		var road_width: float = 16.0
-		if _track.has_method("get_v2_width_for_segment"):
-			road_width = float(_track.get_v2_width_for_segment(segment_index))
+		if segment_index >= 0 and segment_index < WildDashGrandPrixTrack.SEGMENT_WIDTHS.size():
+			road_width = float(WildDashGrandPrixTrack.SEGMENT_WIDTHS[segment_index])
 		var required: float = road_width * 0.5 + radius + SAFETY_BUFFER
 		if distance < nearest_distance:
 			nearest_distance = distance
 			nearest_required = required
-			nearest_segment = segment_index
 		if distance < required:
 			print("GHOST SCENERY CULLED source=EnvironmentDressing segment=%d local_segment=%d distance=%.2f required=%.2f radius=%.2f" % [
 				segment_index, local_segment_index, distance, required, radius,
@@ -122,13 +124,13 @@ func _planar_distance_to_segment(point: Vector3, a: Vector3, b: Vector3) -> floa
 	var t: float = clampf((point_2d - a_2d).dot(ab) / length_sq, 0.0, 1.0)
 	return point_2d.distance_to(a_2d + ab * t)
 
-func _find_track(root: Node) -> WildDashGrandPrixV2Track:
+func _find_track(root: Node) -> WildDashGrandPrixTrack:
 	if root == null:
 		return null
-	if root is WildDashGrandPrixV2Track:
-		return root as WildDashGrandPrixV2Track
+	if root is WildDashGrandPrixTrack:
+		return root as WildDashGrandPrixTrack
 	for child: Node in root.get_children():
-		var found: WildDashGrandPrixV2Track = _find_track(child)
+		var found: WildDashGrandPrixTrack = _find_track(child)
 		if found != null:
 			return found
 	return null
