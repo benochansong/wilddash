@@ -7,6 +7,9 @@ extends RefCounted
 ## a particular animal.
 
 static func get_basic_attack(animal_id: StringName) -> WildDashCombatAbilitySpec:
+	var final_override: WildDashCombatAbilitySpec = WildDashCombatV2FinalOverrides.get_basic_attack(animal_id)
+	if final_override != null:
+		return final_override
 	if WildDashCombatV2Phase3Profile.has_profile(animal_id):
 		var phase3: WildDashCombatAbilitySpec = WildDashCombatV2Phase3Profile.get_basic_attack(animal_id)
 		if phase3 != null:
@@ -37,6 +40,9 @@ static func get_special_attack(animal_id: StringName) -> WildDashCombatAbilitySp
 	return WildDashAnimalCombatProfile.get_special_attack(animal_id)
 
 static func get_ability(animal_id: StringName, ability_id: StringName) -> WildDashCombatAbilitySpec:
+	var final_basic: WildDashCombatAbilitySpec = WildDashCombatV2FinalOverrides.get_basic_attack(animal_id)
+	if final_basic != null and final_basic.ability_id == ability_id:
+		return final_basic
 	var phase3: WildDashCombatAbilitySpec = WildDashCombatV2Phase3Profile.get_ability(animal_id, ability_id)
 	if phase3 != null:
 		return phase3
