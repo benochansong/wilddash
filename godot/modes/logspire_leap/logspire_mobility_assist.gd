@@ -6,9 +6,9 @@ const HEAVY_JUMP_FLOOR: float = 9.20
 const STANDARD_JUMP_FLOOR: float = 8.35
 const HEAVY_AI_SPEED_SCALE: float = 0.94
 const STANDARD_AI_SPEED_SCALE: float = 0.89
-const LANDING_FLOOR_SNAP: float = 0.62
-const COYOTE_TIME_SECONDS: float = 0.13
-const JUMP_BUFFER_SECONDS: float = 0.14
+const LANDING_FLOOR_SNAP: float = 0.72
+const COYOTE_TIME_SECONDS: float = 0.18
+const JUMP_BUFFER_SECONDS: float = 0.18
 
 var _logged_racers: Dictionary = {}
 var _logged_drivers: Dictionary = {}
@@ -107,7 +107,7 @@ func _apply_animal_platform_identity(racer: WildDashCharacterController) -> void
 			racer.turn_speed *= 1.06
 			racer.set_meta(&"logspire_aerial_adjustment", 1.12)
 		&"cat":
-			racer.floor_snap_length = maxf(racer.floor_snap_length, 0.82)
+			racer.floor_snap_length = maxf(racer.floor_snap_length, 0.86)
 			racer.set_meta(&"logspire_landing_stability", 1.14)
 		&"monkey":
 			racer.set_meta(&"logspire_vine_affinity", 1.10)
