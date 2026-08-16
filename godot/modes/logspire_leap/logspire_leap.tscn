@@ -1,8 +1,9 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_leap.gd" id="1_mode"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_world.gd" id="2_world"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_rebalance.gd" id="2b_jump_rebalance"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_gap_guard.gd" id="2c_gap_guard"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_platform_graph.gd" id="3_graph"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_recovery_system.gd" id="4_recovery"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_mobility_assist.gd" id="5_mobility"]
@@ -19,6 +20,9 @@ script = ExtResource("2_world")
 
 [node name="JumpRebalance" type="Node" parent="."]
 script = ExtResource("2b_jump_rebalance")
+
+[node name="JumpGapGuard" type="Node" parent="."]
+script = ExtResource("2c_gap_guard")
 
 [node name="PlatformGraph" type="Node" parent="."]
 script = ExtResource("3_graph")
