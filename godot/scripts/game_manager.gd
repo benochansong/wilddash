@@ -16,21 +16,22 @@ enum GameState {
 	RESULT,
 }
 
-# RC9 campaign now carries five production rounds. Snowpeak remains dormant and
-# Round 5 TIDAL CLASH follows the existing Round 4 arena without changing RC8.
+# RC9 production campaign: two opening rounds, vertical LOGSPIRE race, Round 4
+# Wild Rumble, then the existing Wild Tide / Neon Harbor race as Round 5 finale.
+# TIDAL CLASH remains in the repository as a future Round 6 / bonus mode.
 const ROUND_IDS: Array[StringName] = [
 	&"grand_prix",
 	&"fruit_collection",
-	&"neon_harbor_race",
+	&"logspire_leap",
 	&"push_out",
-	&"tidal_clash",
+	&"neon_harbor_race",
 ]
 const ROUND_SCENES: Array[String] = [
 	"res://modes/grand_prix/grand_prix.tscn",
 	"res://modes/fruit_collection/fruit_collection.tscn",
-	"res://modes/neon_harbor_race/neon_harbor_race.tscn",
+	"res://modes/logspire_leap/logspire_leap.tscn",
 	"res://modes/push_out/push_out.tscn",
-	"res://modes/tidal_clash/tidal_clash.tscn",
+	"res://modes/neon_harbor_race/neon_harbor_race.tscn",
 ]
 const LOBBY_SCENE := "res://scenes/lobby.tscn"
 const CHARACTER_SELECT_SCENE := "res://scenes/character_select.tscn"
@@ -161,24 +162,27 @@ func begin_round(mode_id: StringName) -> void:
 	match mode_id:
 		&"grand_prix":
 			set_state(GameState.RACE)
-			print("RC_FLOW Race")
+			print("RC_FLOW Round 1 Grand Prix")
 		&"fruit_collection":
 			set_state(GameState.ARENA)
-			print("RC_FLOW Round 2")
-		&"neon_harbor_race":
+			print("RC_FLOW Round 2 Fruit Collection")
+		&"logspire_leap":
 			set_state(GameState.RACE)
-			print("RC_FLOW Round 3 Neon Harbor Race")
+			print("CAMPAIGN ROUND 3 LOGSPIRE")
 		&"floor_collapse":
 			set_state(GameState.ARENA)
 			print("RC_FLOW Floor Collapse Free Play")
 		&"push_out":
-			# Keep the existing Round 4 arena state/presentation unchanged. The
-			# campaign transition now continues to Round 5 instead of Result.
 			set_state(GameState.FINAL)
 			print("RC_FLOW Round 4 Wild Rumble FINAL")
-		&"tidal_clash":
+		&"neon_harbor_race":
 			set_state(GameState.RACE)
-			print("RC_FLOW Round 5 TIDAL CLASH")
+			print("CAMPAIGN ROUND 5 NEON HARBOR")
+		&"tidal_clash":
+			# Reserve/free-play compatibility. TIDAL CLASH is no longer in the base
+			# five-round campaign, but its scene and systems remain intact for Round 6.
+			set_state(GameState.RACE)
+			print("RC_FLOW Bonus TIDAL CLASH reserve_round_6=true")
 		_:
 			set_state(GameState.ARENA)
 	round_changed.emit(current_round_index, mode_id)
@@ -248,7 +252,7 @@ func _transition_after_round() -> void:
 		return
 	campaign_running = false
 	set_state(GameState.RESULT)
-	print("CAMPAIGN COMPLETE rounds=%d clears=%d" % [ResultManager.round_results.size(), ResultManager.get_success_count()])
+	print("CAMPAIGN COMPLETE rounds=%d clears=%d final_round=neon_harbor_race" % [ResultManager.round_results.size(), ResultManager.get_success_count()])
 	var error: Error = get_tree().change_scene_to_file(RESULT_SCENE)
 	if error != OK:
 		push_error("Failed to load result scene: %s" % error_string(error))
@@ -267,6 +271,8 @@ func _race_theme_for_current_round() -> String:
 	match get_current_round_id():
 		&"grand_prix":
 			return "race_grand_prix"
+		&"logspire_leap":
+			return "race_logspire"
 		&"neon_harbor_race":
 			return "race_neon_harbor"
 		_:
