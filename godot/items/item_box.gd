@@ -1,8 +1,11 @@
 class_name WildDashItemBox
 extends Area3D
 
-## RC9 emergency pickup guarantee: body_entered + swept segment + proximity.
-## Race boxes stay globally active; cooldown is per racer/per box.
+## RC9 yellow-box pickup hotfix.
+## Player pickup never depends on RaceManager registration timing: the player is
+## resolved directly from the wilddash_racer group every physics tick. AI still
+## uses the shared race roster on a throttled scan. A successful pickup hides the
+## box immediately, defers collision-state changes safely, then respawns it.
 
 const AI_RADIUS := 3.45
 const PLAYER_RADIUS := 5.50
@@ -36,7 +39,9 @@ func _ready() -> void:
 	_build_visual()
 	if not body_entered.is_connected(_on_body_entered):
 		body_entered.connect(_on_body_entered)
-	print("ITEM BOX GUARANTEE READY box=%s detectors=body+swept+proximity player_radius=%.2f global_disappear_race=false" % [name, PLAYER_RADIUS + PLAYER_FALLBACK])
+	print("YELLOW ITEM BOX READY box=%s player_direct_scan=true detectors=body+swept+proximity disappear_on_success=true radius=%.2f" % [
+		name, PLAYER_RADIUS + PLAYER_FALLBACK,
+	])
 
 func _process(delta: float) -> void:
 	_time += delta
@@ -47,32 +52,55 @@ func _process(delta: float) -> void:
 func _physics_process(delta: float) -> void:
 	if not _active:
 		return
+
+	# P0 guarantee: scan the human racer directly from the racer group every
+	# physics tick. This does not rely on RaceManager.racers being populated yet.
+	var player_racer := _resolve_player_racer()
+	if player_racer != null and _scan_racer(player_racer, true):
+		return
+
 	_ai_elapsed += delta
-	var scan_ai := _ai_elapsed >= AI_SCAN_INTERVAL
-	if scan_ai:
-		_ai_elapsed = 0.0
+	if _ai_elapsed < AI_SCAN_INTERVAL:
+		return
+	_ai_elapsed = 0.0
 	for value: Variant in RaceManager.racers:
 		var racer := value as WildDashCharacterController
-		if racer == null or not is_instance_valid(racer) or racer.finished or RaceManager.finish_order.has(racer):
+		if racer == null or not is_instance_valid(racer) or racer.is_player:
 			continue
-		var human := racer.is_player
-		if not human and not scan_ai:
+		if _scan_racer(racer, false):
+			return
+
+func _scan_racer(racer: WildDashCharacterController, human: bool) -> bool:
+	if racer == null or not is_instance_valid(racer) or racer.finished:
+		return false
+	if RaceManager.finish_order.has(racer):
+		return false
+
+	var probe := racer.global_position + Vector3.UP * 0.8
+	var id := racer.get_instance_id()
+	var previous: Vector3 = _previous_probe.get(id, probe)
+	_previous_probe[id] = probe
+	var radius := PLAYER_RADIUS if human else AI_RADIUS
+	if racer.has_method("get_interaction_radius"):
+		radius = float(racer.call("get_interaction_radius", radius))
+	radius = ItemSystem.get_pickup_radius(racer, radius)
+	var vertical := PLAYER_VERTICAL if human else AI_VERTICAL
+	var fallback := PLAYER_FALLBACK if human else AI_FALLBACK
+	var swept := _swept_hit(global_position, previous, probe, radius, vertical)
+	var proximity := _proximity_hit(global_position, probe, radius + fallback, vertical)
+	var overlap := overlaps_body(racer)
+	if not swept and not proximity and not overlap:
+		return false
+	return _try_pickup_context(racer, "player_direct_scan" if human else "ai_scan", swept, overlap, proximity)
+
+func _resolve_player_racer() -> WildDashCharacterController:
+	for node: Node in get_tree().get_nodes_in_group("wilddash_racer"):
+		var racer := node as WildDashCharacterController
+		if racer == null or not is_instance_valid(racer):
 			continue
-		var probe := racer.global_position + Vector3.UP * 0.8
-		var id := racer.get_instance_id()
-		var previous: Vector3 = _previous_probe.get(id, probe)
-		_previous_probe[id] = probe
-		var radius := PLAYER_RADIUS if human else AI_RADIUS
-		if racer.has_method("get_interaction_radius"):
-			radius = float(racer.call("get_interaction_radius", radius))
-		radius = ItemSystem.get_pickup_radius(racer, radius)
-		var vertical := PLAYER_VERTICAL if human else AI_VERTICAL
-		var fallback := PLAYER_FALLBACK if human else AI_FALLBACK
-		var swept := _swept_hit(global_position, previous, probe, radius, vertical)
-		var proximity := _proximity_hit(global_position, probe, radius + fallback, vertical)
-		var overlap := overlaps_body(racer)
-		if swept or proximity or overlap:
-			_try_pickup_context(racer, "physics_scan", swept, overlap, proximity)
+		if racer.is_player and racer.movement_mode == WildDashCharacterController.MovementMode.RACE and not racer.finished:
+			return racer
+	return null
 
 func force_pickup(racer: Node) -> bool:
 	return _try_pickup_context(racer, "force", false, false, true)
@@ -96,8 +124,14 @@ func _try_pickup_context(body: Node, trigger: String, swept: bool, overlap: bool
 	if body is WildDashCharacterController:
 		var racer := body as WildDashCharacterController
 		print("ITEM PICKUP ATTEMPT box=%s racer=%s trigger=%s distance=%.2f swept=%s overlap=%s proximity=%s held_item=%s" % [
-			name, _label(racer), trigger, global_position.distance_to(racer.global_position + Vector3.UP * 0.8),
-			str(swept), str(overlap), str(proximity), String(racer.get_held_item()),
+			name,
+			_label(racer),
+			trigger,
+			global_position.distance_to(racer.global_position + Vector3.UP * 0.8),
+			str(swept),
+			str(overlap),
+			str(proximity),
+			String(racer.get_held_item()),
 		])
 	if _is_party_racer(body):
 		return _try_party_pickup(body as WildDashCharacterController, trigger)
@@ -117,22 +151,28 @@ func _try_party_pickup(racer: WildDashCharacterController, trigger: String) -> b
 	if now < int(racer.get_meta(PICKUP_LOCK_META, 0)):
 		_log_denied(racer, "COOLDOWN_GLOBAL", trigger)
 		return false
+
 	var previous := racer.get_held_item()
 	var replaced := false
 	if previous != &"":
 		if not racer.is_player:
 			_log_denied(racer, "HELD_ITEM_AI", trigger)
 			return false
+		# RC9 player guarantee: a stale/held item must never make a yellow box look
+		# broken. Replace it atomically and restore it if the new grant fails.
 		racer.set_held_item(&"")
 		replaced = true
+
 	if not ItemSystem.grant_weighted_item(racer):
 		if replaced:
 			racer.set_held_item(previous)
 		_log_denied(racer, "GRANT_FAILED", trigger)
 		return false
+
 	racer.set_meta(PICKUP_LOCK_META, now + GLOBAL_LOCK_MSEC)
 	_same_box_until[id] = now + SAME_BOX_LOCK_MSEC
 	_success(racer, replaced, trigger)
+	_deactivate()
 	return true
 
 func _try_legacy_pickup(body: Node, trigger: String) -> bool:
@@ -161,13 +201,17 @@ func _try_legacy_pickup(body: Node, trigger: String) -> bool:
 	return true
 
 func _success(racer: WildDashCharacterController, replaced: bool, trigger: String) -> void:
-	print("ITEM PICKUP SUCCESS box=%s racer=%s item=%s rank=%d replaced=%s trigger=%s box_global_active=true" % [
-		name, _label(racer), ItemSystem.get_display_name(racer.get_held_item()), RaceManager.get_rank(racer), str(replaced), trigger,
+	print("ITEM PICKUP SUCCESS box=%s racer=%s item=%s rank=%d replaced=%s trigger=%s disappear=true" % [
+		name,
+		_label(racer),
+		ItemSystem.get_display_name(racer.get_held_item()),
+		RaceManager.get_rank(racer),
+		str(replaced),
+		trigger,
 	])
-	if _visual != null:
-		_visual.scale = Vector3(0.72, 0.72, 0.72)
-		var tween := _visual.create_tween()
-		tween.tween_property(_visual, "scale", Vector3.ONE, 0.15)
+	var audio := get_node_or_null("/root/AudioManager")
+	if audio != null:
+		audio.call("play_sfx_id", "item", 0.88)
 
 func _log_denied(body: Node, reason: String, trigger: String) -> void:
 	var now := Time.get_ticks_msec()
@@ -179,10 +223,12 @@ func _log_denied(body: Node, reason: String, trigger: String) -> void:
 	var held := ""
 	if body != null and body.has_method("get_held_item"):
 		held = String(body.call("get_held_item"))
-	print("ITEM PICKUP DENIED box=%s racer=%s reason=%s trigger=%s held_item=%s" % [name, _label(body), reason, trigger, held])
+	print("ITEM PICKUP DENIED box=%s racer=%s reason=%s trigger=%s held_item=%s" % [
+		name, _label(body), reason, trigger, held,
+	])
 
 func _is_party_racer(body: Node) -> bool:
-	return body is WildDashCharacterController and (body as WildDashCharacterController).movement_mode == WildDashCharacterController.MovementMode.RACE and RaceManager.racers.has(body)
+	return body is WildDashCharacterController and (body as WildDashCharacterController).movement_mode == WildDashCharacterController.MovementMode.RACE
 
 func _label(body: Node) -> String:
 	if body == null:
@@ -192,12 +238,16 @@ func _label(body: Node) -> String:
 	return body.name
 
 func _deactivate() -> void:
+	if not _active:
+		return
 	_active = false
-	monitoring = false
-	if _collision != null:
-		_collision.disabled = true
 	if _visual != null:
 		_visual.visible = false
+	# Never mutate physics-query state directly from body_entered/physics scan.
+	# Deferred toggles avoid Godot's flushing-queries state-change error.
+	set_deferred("monitoring", false)
+	if _collision != null:
+		_collision.set_deferred("disabled", true)
 	_respawn_later()
 
 func _respawn_later() -> void:
@@ -206,13 +256,12 @@ func _respawn_later() -> void:
 		return
 	_active = true
 	_previous_probe.clear()
-	monitoring = true
+	set_deferred("monitoring", true)
 	if _collision != null:
-		_collision.disabled = false
+		_collision.set_deferred("disabled", false)
 	if _visual != null:
 		_visual.visible = true
-	for body: Node3D in get_overlapping_bodies():
-		_try_pickup_context(body, "respawn_overlap", false, true, true)
+	print("ITEM BOX RESPAWN box=%s seconds=%.1f" % [name, respawn_seconds])
 
 func _swept_hit(point: Vector3, a: Vector3, b: Vector3, radius: float, vertical: float) -> bool:
 	var p := Vector2(point.x, point.z)
