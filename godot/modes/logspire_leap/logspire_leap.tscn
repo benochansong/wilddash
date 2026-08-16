@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_leap.gd" id="1_mode"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_world.gd" id="2_world"]
@@ -11,6 +11,8 @@
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_combat_safety.gd" id="7_combat"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_mushroom_feedback.gd" id="8_mushroom"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_phase3_director.gd" id="9_phase3"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_ladder_system.gd" id="10_ladder"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_recovery.gd" id="11_water"]
 
 [node name="LogspireLeap" type="Node3D"]
 script = ExtResource("1_mode")
@@ -26,6 +28,12 @@ script = ExtResource("2c_gap_guard")
 
 [node name="PlatformGraph" type="Node" parent="."]
 script = ExtResource("3_graph")
+
+[node name="LadderSystem" type="Node3D" parent="."]
+script = ExtResource("10_ladder")
+
+[node name="WaterRecovery" type="Node3D" parent="."]
+script = ExtResource("11_water")
 
 [node name="RecoverySystem" type="Node" parent="."]
 script = ExtResource("4_recovery")
