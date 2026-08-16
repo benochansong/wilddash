@@ -12,7 +12,8 @@ enum JumpState {
 const ROUTE_SAFE: StringName = &"safe"
 const ROUTE_WILD: StringName = &"wild"
 const MIN_JUMP_DISTANCE: float = 3.4
-const MAX_JUMP_TRIGGER: float = 10.8
+const MIN_JUMP_TRIGGER: float = 15.8
+const MAX_JUMP_TRIGGER: float = 18.0
 const LAND_STATE_SECONDS: float = 0.16
 const JUMP_COOLDOWN_SECONDS: float = 0.28
 
@@ -41,9 +42,9 @@ func configure(
 	_route = _copy_route(route_points)
 	_safe_route = _copy_route(safe_route_points)
 	_route_id = route_id
-	_trigger_bias = float((racer.get_instance_id() % 7) - 3) * 0.06 if racer != null else 0.0
+	_trigger_bias = float((racer.get_instance_id() % 7) - 3) * 0.08 if racer != null else 0.0
 	_was_on_floor = racer != null and racer.is_on_floor()
-	print("LOGSPIRE PLATFORM AI READY racer=%s route=%s nodes=%d difficulty=%s" % [
+	print("LOGSPIRE PLATFORM AI READY racer=%s route=%s nodes=%d difficulty=%s predictive_jump=true" % [
 		RaceManager.get_racer_label(racer),
 		String(_route_id),
 		_route.size(),
@@ -92,7 +93,7 @@ func _physics_process(delta: float) -> void:
 	_state = JumpState.JUMP
 	var jump_scale: float = _get_jump_scale(height_delta)
 	_racer.velocity.y = maxf(_racer.velocity.y, _racer.jump_velocity * jump_scale)
-	_racer.current_speed = maxf(_racer.current_speed, _racer.cruise_speed * 0.90)
+	_racer.current_speed = maxf(_racer.current_speed, _racer.cruise_speed * 0.96)
 	_jump_cooldown = JUMP_COOLDOWN_SECONDS
 	_jump_count += 1
 	print("LOGSPIRE JUMP AI racer=%s from_route=%d target=%d route=%s distance=%.2f height=%.2f jump_scale=%.2f" % [
@@ -132,28 +133,28 @@ func get_recovery_count() -> int:
 	return _recovery_count
 
 func _get_jump_trigger_distance() -> float:
-	var trigger: float = 9.65 + clampf(_racer.current_speed - 10.0, 0.0, 8.0) * 0.08 + _trigger_bias
+	var trigger: float = 16.35 + clampf(_racer.current_speed - 10.0, 0.0, 8.0) * 0.10 + _trigger_bias
 	match GameManager.difficulty:
 		&"wild":
-			trigger += 0.45
+			trigger += 0.40
 		&"nightmare":
-			trigger -= 0.18
+			trigger -= 0.20
 		_:
 			pass
-	return clampf(trigger, 9.0, MAX_JUMP_TRIGGER)
+	return clampf(trigger, MIN_JUMP_TRIGGER, MAX_JUMP_TRIGGER)
 
 func _get_jump_scale(height_delta: float) -> float:
-	var scale: float = 0.96
-	if height_delta > 1.5:
+	var scale: float = 1.08
+	if height_delta > 1.0:
 		scale += minf(0.12, height_delta * 0.025)
 	match GameManager.difficulty:
 		&"wild":
-			scale += 0.05
+			scale += 0.04
 		&"nightmare":
 			scale -= 0.01
 		_:
 			pass
-	return clampf(scale, 0.92, 1.10)
+	return clampf(scale, 1.04, 1.22)
 
 func _copy_route(points: Array[Vector3]) -> Array[Vector3]:
 	var result: Array[Vector3] = []
