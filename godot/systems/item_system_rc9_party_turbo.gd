@@ -1,37 +1,42 @@
 extends "res://systems/item_system.gd"
 
-## RC9 party-racing item adapter.
-##
-## Keeps the existing ItemSystem implementation authoritative for every legacy
-## item, while adding one explicit catch-up item: WILD TURBO. The adapter is the
-## production autoload, so all existing ItemSystem calls continue through the
-## same singleton/API instead of creating a competing item system.
+## RC9 production ItemSystem adapter. Base ItemSystem owns the original twelve
+## items; this autoload adds the rare WILD TURBO plus the emergency Shockwave /
+## Wind power pass without creating a second inventory system.
 
 const WILD_TURBO: StringName = &"wild_turbo"
+const WILD_TURBO_DURATION := 2.25
+const WILD_TURBO_INITIAL := 1.45
+const WILD_TURBO_SPEED := 1.80
+const WILD_TURBO_ACCEL := 2.50
+const WILD_TURBO_HANDLING := 1.08
+const WILD_TURBO_CAP := 1.80
+const WILD_TURBO_FRONT_WEIGHT := 3.0
+const WILD_TURBO_MID_WEIGHT := 8.0
+const WILD_TURBO_BACK_WEIGHT := 15.0
+const WILD_TURBO_LAST_WEIGHT := 22.0
 
-const WILD_TURBO_DURATION: float = 1.50
-const WILD_TURBO_INITIAL_SPEED_MULTIPLIER: float = 1.38
-const WILD_TURBO_SPEED_MULTIPLIER: float = 1.68
-const WILD_TURBO_ACCELERATION_MULTIPLIER: float = 1.50
-const WILD_TURBO_HANDLING_MULTIPLIER: float = 1.05
-const WILD_TURBO_CANONICAL_SPEED_CAP: float = 1.80
-const WILD_TURBO_FRONT_WEIGHT: float = 2.0
-const WILD_TURBO_MID_WEIGHT: float = 6.0
-const WILD_TURBO_BACK_WEIGHT: float = 12.0
+const POWER_SHOCKWAVE_RADIUS := 8.50
+const POWER_SHOCKWAVE_DURATION := 0.68
+const POWER_SHOCKWAVE_SLOW := 0.72
+const POWER_SHOCKWAVE_KNOCKBACK := 5.80
+const POWER_WIND_RADIUS := 9.00
+const POWER_WIND_PUSH := 3.80
+const POWER_WIND_SELF_SPEED := 1.16
 
 var _wild_turbo_effects: Dictionary = {}
 
 func _ready() -> void:
 	super._ready()
-	_register_wild_turbo_definition()
-	print("ITEM SYSTEM RC9 PARTY TURBO READY items=%d wild_turbo=true weights=%.0f/%.0f/%.0f duration=%.2f speed=%.2fx cap=%.2fx" % [
-		get_item_count(), WILD_TURBO_FRONT_WEIGHT, WILD_TURBO_MID_WEIGHT, WILD_TURBO_BACK_WEIGHT,
-		WILD_TURBO_DURATION, WILD_TURBO_SPEED_MULTIPLIER, WILD_TURBO_CANONICAL_SPEED_CAP,
+	_register_wild_turbo()
+	print("ITEM SYSTEM RC9 EMERGENCY READY items=%d wild_turbo=true duration=%.2f speed=%.2fx cap=%.2fx weights=%.0f/%.0f/%.0f/last%.0f" % [
+		get_item_count(), WILD_TURBO_DURATION, WILD_TURBO_SPEED, WILD_TURBO_CAP,
+		WILD_TURBO_FRONT_WEIGHT, WILD_TURBO_MID_WEIGHT, WILD_TURBO_BACK_WEIGHT, WILD_TURBO_LAST_WEIGHT,
 	])
 
 func _process(delta: float) -> void:
 	super._process(delta)
-	_update_wild_turbo_effects(delta)
+	_update_wild_turbo(delta)
 
 func is_valid_item(item_id: StringName) -> bool:
 	return item_id == WILD_TURBO or super.is_valid_item(item_id)
@@ -40,256 +45,238 @@ func is_new_item(item_id: StringName) -> bool:
 	return item_id == WILD_TURBO or super.is_new_item(item_id)
 
 func get_item_count() -> int:
-	return _rc9_item_ids().size()
+	return ITEM_IDS.size() + 1
 
 func get_all_item_ids() -> Array[StringName]:
-	return _rc9_item_ids()
-
-func get_definition(item_id: StringName) -> WildDashItemDefinition:
-	# Some smoke/editor calls can query a definition before this autoload's
-	# _ready(). Ensure the inherited 12 definitions are installed before adding
-	# Turbo so an early WILD_TURBO lookup cannot leave the dictionary half-built.
-	if _definitions.is_empty():
-		super._register_definitions()
-	if item_id == WILD_TURBO and not _definitions.has(WILD_TURBO):
-		_register_wild_turbo_definition()
-	return super.get_definition(item_id)
-
-func roll_item_for_rank(rank: int, total: int, history: Array = []) -> StringName:
-	var safe_total: int = maxi(1, total)
-	var normalized: float = float(clampi(rank, 1, safe_total) - 1) / float(maxi(1, safe_total - 1))
-	var band: StringName = &"mid"
-	if normalized <= 0.30:
-		band = &"front"
-	elif normalized >= 0.70:
-		band = &"back"
-	return _weighted_pick(band, history)
-
-func use_held_item(character: Node) -> bool:
-	if character == null or not character.has_method("get_held_item") or not character.has_method("set_held_item"):
-		return false
-	var item_id: StringName = StringName(character.call("get_held_item"))
-	if item_id != WILD_TURBO:
-		return super.use_held_item(character)
-	if not _use_wild_turbo(character):
-		return false
-	character.call("set_held_item", &"")
-	_last_used_item[character.get_instance_id()] = WILD_TURBO
-	_usage_counts[WILD_TURBO] = int(_usage_counts.get(WILD_TURBO, 0)) + 1
-	item_used.emit(character, WILD_TURBO)
-	var rank: int = RaceManager.get_rank(character as Node3D) if character is Node3D else 0
-	print("ITEM USE racer=%s item=WILD_TURBO rank=%d duration=%.2f speed_multiplier=%.2f acceleration_multiplier=%.2f cap=%.2f" % [
-		_label(character), rank, WILD_TURBO_DURATION, WILD_TURBO_SPEED_MULTIPLIER,
-		WILD_TURBO_ACCELERATION_MULTIPLIER, WILD_TURBO_CANONICAL_SPEED_CAP,
-	])
-	return true
-
-func has_effect(character: Node, effect_id: StringName) -> bool:
-	if character == null:
-		return false
-	if effect_id == WILD_TURBO or effect_id == &"wild_turbo":
-		return _effect_active(_wild_turbo_effects, character.get_instance_id(), _now_seconds())
-	return super.has_effect(character, effect_id)
-
-func get_status_text(character: Node) -> String:
-	if character != null:
-		var id: int = character.get_instance_id()
-		var now: float = _now_seconds()
-		if _effect_active(_wild_turbo_effects, id, now):
-			return "WILD TURBO %.1fs · MAX TURBO" % _effect_remaining(_wild_turbo_effects, id, now)
-	return super.get_status_text(character)
-
-func get_unique_used_count() -> int:
-	var count: int = super.get_unique_used_count()
-	if get_usage_count(WILD_TURBO) > 0:
-		count += 1
-	return count
-
-func get_new_unique_used_count() -> int:
-	var count: int = super.get_new_unique_used_count()
-	if get_usage_count(WILD_TURBO) > 0:
-		count += 1
-	return count
-
-func reset_runtime() -> void:
-	for id_value: Variant in _wild_turbo_effects.keys():
-		_cleanup_wild_turbo_effect(int(id_value))
-	_wild_turbo_effects.clear()
-	super.reset_runtime()
-
-func get_wild_turbo_speed_cap(character: Node) -> float:
-	if not (character is WildDashCharacterController):
-		return 0.0
-	return _wild_turbo_speed_cap(character as WildDashCharacterController)
-
-func _weighted_pick(band: StringName, history: Array) -> StringName:
-	var item_ids: Array[StringName] = _rc9_item_ids()
-	var weighted: Dictionary = {}
-	var total: float = 0.0
-	for item_id: StringName in item_ids:
-		var definition: WildDashItemDefinition = get_definition(item_id)
-		var weight: float = definition.weight_for_band(band) if definition != null else 1.0
-		weight *= _history_multiplier(item_id, history)
-		weighted[item_id] = weight
-		total += weight
-	if total <= 0.0:
-		return DASH_BERRY
-	var roll: float = _rng.randf_range(0.0, total)
-	var cursor: float = 0.0
-	for item_id: StringName in item_ids:
-		cursor += float(weighted.get(item_id, 0.0))
-		if roll <= cursor:
-			return item_id
-	return item_ids[item_ids.size() - 1]
-
-func _rc9_item_ids() -> Array[StringName]:
 	var result: Array[StringName] = []
 	for item_id: StringName in ITEM_IDS:
 		result.append(item_id)
 	result.append(WILD_TURBO)
 	return result
 
-func _register_wild_turbo_definition() -> void:
-	if _definitions.has(WILD_TURBO):
-		return
-	_register_definition(
-		WILD_TURBO,
-		"WILD TURBO",
-		&"speed",
-		"WT",
-		"MAX TURBO",
-		WILD_TURBO_FRONT_WEIGHT,
-		WILD_TURBO_MID_WEIGHT,
-		WILD_TURBO_BACK_WEIGHT,
-		WILD_TURBO_DURATION,
-		WILD_TURBO_SPEED_MULTIPLIER,
-		WILD_TURBO_ACCELERATION_MULTIPLIER
-	)
+func get_definition(item_id: StringName) -> WildDashItemDefinition:
+	if _definitions.is_empty():
+		super._register_definitions()
+	if item_id == WILD_TURBO and not _definitions.has(WILD_TURBO):
+		_register_wild_turbo()
+	return super.get_definition(item_id)
+
+func grant_item(character: Node, item_id: StringName) -> bool:
+	var granted := super.grant_item(character, item_id)
+	if granted and item_id == WILD_TURBO:
+		var rank := RaceManager.get_rank(character as Node3D) if character is Node3D else 0
+		var total := maxi(1, RaceManager.racers.size())
+		print("WILD TURBO GRANTED racer=%s rank=%d/%d weight=%.1f" % [_label(character), rank, total, get_wild_turbo_weight_for_rank(rank, total)])
+	return granted
+
+func roll_item_for_rank(rank: int, total: int, history: Array = []) -> StringName:
+	var safe_total := maxi(1, total)
+	var normalized := float(clampi(rank, 1, safe_total) - 1) / float(maxi(1, safe_total - 1))
+	var band: StringName = &"mid"
+	if normalized <= 0.30:
+		band = &"front"
+	elif normalized >= 0.70:
+		band = &"back"
+	return _weighted_pick_rc9(band, history, get_wild_turbo_weight_for_rank(rank, safe_total))
+
+func get_wild_turbo_weight_for_rank(rank: int, total: int) -> float:
+	var safe_total := maxi(1, total)
+	var safe_rank := clampi(rank, 1, safe_total)
+	if safe_total > 1 and safe_rank == safe_total:
+		return WILD_TURBO_LAST_WEIGHT
+	var normalized := float(safe_rank - 1) / float(maxi(1, safe_total - 1))
+	if normalized <= 0.30:
+		return WILD_TURBO_FRONT_WEIGHT
+	if normalized >= 0.70:
+		return WILD_TURBO_BACK_WEIGHT
+	return WILD_TURBO_MID_WEIGHT
+
+func use_held_item(character: Node) -> bool:
+	if character == null or not character.has_method("get_held_item"):
+		return false
+	var item_id := StringName(character.call("get_held_item"))
+	if item_id == WILD_TURBO:
+		if not _use_wild_turbo(character): return false
+		_complete_special_use(character, WILD_TURBO)
+		return true
+	if item_id == SHOCKWAVE:
+		if not _use_power_shockwave(character): return false
+		_complete_special_use(character, SHOCKWAVE)
+		return true
+	if item_id == WIND_BOOST:
+		if not _use_power_wind(character): return false
+		_complete_special_use(character, WIND_BOOST)
+		return true
+	return super.use_held_item(character)
+
+func _complete_special_use(character: Node, item_id: StringName) -> void:
+	character.call("set_held_item", &"")
+	_last_used_item[character.get_instance_id()] = item_id
+	_usage_counts[item_id] = int(_usage_counts.get(item_id, 0)) + 1
+	item_used.emit(character, item_id)
+	if item_id == WILD_TURBO:
+		print("WILD TURBO USE racer=%s duration=%.2f multiplier=%.2f accel=%.2f handling=%.2f" % [_label(character), WILD_TURBO_DURATION, WILD_TURBO_SPEED, WILD_TURBO_ACCEL, WILD_TURBO_HANDLING])
+	else:
+		print("ITEM USE racer=%s item=%s source=rc9_power" % [_label(character), get_display_name(item_id)])
+
+func has_effect(character: Node, effect_id: StringName) -> bool:
+	if character != null and effect_id == WILD_TURBO:
+		return _effect_active(_wild_turbo_effects, character.get_instance_id(), _now_seconds())
+	return super.has_effect(character, effect_id)
+
+func get_status_text(character: Node) -> String:
+	if character != null:
+		var id := character.get_instance_id()
+		var now := _now_seconds()
+		if _effect_active(_wild_turbo_effects, id, now):
+			return "WILD TURBO %.1fs · MAX TURBO" % _effect_remaining(_wild_turbo_effects, id, now)
+		if character.has_method("get_held_item") and StringName(character.call("get_held_item")) == WILD_TURBO:
+			return "WILD TURBO READY · Q / B"
+	return super.get_status_text(character)
+
+func get_unique_used_count() -> int:
+	return super.get_unique_used_count() + (1 if get_usage_count(WILD_TURBO) > 0 else 0)
+
+func get_new_unique_used_count() -> int:
+	return super.get_new_unique_used_count() + (1 if get_usage_count(WILD_TURBO) > 0 else 0)
+
+func reset_runtime() -> void:
+	for id: Variant in _wild_turbo_effects.keys():
+		_cleanup_wild_turbo(int(id))
+	_wild_turbo_effects.clear()
+	super.reset_runtime()
+
+func get_wild_turbo_speed_cap(character: Node) -> float:
+	return _canonical_max(character as WildDashCharacterController) * WILD_TURBO_CAP if character is WildDashCharacterController else 0.0
+
+func _weighted_pick_rc9(band: StringName, history: Array, wild_weight: float) -> StringName:
+	var ids := get_all_item_ids()
+	var weighted: Dictionary = {}
+	var total := 0.0
+	for item_id: StringName in ids:
+		var weight := wild_weight if item_id == WILD_TURBO else get_definition(item_id).weight_for_band(band)
+		weight *= _history_multiplier(item_id, history)
+		weighted[item_id] = weight
+		total += weight
+	if total <= 0.0:
+		return DASH_BERRY
+	var roll := _rng.randf_range(0.0, total)
+	var cursor := 0.0
+	for item_id: StringName in ids:
+		cursor += float(weighted.get(item_id, 0.0))
+		if roll <= cursor:
+			return item_id
+	return ids[-1]
+
+func _register_wild_turbo() -> void:
+	if _definitions.has(WILD_TURBO): return
+	_register_definition(WILD_TURBO, "WILD TURBO", &"speed", "WT", "WILD TURBO",
+		WILD_TURBO_FRONT_WEIGHT, WILD_TURBO_MID_WEIGHT, WILD_TURBO_BACK_WEIGHT,
+		WILD_TURBO_DURATION, WILD_TURBO_SPEED, WILD_TURBO_ACCEL)
 
 func _use_wild_turbo(character: Node) -> bool:
-	if not (character is WildDashCharacterController):
-		return false
-	var controller: WildDashCharacterController = character as WildDashCharacterController
-	var id: int = controller.get_instance_id()
-	if _wild_turbo_effects.has(id):
-		_cleanup_wild_turbo_effect(id)
-
-	var cap: float = _wild_turbo_speed_cap(controller)
-	var initial_speed: float = minf(controller.max_speed * WILD_TURBO_INITIAL_SPEED_MULTIPLIER, cap)
-	var base_turn_speed: float = controller.turn_speed
-	var turbo_turn_speed: float = base_turn_speed * WILD_TURBO_HANDLING_MULTIPLIER
-	controller.current_speed = maxf(controller.current_speed, initial_speed)
-	controller.turn_speed = turbo_turn_speed
-
-	var vfx: Node3D = _spawn_wild_turbo_vfx(controller)
-	_wild_turbo_effects[id] = {
-		"character": controller,
-		"expires": _now_seconds() + WILD_TURBO_DURATION,
-		"base_turn_speed": base_turn_speed,
-		"turbo_turn_speed": turbo_turn_speed,
-		"vfx": vfx,
-	}
-
-	var audio: Node = get_node_or_null("/root/AudioManager")
-	if audio != null:
-		audio.call("play_sfx_id", "item", 1.0)
-		if controller.has_meta(&"wild_tide_terrain"):
-			audio.call("play_sfx_id", "splash", 0.86)
+	if not character is WildDashCharacterController: return false
+	var racer := character as WildDashCharacterController
+	var id := racer.get_instance_id()
+	if _wild_turbo_effects.has(id): _cleanup_wild_turbo(id)
+	var canonical := _canonical_max(racer)
+	var cap := canonical * WILD_TURBO_CAP
+	racer.current_speed = maxf(racer.current_speed, canonical * WILD_TURBO_INITIAL)
+	var base_turn := racer.turn_speed
+	var turbo_turn := base_turn * WILD_TURBO_HANDLING
+	racer.turn_speed = turbo_turn
+	var vfx := _spawn_turbo_vfx(racer)
+	var camera := racer.get_viewport().get_camera_3d()
+	var base_fov := camera.fov if camera != null else 0.0
+	var turbo_fov := minf(96.0, base_fov + 10.0) if camera != null else 0.0
+	if camera != null: camera.fov = turbo_fov
+	_wild_turbo_effects[id] = {"character": racer, "expires": _now_seconds() + WILD_TURBO_DURATION,
+		"base_turn": base_turn, "turbo_turn": turbo_turn, "vfx": vfx, "camera": camera,
+		"base_fov": base_fov, "turbo_fov": turbo_fov}
+	racer.set_meta(&"wild_turbo_active", true)
+	AudioManager.play_sfx_id("skill", 1.0)
+	AudioManager.play_sfx_id("item", 1.0)
+	if racer.has_meta(&"wild_tide_terrain"): AudioManager.play_sfx_id("splash", 0.92)
+	print("WILD TURBO SPEED CAP racer=%s canonical=%.2f initial=%.2f cap=%.2f multiplier=%.2f" % [_label(racer), canonical, canonical * WILD_TURBO_INITIAL, cap, WILD_TURBO_CAP])
 	return true
 
-func _update_wild_turbo_effects(delta: float) -> void:
-	var now: float = _now_seconds()
+func _update_wild_turbo(delta: float) -> void:
+	var now := _now_seconds()
 	for id_value: Variant in _wild_turbo_effects.keys():
-		var id: int = int(id_value)
+		var id := int(id_value)
 		var data: Dictionary = _wild_turbo_effects.get(id, {})
-		var character_value: Variant = data.get("character")
-		if character_value == null or not is_instance_valid(character_value):
-			_cleanup_wild_turbo_effect(id)
+		var racer := data.get("character") as WildDashCharacterController
+		if racer == null or not is_instance_valid(racer) or float(data.get("expires", 0.0)) <= now:
+			_cleanup_wild_turbo(id)
 			continue
-		if float(data.get("expires", 0.0)) <= now:
-			_cleanup_wild_turbo_effect(id)
-			continue
-		if not (character_value is WildDashCharacterController):
-			_cleanup_wild_turbo_effect(id)
-			continue
+		var canonical := _canonical_max(racer)
+		var cap := canonical * WILD_TURBO_CAP
+		racer.current_speed = minf(cap, move_toward(racer.current_speed, cap, racer.acceleration * WILD_TURBO_ACCEL * delta))
 
-		var controller: WildDashCharacterController = character_value as WildDashCharacterController
-		var cap: float = _wild_turbo_speed_cap(controller)
-		var sustained: float = minf(controller.max_speed * WILD_TURBO_SPEED_MULTIPLIER, cap)
-		var turbo_acceleration: float = controller.acceleration * WILD_TURBO_ACCELERATION_MULTIPLIER
-		controller.current_speed = move_toward(controller.current_speed, sustained, turbo_acceleration * delta)
-		var minimum_burst: float = minf(controller.max_speed * 1.48, cap)
-		controller.current_speed = maxf(controller.current_speed, minimum_burst)
-
-		var vfx_value: Variant = data.get("vfx")
-		if vfx_value is Node3D and is_instance_valid(vfx_value):
-			var vfx: Node3D = vfx_value as Node3D
-			vfx.scale.z = 0.88 + sin(now * 24.0) * 0.10
-
-func _cleanup_wild_turbo_effect(id: int) -> void:
+func _cleanup_wild_turbo(id: int) -> void:
 	var data: Dictionary = _wild_turbo_effects.get(id, {})
-	if data.is_empty():
-		return
-	var character_value: Variant = data.get("character")
-	if character_value is WildDashCharacterController and is_instance_valid(character_value):
-		var controller: WildDashCharacterController = character_value as WildDashCharacterController
-		var base_turn: float = float(data.get("base_turn_speed", controller.turn_speed))
-		var turbo_turn: float = float(data.get("turbo_turn_speed", controller.turn_speed))
-		# Only restore when another terrain/system has not intentionally replaced
-		# turn_speed while Turbo was active.
-		if absf(controller.turn_speed - turbo_turn) <= 0.02:
-			controller.turn_speed = base_turn
-	var vfx_value: Variant = data.get("vfx")
-	if vfx_value is Node and is_instance_valid(vfx_value):
-		(vfx_value as Node).queue_free()
+	if data.is_empty(): return
+	var racer := data.get("character") as WildDashCharacterController
+	if racer != null and is_instance_valid(racer):
+		if absf(racer.turn_speed - float(data.get("turbo_turn", racer.turn_speed))) <= 0.03:
+			racer.turn_speed = float(data.get("base_turn", racer.turn_speed))
+		racer.remove_meta(&"wild_turbo_active")
+	var camera := data.get("camera") as Camera3D
+	if camera != null and is_instance_valid(camera) and absf(camera.fov - float(data.get("turbo_fov", camera.fov))) <= 0.2:
+		camera.fov = float(data.get("base_fov", camera.fov))
+	var vfx := data.get("vfx") as Node
+	if vfx != null and is_instance_valid(vfx): vfx.queue_free()
 	_wild_turbo_effects.erase(id)
 
-func _wild_turbo_speed_cap(controller: WildDashCharacterController) -> float:
-	if controller == null:
-		return 0.0
-	var canonical_max: float = controller.max_speed
-	var definition: WildDashAnimalDefinition = controller.get_animal_definition()
-	if definition != null and definition.max_speed > 0.01:
-		canonical_max = definition.max_speed
-	# Strict canonical cap prevents Crocodile water multipliers and other runtime
-	# max-speed modifications from stacking Turbo into an unintended extreme.
-	return canonical_max * WILD_TURBO_CANONICAL_SPEED_CAP
+func _canonical_max(racer: WildDashCharacterController) -> float:
+	if racer == null: return 0.0
+	var definition := racer.get_animal_definition()
+	return definition.max_speed if definition != null and definition.max_speed > 0.01 else racer.max_speed
 
-func _spawn_wild_turbo_vfx(controller: WildDashCharacterController) -> Node3D:
-	var root: Node3D = Node3D.new()
+func _use_power_shockwave(character: Node) -> bool:
+	if not character is WildDashCharacterController: return false
+	var source := character as WildDashCharacterController
+	var hits := 0
+	for value: Variant in RaceManager.racers:
+		var target := value as WildDashCharacterController
+		if target == null or target == source or target.finished: continue
+		if source.global_position.distance_to(target.global_position) <= POWER_SHOCKWAVE_RADIUS:
+			if apply_attack(target, source, &"shockwave", POWER_SHOCKWAVE_DURATION, POWER_SHOCKWAVE_SLOW, POWER_SHOCKWAVE_KNOCKBACK): hits += 1
+	print("SHOCKWAVE POWER RESOLVE racer=%s hits=%d radius=%.1f knockback=%.1f speed_loss=%.0f%%" % [_label(source), hits, POWER_SHOCKWAVE_RADIUS, POWER_SHOCKWAVE_KNOCKBACK, (1.0 - POWER_SHOCKWAVE_SLOW) * 100.0])
+	return true
+
+func _use_power_wind(character: Node) -> bool:
+	if not character is WildDashCharacterController: return false
+	var source := character as WildDashCharacterController
+	source.current_speed = maxf(source.current_speed, source.max_speed * POWER_WIND_SELF_SPEED)
+	var forward := -source.global_transform.basis.z.normalized()
+	var hits := 0
+	for value: Variant in RaceManager.racers:
+		var target := value as WildDashCharacterController
+		if target == null or target == source or target.finished: continue
+		var offset := target.global_position - source.global_position
+		if offset.length() <= POWER_WIND_RADIUS and offset.length() > 0.01 and forward.dot(offset.normalized()) >= 0.16:
+			if apply_attack(target, source, &"wind_boost", 0.18, 0.94, POWER_WIND_PUSH): hits += 1
+	print("WIND BOOST POWER RESOLVE racer=%s hits=%d radius=%.1f push=%.1f" % [_label(source), hits, POWER_WIND_RADIUS, POWER_WIND_PUSH])
+	return true
+
+func _spawn_turbo_vfx(racer: WildDashCharacterController) -> Node3D:
+	var root := Node3D.new()
 	root.name = "WildTurboVFX"
 	root.position = Vector3(0.0, 0.58, 1.55)
-	controller.add_child(root)
-
-	var dry_material: StandardMaterial3D = _turbo_material(Color(1.0, 0.76, 0.10), Color(1.0, 0.34, 0.04), 2.6)
-	var water_material: StandardMaterial3D = _turbo_material(Color(0.35, 0.96, 1.0), Color(0.05, 0.72, 1.0), 2.8)
-	var material: StandardMaterial3D = water_material if controller.has_meta(&"wild_tide_terrain") else dry_material
-	for side: float in [-1.0, 1.0]:
-		var streak: MeshInstance3D = MeshInstance3D.new()
-		var mesh: BoxMesh = BoxMesh.new()
-		mesh.size = Vector3(0.13, 0.10, 4.4)
-		streak.mesh = mesh
-		streak.position = Vector3(side * 0.68, 0.0, 1.35)
-		streak.material_override = material
-		streak.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		root.add_child(streak)
-		if controller.has_meta(&"wild_tide_terrain"):
-			var foam: MeshInstance3D = MeshInstance3D.new()
-			var foam_mesh: BoxMesh = BoxMesh.new()
-			foam_mesh.size = Vector3(0.26, 0.035, 3.6)
-			foam.mesh = foam_mesh
-			foam.position = Vector3(side * 0.78, -0.42, 1.15)
-			foam.material_override = water_material
-			foam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			root.add_child(foam)
-	return root
-
-func _turbo_material(albedo: Color, emission: Color, energy: float) -> StandardMaterial3D:
-	var material: StandardMaterial3D = StandardMaterial3D.new()
-	material.albedo_color = albedo
+	racer.add_child(root)
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.35, 0.96, 1.0) if racer.has_meta(&"wild_tide_terrain") else Color(1.0, 0.76, 0.10)
 	material.emission_enabled = true
-	material.emission = emission
-	material.emission_energy_multiplier = energy
+	material.emission = material.albedo_color
+	material.emission_energy_multiplier = 3.0
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	return material
+	for side: float in [-1.0, 1.0]:
+		var streak := MeshInstance3D.new()
+		var mesh := BoxMesh.new()
+		mesh.size = Vector3(0.14, 0.10, 6.0)
+		streak.mesh = mesh
+		streak.position = Vector3(side * 0.72, 0.0, 1.75)
+		streak.material_override = material
+		root.add_child(streak)
+	return root

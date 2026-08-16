@@ -1,36 +1,37 @@
 class_name WildDashSpringTrap
 extends Area3D
 
-const LIFE_SECONDS := 10.0
+const LIFE_SECONDS: float = 10.0
+const LAUNCH_SCALE: float = 0.92
 
 var owner_racer: WildDashCharacterController
-var _life := LIFE_SECONDS
+var _life: float = LIFE_SECONDS
 
 func _ready() -> void:
 	collision_layer = 8
 	collision_mask = 2
 	monitoring = true
 	body_entered.connect(_on_body_entered)
-	var collision := CollisionShape3D.new()
-	var shape := CylinderShape3D.new()
-	shape.radius = 0.95
+	var collision: CollisionShape3D = CollisionShape3D.new()
+	var shape: CylinderShape3D = CylinderShape3D.new()
+	shape.radius = 1.00
 	shape.height = 0.45
 	collision.shape = shape
 	add_child(collision)
-	var visual := MeshInstance3D.new()
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = 0.85
-	mesh.bottom_radius = 1.05
+	var visual: MeshInstance3D = MeshInstance3D.new()
+	var mesh: CylinderMesh = CylinderMesh.new()
+	mesh.top_radius = 0.90
+	mesh.bottom_radius = 1.10
 	mesh.height = 0.22
 	mesh.radial_segments = 10
 	visual.mesh = mesh
-	var material := StandardMaterial3D.new()
+	var material: StandardMaterial3D = StandardMaterial3D.new()
 	material.albedo_color = Color(0.92, 0.18, 0.23)
 	material.metallic = 0.35
 	material.roughness = 0.42
 	material.emission_enabled = true
 	material.emission = Color(0.28, 0.02, 0.03)
-	material.emission_energy_multiplier = 0.9
+	material.emission_energy_multiplier = 1.1
 	visual.material_override = material
 	add_child(visual)
 
@@ -42,7 +43,7 @@ func _process(delta: float) -> void:
 func _on_body_entered(body: Node) -> void:
 	if body == owner_racer or not body is WildDashCharacterController:
 		return
-	var racer := body as WildDashCharacterController
+	var racer: WildDashCharacterController = body as WildDashCharacterController
 	if ItemSystem.has_shield(racer):
 		ItemSystem.apply_attack(racer, owner_racer, &"spring_trap", 0.0, 1.0, 0.0)
 		queue_free()
@@ -50,9 +51,12 @@ func _on_body_entered(body: Node) -> void:
 	var defense: float = WildDashRaceCombatBalance.get_defense_rating(racer.animal_id)
 	var launch_multiplier: float = WildDashRaceCombatBalance.get_trap_launch_multiplier(racer.animal_id)
 	var disruption: float = WildDashRaceCombatBalance.get_item_disruption_multiplier(racer.animal_id)
-	var launch_velocity: float = racer.jump_velocity * 0.76 * launch_multiplier
+	var launch_velocity: float = racer.jump_velocity * LAUNCH_SCALE * launch_multiplier
 	racer.velocity.y = maxf(racer.velocity.y, launch_velocity)
-	var speed_retention: float = clampf(0.86 + (1.0 - disruption) * 0.24, 0.86, 0.97)
+	var speed_retention: float = clampf(0.80 + (1.0 - disruption) * 0.20, 0.80, 0.94)
 	racer.current_speed *= speed_retention
-	print("SPRING TRAP DEFENSE target=%s defense=%.1f launch=%.2f retention=%.2f" % [RaceManager.get_racer_label(racer), defense, launch_velocity, speed_retention])
+	AudioManager.play_sfx_id("hit", 0.72)
+	print("SPRING TRAP POWER target=%s defense=%.1f launch=%.2f retention=%.2f" % [
+		RaceManager.get_racer_label(racer), defense, launch_velocity, speed_retention,
+	])
 	queue_free()
