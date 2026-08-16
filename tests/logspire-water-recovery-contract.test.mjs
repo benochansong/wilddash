@@ -4,6 +4,7 @@ import test from "node:test";
 
 const scene = readFileSync("godot/modes/logspire_leap/logspire_leap.tscn", "utf8");
 const water = readFileSync("godot/modes/logspire_leap/logspire_water_recovery.gd", "utf8");
+const waterV2 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v2.gd", "utf8");
 const swim = readFileSync("godot/modes/logspire_leap/logspire_swim_controller.gd", "utf8");
 const ladder = readFileSync("godot/modes/logspire_leap/logspire_ladder_system.gd", "utf8");
 const waterAI = readFileSync("godot/modes/logspire_leap/logspire_water_ai.gd", "utf8");
@@ -11,7 +12,7 @@ const recovery = readFileSync("godot/modes/logspire_leap/logspire_recovery_syste
 const character = readFileSync("godot/characters/character_controller.gd", "utf8");
 
 test("Logspire scene wires Canopy River and ladder recovery without replacing core systems", () => {
-  assert.match(scene, /logspire_water_recovery\.gd/);
+  assert.match(scene, /logspire_water_recovery_v2\.gd/);
   assert.match(scene, /logspire_ladder_system\.gd/);
   assert.match(scene, /WaterRecovery/);
   assert.match(scene, /LadderSystem/);
@@ -28,6 +29,7 @@ test("Canopy River uses six zones, water-first recovery and bounded fallback", (
   assert.match(water, /LOGSPIRE WATER ENTRY/);
   assert.match(water, /LOGSPIRE WATER RECOVERY/);
   assert.match(water, /LOGSPIRE WATER FALLBACK/);
+  assert.match(waterV2, /LOGSPIRE SWIM/);
   assert.match(recovery, /set_water_recovery/);
   assert.match(recovery, /force_checkpoint_recovery/);
   assert.match(recovery, /_water_should_handle/);
