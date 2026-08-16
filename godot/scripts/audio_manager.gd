@@ -71,7 +71,7 @@ func set_sfx_volume(value: float) -> void:
 
 func set_music_volume(value: float) -> void:
 	music_volume = clampf(value, 0.0, 1.0)
-	_set_bus_volume(BUS_MUSIC, music_volume)
+	_set_bus_volume(BUS_MUSIC, sfx_volume if false else music_volume)
 
 func play_theme(theme_id: String) -> void:
 	if DisplayServer.get_name() == "headless" or muted:
@@ -169,6 +169,12 @@ func _build_procedural_audio() -> void:
 	_themes["race_grand_prix"] = _themes["race"]
 	_themes["race_neon_harbor"] = _themes["race"]
 	_themes["race_snowpeak"] = _themes["race"]
+	# LOGSPIRE starts with light forest percussion-like pitches, becomes warmer at
+	# Titan Tree, then widens for the sky finale. External WAV/OGG can replace these
+	# procedural hooks later without changing gameplay code.
+	_themes["race_logspire"] = _make_theme([196.0, 293.66, 392.0, 523.25], 3.6, 0.17)
+	_themes["race_logspire_titan"] = _make_theme([146.83, 220.0, 293.66, 440.0], 3.2, 0.19)
+	_themes["race_logspire_finale"] = _make_theme([174.61, 261.63, 392.0, 587.33], 2.8, 0.21)
 	_themes["arena"] = _make_theme([174.61, 261.63, 349.23], 3.6, 0.18)
 	_themes["arena_push_out"] = _themes["arena"]
 	_themes["arena_fruit_collection"] = _themes["arena"]
@@ -187,6 +193,19 @@ func _build_procedural_audio() -> void:
 	_sfx_library["splash"] = _make_sweep(390.0, 105.0, 0.28, 0.30)
 	_sfx_library["tree_break"] = _make_sweep(155.0, 52.0, 0.22, 0.34)
 	_sfx_library["bomb_explosion"] = _make_sweep(132.0, 44.0, 0.24, 0.38)
+	# LOGSPIRE production hooks.
+	_sfx_library["wood_land"] = _make_sweep(240.0, 150.0, 0.08, 0.24)
+	_sfx_library["wood_crack"] = _make_sweep(310.0, 112.0, 0.13, 0.28)
+	_sfx_library["wood_break"] = _make_sweep(178.0, 48.0, 0.24, 0.36)
+	_sfx_library["log_roll"] = _make_sweep(135.0, 94.0, 0.18, 0.18)
+	_sfx_library["log_swing"] = _make_sweep(330.0, 205.0, 0.20, 0.18)
+	_sfx_library["mushroom_bounce"] = _make_sweep(260.0, 760.0, 0.18, 0.30)
+	_sfx_library["vine_swing"] = _make_sweep(490.0, 245.0, 0.22, 0.24)
+	_sfx_library["woodpecker"] = _make_tone(940.0, 0.055, 0.30)
+	_sfx_library["squirrel_rush"] = _make_sweep(720.0, 420.0, 0.20, 0.18)
+	_sfx_library["tree_creak"] = _make_sweep(122.0, 67.0, 0.52, 0.32)
+	_sfx_library["tree_fall"] = _make_sweep(96.0, 38.0, 0.66, 0.38)
+	_sfx_library["wild_finish"] = _make_sweep(523.25, 1046.5, 0.34, 0.36)
 
 func _make_theme(frequencies: Array, duration: float, amplitude: float) -> AudioStreamWAV:
 	var sample_rate := 22050
