@@ -21,6 +21,7 @@ var _recovery: Node
 var _gameplay: Node
 var _combat_safety: Node
 var _mushroom_feedback: Node
+var _phase3: Node
 var _main_route: Array[Vector3] = []
 var _safe_route_with_runout: Array[Vector3] = []
 var _safe_route_ids: Array[StringName] = []
@@ -37,7 +38,7 @@ func _ready() -> void:
 	setup_mode(
 		MODE_ID,
 		"ROUND 3 — LOGSPIRE LEAP",
-		"W/↑ 달리기 · A/D 조향 · Space 점프 · 움직이는 통나무를 읽고 THE CROWN NEST까지 올라가세요",
+		"W/↑ 달리기 · A/D 조향 · Space 점프 · 살아 움직이는 숲을 올라 THE CROWN NEST에 도달하세요",
 		false,
 	)
 	RaceManager.active = false
@@ -51,8 +52,9 @@ func _ready() -> void:
 	_gameplay = get_node_or_null("PlatformGameplay")
 	_combat_safety = get_node_or_null("CombatSafety")
 	_mushroom_feedback = get_node_or_null("MushroomFeedback")
-	if _world == null or _graph == null or _recovery == null or _gameplay == null or _combat_safety == null or _mushroom_feedback == null:
-		push_error("LOGSPIRE ROUND INIT FAIL missing world/graph/recovery/gameplay/combat/feedback node")
+	_phase3 = get_node_or_null("Phase3Director")
+	if _world == null or _graph == null or _recovery == null or _gameplay == null or _combat_safety == null or _mushroom_feedback == null or _phase3 == null:
+		push_error("LOGSPIRE ROUND INIT FAIL missing world/graph/recovery/gameplay/combat/feedback/phase3 node")
 		return
 
 	_graph.call("configure", _world)
@@ -61,6 +63,7 @@ func _ready() -> void:
 		return
 	_gameplay.call("configure", _world, _graph)
 	_mushroom_feedback.call("configure", _world)
+	_phase3.call("configure", _world, _graph)
 
 	_main_route = _copy_vector3_array(_world.call("get_main_route_points"))
 	var checkpoints: Array[Vector3] = _copy_vector3_array(_world.call("get_checkpoint_positions"))
@@ -137,9 +140,10 @@ func _ready() -> void:
 		GameManager.set_state(GameManager.GameState.RACE)
 	else:
 		GameManager.begin_round(MODE_ID)
+		print("CAMPAIGN ROUND 3 LOGSPIRE id=logspire_leap next=push_out")
 	RaceManager.start_race()
 
-	print("LOGSPIRE ROUND READY phase=2 run_mode=%s racers=%d ai=%d zones=%d checkpoints=%d platforms=%d course_length=%.1fm vertical_gain=%.1fm item_boxes=%d moving_gameplay=true" % [
+	print("LOGSPIRE ROUND READY phase=3 run_mode=%s racers=%d ai=%d zones=%d checkpoints=%d platforms=%d course_length=%.1fm vertical_gain=%.1fm item_boxes=%d living_tree=true finale=true" % [
 		"F6_DIRECT" if _direct_run else "CAMPAIGN",
 		RaceManager.racers.size(),
 		ai_racers.size(),
@@ -296,10 +300,12 @@ func _on_player_finished(rank: int) -> void:
 	if mode_finished:
 		return
 	_player_rank = rank
+	if _phase3 != null and _phase3.has_method("notify_player_finish"):
+		_phase3.call("notify_player_finish", rank)
 	var elapsed: float = RaceManager.get_elapsed_seconds()
 	var success: bool = rank > 0 and rank <= ceili(float(RaceManager.racers.size()) * 0.5)
 	var average_fps: float = 0.0 if _fps_samples == 0 else _fps_sum / float(_fps_samples)
-	print("LOGSPIRE PLAYER FINISH rank=%d elapsed=%.2fs checkpoints=%d/%d fps=%.1f phase=2" % [
+	print("LOGSPIRE PLAYER FINISH rank=%d elapsed=%.2fs checkpoints=%d/%d fps=%.1f phase=3" % [
 		rank, elapsed, RaceManager.get_checkpoint_progress(player), RaceManager.get_checkpoint_count(), average_fps,
 	])
 	if _direct_run:
@@ -318,7 +324,7 @@ func _on_player_finished(rank: int) -> void:
 		"average_fps": average_fps,
 		"item_boxes": _item_boxes.size(),
 		"shortcut_design_saving_seconds": float(_gameplay.call("get_design_shortcut_saving_seconds")),
-		"phase": 2,
+		"phase": 3,
 	})
 
 func _on_race_completed() -> void:
@@ -336,7 +342,7 @@ func _on_race_completed() -> void:
 		"checkpoints": RaceManager.get_checkpoint_count(),
 		"track_length_m": RaceManager.get_track_length(),
 		"item_boxes": _item_boxes.size(),
-		"phase": 2,
+		"phase": 3,
 	})
 
 func _is_campaign_slot_active() -> bool:
