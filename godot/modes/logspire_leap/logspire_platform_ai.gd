@@ -18,6 +18,7 @@ const LAND_STATE_SECONDS: float = 0.18
 const JUMP_COOLDOWN_SECONDS: float = 0.28
 const SAFE_TARGET_AFTER_FAILURES: int = 2
 const ROUTE_FALLBACK_AFTER_FAILURES: int = 3
+const FINAL_BRIDGE_JUMP_TRIGGER: float = 7.2
 
 var _racer: WildDashCharacterController
 var _driver: WildDashAIController
@@ -39,6 +40,9 @@ var _last_failed_target: int = -1
 var _same_target_failures: int = 0
 var _safer_landing_mode: bool = false
 var _last_landed_route_index: int = 0
+var _phase3_world_state: StringName = &"STATE_A"
+var _phase3_grace_seconds: float = 0.0
+var _final_bridge_ready: bool = false
 
 func configure(
 	racer: WildDashCharacterController,
@@ -62,7 +66,7 @@ func configure(
 	_route_id = route_id
 	_trigger_bias = float((racer.get_instance_id() % 7) - 3) * 0.08 if racer != null else 0.0
 	_was_on_floor = racer != null and racer.is_on_floor()
-	print("LOGSPIRE PLATFORM AI V2 READY racer=%s route=%s nodes=%d difficulty=%s moving_prediction=true rotation_prediction=true failure_counter=true" % [
+	print("LOGSPIRE PLATFORM AI V3 READY racer=%s route=%s nodes=%d difficulty=%s moving_prediction=true rotation_prediction=true failure_counter=true phase3_state=true" % [
 		RaceManager.get_racer_label(racer),
 		String(_route_id),
 		_route.size(),
@@ -72,6 +76,7 @@ func configure(
 func _physics_process(delta: float) -> void:
 	_jump_cooldown = maxf(0.0, _jump_cooldown - delta)
 	_land_state_remaining = maxf(0.0, _land_state_remaining - delta)
+	_phase3_grace_seconds = maxf(0.0, _phase3_grace_seconds - delta)
 	if _racer == null or _driver == null or _racer.finished or not RaceManager.active:
 		return
 
@@ -115,6 +120,11 @@ func _physics_process(delta: float) -> void:
 	planar_delta.y = 0.0
 	var planar_distance: float = planar_delta.length()
 	var trigger_distance: float = _get_jump_trigger_distance(risk, landing_radius, target_velocity.length(), tilt, shortcut)
+	# Once the Last Tree has settled, racers should use it as the bridge instead of
+	# trying a long early jump to the Crown Nest center. The launch area at the tree
+	# tip then produces the authored final jump for both player and AI.
+	if _final_bridge_ready and platform_id == &"CROWN_NEST":
+		trigger_distance = minf(trigger_distance, FINAL_BRIDGE_JUMP_TRIGGER)
 
 	if planar_distance <= trigger_distance + 2.6 and planar_distance > trigger_distance:
 		_state = JumpState.PREPARE_JUMP
@@ -134,7 +144,7 @@ func _physics_process(delta: float) -> void:
 	_racer.current_speed = maxf(_racer.current_speed, _racer.cruise_speed * (1.00 if _safer_landing_mode else 0.96))
 	_jump_cooldown = JUMP_COOLDOWN_SECONDS
 	_jump_count += 1
-	print("LOGSPIRE JUMP AI racer=%s from=%d target=%d platform=%s route=%s distance=%.2f height=%.2f radius=%.2f risk=%.2f moving=%.2f tilt=%.3f shortcut=%s shortcut_value=%.1fs safer=%s" % [
+	print("LOGSPIRE JUMP AI racer=%s from=%d target=%d platform=%s route=%s distance=%.2f height=%.2f radius=%.2f risk=%.2f moving=%.2f tilt=%.3f shortcut=%s shortcut_value=%.1fs safer=%s world_state=%s final_bridge=%s" % [
 		RaceManager.get_racer_label(_racer),
 		maxi(0, target_index - 1),
 		target_index,
@@ -149,6 +159,33 @@ func _physics_process(delta: float) -> void:
 		str(shortcut),
 		shortcut_value,
 		str(_safer_landing_mode),
+		String(_phase3_world_state),
+		str(_final_bridge_ready),
+	])
+
+func notify_phase3_state(state: StringName) -> void:
+	_phase3_world_state = state
+	match state:
+		&"living_tree_transition":
+			_phase3_grace_seconds = 1.20
+			_safer_landing_mode = true
+		&"living_tree_state_b":
+			_phase3_world_state = &"STATE_B"
+			_phase3_grace_seconds = 0.55
+			if _same_target_failures <= 0:
+				_safer_landing_mode = false
+		&"final_tree_falling":
+			_phase3_grace_seconds = 1.35
+			_safer_landing_mode = true
+		&"final_bridge_ready":
+			_final_bridge_ready = true
+			_phase3_grace_seconds = 0.40
+			if _same_target_failures <= 0:
+				_safer_landing_mode = false
+		_:
+			pass
+	print("LOGSPIRE AI WORLD STATE racer=%s state=%s grace=%.2f final_bridge=%s cached_route_valid=true" % [
+		RaceManager.get_racer_label(_racer), String(state), _phase3_grace_seconds, str(_final_bridge_ready),
 	])
 
 func notify_recovered() -> void:
@@ -164,7 +201,7 @@ func notify_recovered() -> void:
 		_last_failed_target = failed_target
 		_same_target_failures = 1
 
-	_safer_landing_mode = _same_target_failures >= SAFE_TARGET_AFTER_FAILURES
+	_safer_landing_mode = _same_target_failures >= SAFE_TARGET_AFTER_FAILURES or _phase3_grace_seconds > 0.0
 	print("LOGSPIRE AI RECOVERY racer=%s route=%s target=%d same_target_failures=%d safer_landing=%s" % [
 		RaceManager.get_racer_label(_racer), String(_route_id), failed_target, _same_target_failures, str(_safer_landing_mode),
 	])
@@ -208,7 +245,8 @@ func _on_successful_landing() -> void:
 		if _last_failed_target >= 0 and route_index > _last_failed_target:
 			_last_failed_target = -1
 			_same_target_failures = 0
-			_safer_landing_mode = false
+			if _phase3_grace_seconds <= 0.0:
+				_safer_landing_mode = false
 
 func _get_jump_trigger_distance(risk: float, landing_radius: float, moving_speed: float, tilt: float, shortcut: bool) -> float:
 	var trigger: float = 16.20 + clampf(_racer.current_speed - 10.0, 0.0, 9.0) * 0.11 + _trigger_bias
@@ -221,6 +259,8 @@ func _get_jump_trigger_distance(risk: float, landing_radius: float, moving_speed
 		trigger += 0.18
 	if _safer_landing_mode:
 		trigger += 0.75
+	if _phase3_grace_seconds > 0.0:
+		trigger += 0.45
 	match GameManager.difficulty:
 		&"wild":
 			trigger += 0.45
@@ -241,6 +281,8 @@ func _get_jump_scale(height_delta: float, risk: float, moving_speed: float, tilt
 		scale += 0.02
 	if _safer_landing_mode:
 		scale += 0.045
+	if _phase3_grace_seconds > 0.0:
+		scale += 0.025
 	match GameManager.difficulty:
 		&"wild":
 			scale += 0.04
