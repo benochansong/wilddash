@@ -12,14 +12,15 @@ const START_GRID_COLUMNS: int = 5
 const START_GRID_X_SPACING: float = 2.75
 const START_GRID_Z_SPACING: float = 3.35
 const FINISH_RUNOUT_DISTANCE: float = 9.0
-const ROUND1_REFERENCE_ITEM_BOXES: int = 33
-const PHASE2_TARGET_ITEM_BOXES: int = 17
+const ROUND1_REFERENCE_ITEM_BOXES: int = 36
+const PHASE2_TARGET_ITEM_BOXES: int = 20
 
 var _world: Node
 var _graph: Node
 var _recovery: Node
 var _gameplay: Node
 var _combat_safety: Node
+var _mushroom_feedback: Node
 var _main_route: Array[Vector3] = []
 var _safe_route_with_runout: Array[Vector3] = []
 var _safe_route_ids: Array[StringName] = []
@@ -49,8 +50,9 @@ func _ready() -> void:
 	_recovery = get_node_or_null("RecoverySystem")
 	_gameplay = get_node_or_null("PlatformGameplay")
 	_combat_safety = get_node_or_null("CombatSafety")
-	if _world == null or _graph == null or _recovery == null or _gameplay == null or _combat_safety == null:
-		push_error("LOGSPIRE ROUND INIT FAIL missing world/graph/recovery/gameplay/combat node")
+	_mushroom_feedback = get_node_or_null("MushroomFeedback")
+	if _world == null or _graph == null or _recovery == null or _gameplay == null or _combat_safety == null or _mushroom_feedback == null:
+		push_error("LOGSPIRE ROUND INIT FAIL missing world/graph/recovery/gameplay/combat/feedback node")
 		return
 
 	_graph.call("configure", _world)
@@ -58,6 +60,7 @@ func _ready() -> void:
 		push_error("LOGSPIRE ROUND INIT FAIL platform graph unavailable")
 		return
 	_gameplay.call("configure", _world, _graph)
+	_mushroom_feedback.call("configure", _world)
 
 	_main_route = _copy_vector3_array(_world.call("get_main_route_points"))
 	var checkpoints: Array[Vector3] = _copy_vector3_array(_world.call("get_checkpoint_positions"))
@@ -224,11 +227,12 @@ func _spawn_phase2_item_boxes() -> void:
 	elif RaceManager.racers.size() >= 15:
 		respawn = 5.2
 
-	# Five broad three-box stations plus a two-box Wild Route reward = 17 boxes.
+	# Six broad three-box stations plus a two-box Wild Route reward = 20 boxes.
 	_spawn_item_station(&"Z1_07", [-2.8, 0.0, 2.8], ROUTE_SAFE, respawn)
 	_spawn_item_station(&"Z2_08", [-2.7, 0.0, 2.7], ROUTE_SAFE, respawn)
 	_spawn_item_station(&"Z3_04", [-3.2, 0.0, 3.2], ROUTE_SAFE, respawn)
 	_spawn_item_station(&"Z4_MERGE", [-3.4, 0.0, 3.4], ROUTE_SAFE, respawn)
+	_spawn_item_station(&"Z5_APPROACH_02", [-2.6, 0.0, 2.6], ROUTE_SAFE, respawn)
 	_spawn_item_station(&"Z6_START", [-2.8, 0.0, 2.8], ROUTE_SAFE, respawn)
 	_spawn_item_station(&"Z4_WILD_05", [-1.7, 1.7], ROUTE_WILD, respawn)
 
