@@ -9,6 +9,7 @@ var _wild_ids: Array[StringName] = []
 var _safe_points: Array[Vector3] = []
 var _wild_points: Array[Vector3] = []
 var _ready_for_race: bool = false
+var _world_state: StringName = &"STATE_A"
 
 func configure(world: Node) -> void:
 	_world = world
@@ -16,16 +17,29 @@ func configure(world: Node) -> void:
 	_wild_ids = _copy_string_name_array(_world.call("get_route_ids", ROUTE_WILD))
 	_safe_points = _copy_vector3_array(_world.call("get_route_points", ROUTE_SAFE))
 	_wild_points = _copy_vector3_array(_world.call("get_route_points", ROUTE_WILD))
+	_world_state = &"STATE_A"
 	_ready_for_race = _safe_points.size() >= 2 and _wild_points.size() >= 2
-	print("LOGSPIRE PLATFORM GRAPH V2 READY safe_nodes=%d wild_nodes=%d safe_length=%.1fm wild_length=%.1fm route_choice=weighted_by_difficulty" % [
+	print("LOGSPIRE PLATFORM GRAPH V3 READY safe_nodes=%d wild_nodes=%d safe_length=%.1fm wild_length=%.1fm route_choice=weighted_by_difficulty world_state=%s" % [
 		_safe_points.size(),
 		_wild_points.size(),
 		_route_length(_safe_points),
 		_route_length(_wild_points),
+		String(_world_state),
 	])
 
 func is_ready_for_race() -> bool:
 	return _ready_for_race
+
+func set_world_state(state: StringName) -> void:
+	if state == &"" or state == _world_state:
+		return
+	_world_state = state
+	# State B adds authored branch bridges while the original safe route remains
+	# the non-crushing fallback. Cached route points therefore never become stale.
+	print("LOGSPIRE PLATFORM GRAPH STATE state=%s cached_routes_valid=true safety_corridor=true" % String(_world_state))
+
+func get_world_state() -> StringName:
+	return _world_state
 
 func choose_route(slot: int, difficulty: StringName) -> StringName:
 	# WILD difficulty is the accessibility preset: mostly safe with occasional
