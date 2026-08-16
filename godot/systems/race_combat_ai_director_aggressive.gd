@@ -205,4 +205,41 @@ func _try_body_check(
 	return true
 
 func _on_item_hit(target: Node, source: Node, effect_id: StringName, blocked: bool) -> void:
-	super._on_item_hit(target, source, efffV5ñ¥°‰±½­•¤(%¥˜‰±½­•è($%É•ÑÕÉ¸(%Ù…ÈÙ¥Ñ¥´è]¥±‘…Í¡¡…É…Ñ•É½¹ÑÉ½±±•È€ôÑ…É•Ð…Ì]¥±‘…Í¡¡…É…Ñ•É½¹ÑÉ½±±•È(%Ù…È…ÑÑ…­•Èè]¥±‘…Í¡¡…É…Ñ•É½¹ÑÉ½±±•È€ôÍ½ÕÉ”…Ì]¥±‘…Í¡¡…É…Ñ•É½¹ÑÉ½±±•È(%¥˜Ù¥Ñ¥´€ôô¹Õ±°½È…ÑÑ…­•È€ôô¹Õ±°½ÈÙ¥Ñ¥´€ôô…ÑÑ…­•Èè($%É•ÑÕÉ¸(%¥˜¹½ÐI…•5…¹…•È¹É…•ÉÌ¹¡…Ì¡Ù¥Ñ¥´¤½È¹½ÐI…•5…¹…•È¹É…•ÉÌ¹¡…Ì¡…ÑÑ…­•È¤è($%É•ÑÕÉ¸(%}É•½É‘}Á…ÉÑå}µ¥à¡…ÑÑ…­•È°Ù¥Ñ¥´°™…±Í”¤(%¥˜¹½Ð…ÑÑ…­•È¹¥Í}Á±…å•Èè($%ÁÉ¥¹Ð ‰$%Q4!%P…ÑÑ…­•Èô•ÌÑ…É•Ðô•Ì¥Ñ•´ô•Ìµ¥àô•Ìˆ€”l($$%I…•5…¹…•È¹•Ñ}É…•É}±…‰•°¡…ÑÑ…­•È¤°($$%I…•5…¹…•È¹•Ñ}É…•É}±…‰•°¡Ù¥Ñ¥´¤°($$%MÑÉ¥¹œ¡•™™•Ñ}¥¤°($$%}µ¥á}±…‰•°¡…ÑÑ…­•È°Ù¥Ñ¥´¤°($%t¤()™Õ¹Œ}É•½É‘}Á…ÉÑå}µ¥à¡…ÑÑ…­•Èè]¥±‘…Í¡¡…É…Ñ•É½¹ÑÉ½±±•È°Ù¥Ñ¥´è]¥±‘…Í¡¡…É…Ñ•É½¹ÑÉ½±±•È°‰½‘å}¡¥Ðè‰½½°¤€´øÙ½¥è(%¥˜…ÑÑ…­•È€ôô¹Õ±°½ÈÙ¥Ñ¥´€ôô¹Õ±°è($%É•ÑÕÉ¸(%¥˜…ÑÑ…­•È¹¥Í}Á±…å•È…¹¹½ÐÙ¥Ñ¥´¹¥Í}Á±…å•Èè($%}Á…ÉÑå}Á±…å•É}ÙÍ}…¥}¡¥ÑÌ€¬ô€Ä(%•±¥˜¹½Ð…ÑÑ…­•È¹¥Í}Á±…å•È…¹Ù¥Ñ¥´¹¥Í}Á±…å•Èè($%}Á…ÉÑå}…¥}ÙÍ}Á±…å•É}¡¥ÑÌ€¬ô€Ä(%•±Í”è($%}Á…ÉÑå}…¥}ÙÍ}…¥}¡¥ÑÌ€¬ô€Ä(%¥˜‰½‘å}¡¥Ðè($%}Á…ÉÑå}‰½‘å}¡¥ÑÌ€¬ô€Ä(%•±Í”è($%}Á…ÉÑå}¥Ñ•µ}¡¥ÑÌ€¬ô€Ä()™Õ¹Œ}µ¥á}±…‰•°¡…ÑÑ…­•Èè]¥±‘…Í¡¡…É…Ñ•É½¹ÑÉ½±±•È°Ù¥Ñ¥´è]¥±‘…Í¡¡…É…Ñ•É½¹ÑÉ½±±•È¤€´øMÑÉ¥¹œè(%¥˜…ÑÑ…­•È¹¥Í}Á±…å•È…¹¹½ÐÙ¥Ñ¥´¹¥Í}Á±…å•Èè($%É•ÑÕÉ¸€‰A1eI}YM}$ˆ(%¥˜¹½Ð…ÑÑ…­•È¹¥Í}Á±…å•È…¹Ù¥Ñ¥´¹¥Í}Á±…å•Èè($%É•ÑÕÉ¸€‰%}YM}A1eHˆ(%É•ÑÕÉ¸€‰%}YM}$ˆ(
+	super._on_item_hit(target, source, effect_id, blocked)
+	if blocked:
+		return
+	var victim: WildDashCharacterController = target as WildDashCharacterController
+	var attacker: WildDashCharacterController = source as WildDashCharacterController
+	if victim == null or attacker == null or victim == attacker:
+		return
+	if not RaceManager.racers.has(victim) or not RaceManager.racers.has(attacker):
+		return
+	_record_party_mix(attacker, victim, false)
+	if not attacker.is_player:
+		print("AI ITEM HIT attacker=%s target=%s item=%s mix=%s" % [
+			RaceManager.get_racer_label(attacker),
+			RaceManager.get_racer_label(victim),
+			String(effect_id),
+			_mix_label(attacker, victim),
+		])
+
+func _record_party_mix(attacker: WildDashCharacterController, victim: WildDashCharacterController, body_hit: bool) -> void:
+	if attacker == null or victim == null:
+		return
+	if attacker.is_player and not victim.is_player:
+		_party_player_vs_ai_hits += 1
+	elif not attacker.is_player and victim.is_player:
+		_party_ai_vs_player_hits += 1
+	else:
+		_party_ai_vs_ai_hits += 1
+	if body_hit:
+		_party_body_hits += 1
+	else:
+		_party_item_hits += 1
+
+func _mix_label(attacker: WildDashCharacterController, victim: WildDashCharacterController) -> String:
+	if attacker.is_player and not victim.is_player:
+		return "PLAYER_VS_AI"
+	if not attacker.is_player and victim.is_player:
+		return "AI_VS_PLAYER"
+	return "AI_VS_AI"
