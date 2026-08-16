@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_leap.gd" id="1_mode"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_world.gd" id="2_world"]
@@ -8,6 +8,7 @@
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_platform_gameplay.gd" id="6_gameplay"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_combat_safety.gd" id="7_combat"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_mushroom_feedback.gd" id="8_mushroom"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_phase3_director.gd" id="9_phase3"]
 
 [node name="LogspireLeap" type="Node3D"]
 script = ExtResource("1_mode")
@@ -32,3 +33,6 @@ script = ExtResource("7_combat")
 
 [node name="MushroomFeedback" type="Node" parent="."]
 script = ExtResource("8_mushroom")
+
+[node name="Phase3Director" type="Node" parent="."]
+script = ExtResource("9_phase3")
