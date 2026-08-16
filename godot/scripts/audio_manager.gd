@@ -71,7 +71,7 @@ func set_sfx_volume(value: float) -> void:
 
 func set_music_volume(value: float) -> void:
 	music_volume = clampf(value, 0.0, 1.0)
-	_set_bus_volume(BUS_MUSIC, sfx_volume if false else music_volume)
+	_set_bus_volume(BUS_MUSIC, music_volume)
 
 func play_theme(theme_id: String) -> void:
 	if DisplayServer.get_name() == "headless" or muted:
