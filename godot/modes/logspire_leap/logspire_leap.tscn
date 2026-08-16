@@ -1,10 +1,12 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_leap.gd" id="1_mode"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_world.gd" id="2_world"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_platform_graph.gd" id="3_graph"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_recovery_system.gd" id="4_recovery"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_mobility_assist.gd" id="5_mobility"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_platform_gameplay.gd" id="6_gameplay"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_combat_safety.gd" id="7_combat"]
 
 [node name="LogspireLeap" type="Node3D"]
 script = ExtResource("1_mode")
@@ -20,3 +22,9 @@ script = ExtResource("4_recovery")
 
 [node name="MobilityAssist" type="Node" parent="."]
 script = ExtResource("5_mobility")
+
+[node name="PlatformGameplay" type="Node" parent="."]
+script = ExtResource("6_gameplay")
+
+[node name="CombatSafety" type="Node" parent="."]
+script = ExtResource("7_combat")

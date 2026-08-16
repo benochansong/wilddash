@@ -17,7 +17,7 @@ func configure(world: Node) -> void:
 	_safe_points = _copy_vector3_array(_world.call("get_route_points", ROUTE_SAFE))
 	_wild_points = _copy_vector3_array(_world.call("get_route_points", ROUTE_WILD))
 	_ready_for_race = _safe_points.size() >= 2 and _wild_points.size() >= 2
-	print("LOGSPIRE PLATFORM GRAPH READY safe_nodes=%d wild_nodes=%d safe_length=%.1fm wild_length=%.1fm" % [
+	print("LOGSPIRE PLATFORM GRAPH V2 READY safe_nodes=%d wild_nodes=%d safe_length=%.1fm wild_length=%.1fm route_choice=weighted_by_difficulty" % [
 		_safe_points.size(),
 		_wild_points.size(),
 		_route_length(_safe_points),
@@ -28,11 +28,14 @@ func is_ready_for_race() -> bool:
 	return _ready_for_race
 
 func choose_route(slot: int, difficulty: StringName) -> StringName:
+	# WILD difficulty is the accessibility preset: mostly safe with occasional
+	# shortcut variety. NORMAL mixes both. NIGHTMARE prefers the Wild Route but
+	# deliberately keeps a safe-route minority so the field never looks scripted.
 	if difficulty == &"wild":
-		return ROUTE_SAFE
+		return ROUTE_WILD if slot % 6 == 5 else ROUTE_SAFE
 	if difficulty == &"nightmare":
-		return ROUTE_WILD if slot % 3 == 0 else ROUTE_SAFE
-	return ROUTE_WILD if slot % 5 == 2 else ROUTE_SAFE
+		return ROUTE_SAFE if slot % 3 == 2 else ROUTE_WILD
+	return ROUTE_WILD if slot % 3 == 1 else ROUTE_SAFE
 
 func get_route_points(route_id: StringName) -> Array[Vector3]:
 	var result: Array[Vector3] = []
@@ -85,6 +88,10 @@ func get_risk(platform_id: StringName) -> float:
 
 func is_shortcut(platform_id: StringName) -> bool:
 	return _world != null and bool(_world.call("is_shortcut_platform", platform_id))
+
+func get_shortcut_value_seconds() -> float:
+	var saving_meters: float = maxf(0.0, _route_length(_safe_points) - _route_length(_wild_points))
+	return clampf(saving_meters / 11.5 + 2.6, 4.0, 8.0)
 
 func get_last_checkpoint_id(checkpoint_progress: int) -> StringName:
 	if _world == null:
