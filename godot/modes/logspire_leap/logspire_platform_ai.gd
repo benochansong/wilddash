@@ -62,7 +62,7 @@ func configure(
 	_route_id = route_id
 	_trigger_bias = float((racer.get_instance_id() % 7) - 3) * 0.08 if racer != null else 0.0
 	_was_on_floor = racer != null and racer.is_on_floor()
-	print("LOGSPIRE PLATFORM AI V2 READY racer=%s route=%s nodes=%d difficulty=%s moving_prediction=true failure_counter=true" % [
+	print("LOGSPIRE PLATFORM AI V2 READY racer=%s route=%s nodes=%d difficulty=%s moving_prediction=true rotation_prediction=true failure_counter=true" % [
 		RaceManager.get_racer_label(racer),
 		String(_route_id),
 		_route.size(),
@@ -100,8 +100,12 @@ func _physics_process(delta: float) -> void:
 	var platform_id: StringName = _platform_id_for_index(target_index)
 	var target: Vector3 = _predicted_target(platform_id, static_target, travel_time)
 	var target_velocity: Vector3 = _platform_velocity(platform_id)
+	var target_rotation: Vector3 = _platform_rotation(platform_id)
 	var landing_radius: float = _landing_radius(platform_id)
 	var risk: float = _platform_risk(platform_id)
+	var shortcut: bool = _is_shortcut(platform_id)
+	var shortcut_value: float = float(_graph.call("get_shortcut_value_seconds")) if shortcut and _graph != null else 0.0
+	var tilt: float = absf(target_rotation.z) + absf(target_rotation.x) * 0.5
 
 	if _safer_landing_mode and target_velocity.length() > 0.01:
 		target -= target_velocity * minf(0.30, travel_time * 0.18)
@@ -110,7 +114,7 @@ func _physics_process(delta: float) -> void:
 	var height_delta: float = planar_delta.y
 	planar_delta.y = 0.0
 	var planar_distance: float = planar_delta.length()
-	var trigger_distance: float = _get_jump_trigger_distance(risk, landing_radius, target_velocity.length())
+	var trigger_distance: float = _get_jump_trigger_distance(risk, landing_radius, target_velocity.length(), tilt, shortcut)
 
 	if planar_distance <= trigger_distance + 2.6 and planar_distance > trigger_distance:
 		_state = JumpState.PREPARE_JUMP
@@ -125,12 +129,12 @@ func _physics_process(delta: float) -> void:
 
 	_state = JumpState.JUMP
 	_face_target(target)
-	var jump_scale: float = _get_jump_scale(height_delta, risk, target_velocity.length())
+	var jump_scale: float = _get_jump_scale(height_delta, risk, target_velocity.length(), tilt, shortcut)
 	_racer.velocity.y = maxf(_racer.velocity.y, _racer.jump_velocity * jump_scale)
 	_racer.current_speed = maxf(_racer.current_speed, _racer.cruise_speed * (1.00 if _safer_landing_mode else 0.96))
 	_jump_cooldown = JUMP_COOLDOWN_SECONDS
 	_jump_count += 1
-	print("LOGSPIRE JUMP AI racer=%s from=%d target=%d platform=%s route=%s distance=%.2f height=%.2f radius=%.2f risk=%.2f moving=%.2f safer=%s" % [
+	print("LOGSPIRE JUMP AI racer=%s from=%d target=%d platform=%s route=%s distance=%.2f height=%.2f radius=%.2f risk=%.2f moving=%.2f tilt=%.3f shortcut=%s shortcut_value=%.1fs safer=%s" % [
 		RaceManager.get_racer_label(_racer),
 		maxi(0, target_index - 1),
 		target_index,
@@ -141,6 +145,9 @@ func _physics_process(delta: float) -> void:
 		landing_radius,
 		risk,
 		target_velocity.length(),
+		tilt,
+		str(shortcut),
+		shortcut_value,
 		str(_safer_landing_mode),
 	])
 
@@ -203,12 +210,15 @@ func _on_successful_landing() -> void:
 			_same_target_failures = 0
 			_safer_landing_mode = false
 
-func _get_jump_trigger_distance(risk: float, landing_radius: float, moving_speed: float) -> float:
+func _get_jump_trigger_distance(risk: float, landing_radius: float, moving_speed: float, tilt: float, shortcut: bool) -> float:
 	var trigger: float = 16.20 + clampf(_racer.current_speed - 10.0, 0.0, 9.0) * 0.11 + _trigger_bias
 	trigger += clampf(moving_speed * 0.08, 0.0, 0.65)
 	trigger += clampf(risk * 0.60, 0.0, 0.55)
+	trigger += clampf(tilt * 1.4, 0.0, 0.35)
 	if landing_radius < 4.0:
 		trigger += 0.35
+	if shortcut:
+		trigger += 0.18
 	if _safer_landing_mode:
 		trigger += 0.75
 	match GameManager.difficulty:
@@ -220,12 +230,15 @@ func _get_jump_trigger_distance(risk: float, landing_radius: float, moving_speed
 			pass
 	return clampf(trigger, MIN_JUMP_TRIGGER, MAX_JUMP_TRIGGER)
 
-func _get_jump_scale(height_delta: float, risk: float, moving_speed: float) -> float:
+func _get_jump_scale(height_delta: float, risk: float, moving_speed: float, tilt: float, shortcut: bool) -> float:
 	var scale: float = 1.07
 	if height_delta > 0.8:
 		scale += minf(0.13, height_delta * 0.025)
 	scale += minf(0.05, moving_speed * 0.01)
 	scale += minf(0.035, risk * 0.04)
+	scale += minf(0.035, tilt * 0.08)
+	if shortcut and GameManager.difficulty == &"wild":
+		scale += 0.02
 	if _safer_landing_mode:
 		scale += 0.045
 	match GameManager.difficulty:
@@ -254,6 +267,12 @@ func _platform_velocity(platform_id: StringName) -> Vector3:
 	var value: Variant = _gameplay.call("get_platform_velocity", platform_id)
 	return value if value is Vector3 else Vector3.ZERO
 
+func _platform_rotation(platform_id: StringName) -> Vector3:
+	if platform_id == &"" or _gameplay == null or not _gameplay.has_method("get_platform_rotation"):
+		return Vector3.ZERO
+	var value: Variant = _gameplay.call("get_platform_rotation", platform_id)
+	return value if value is Vector3 else Vector3.ZERO
+
 func _landing_radius(platform_id: StringName) -> float:
 	if platform_id == &"" or _graph == null:
 		return 4.0
@@ -263,6 +282,9 @@ func _platform_risk(platform_id: StringName) -> float:
 	if platform_id == &"" or _graph == null:
 		return 0.0
 	return float(_graph.call("get_risk", platform_id))
+
+func _is_shortcut(platform_id: StringName) -> bool:
+	return platform_id != &"" and _graph != null and bool(_graph.call("is_shortcut", platform_id))
 
 func _face_target(target: Vector3) -> void:
 	if _racer == null:
