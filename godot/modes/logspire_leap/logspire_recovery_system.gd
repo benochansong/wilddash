@@ -7,6 +7,7 @@ const ABSOLUTE_FALL_Y: float = -18.0
 
 var _world: Node
 var _graph: Node
+var _water_recovery: Node
 var _pending: Dictionary = {}
 
 func configure(world: Node, graph: Node) -> void:
@@ -20,7 +21,20 @@ func configure(world: Node, graph: Node) -> void:
 				continue
 			if not area.body_entered.is_connected(_on_recovery_area_body_entered):
 				area.body_entered.connect(_on_recovery_area_body_entered.bind(area))
-	print("LOGSPIRE RECOVERY READY delay=%.2fs absolute_fall_y=%.1f latest_checkpoint_authority=true" % [RECOVERY_DELAY_SECONDS, ABSOLUTE_FALL_Y])
+	print("LOGSPIRE RECOVERY READY delay=%.2fs absolute_fall_y=%.1f latest_checkpoint_authority=true water_handoff=true" % [RECOVERY_DELAY_SECONDS, ABSOLUTE_FALL_Y])
+
+func set_water_recovery(value: Node) -> void:
+	_water_recovery = value
+	print("LOGSPIRE RECOVERY WATER HANDOFF enabled=%s" % str(_water_recovery != null))
+
+func force_checkpoint_recovery(racer: WildDashCharacterController, source: String = "forced") -> void:
+	if racer == null or racer.finished or _graph == null:
+		return
+	var racer_id: int = racer.get_instance_id()
+	if _pending.has(racer_id):
+		return
+	var target_id: StringName = _latest_checkpoint_target(racer)
+	_queue_recovery(racer, target_id, source)
 
 func _physics_process(_delta: float) -> void:
 	if _graph == null or not RaceManager.active:
@@ -28,6 +42,8 @@ func _physics_process(_delta: float) -> void:
 	for racer_value: Variant in RaceManager.racers.duplicate():
 		var racer := racer_value as WildDashCharacterController
 		if racer == null or racer.finished or racer.global_position.y >= ABSOLUTE_FALL_Y:
+			continue
+		if _water_should_handle(racer):
 			continue
 		var racer_id: int = racer.get_instance_id()
 		if _pending.has(racer_id):
@@ -38,6 +54,8 @@ func _physics_process(_delta: float) -> void:
 func _on_recovery_area_body_entered(body: Node3D, area: Area3D) -> void:
 	var racer := body as WildDashCharacterController
 	if racer == null or racer.finished or not RaceManager.active:
+		return
+	if _water_should_handle(racer):
 		return
 	var racer_id: int = racer.get_instance_id()
 	if _pending.has(racer_id):
@@ -50,6 +68,13 @@ func _on_recovery_area_body_entered(body: Node3D, area: Area3D) -> void:
 		elif meta_value is String:
 			target_id = StringName(meta_value)
 	_queue_recovery(racer, target_id, String(area.name))
+
+func _water_should_handle(racer: WildDashCharacterController) -> bool:
+	if _water_recovery == null or not is_instance_valid(_water_recovery):
+		return false
+	if not _water_recovery.has_method("should_handle_racer"):
+		return false
+	return bool(_water_recovery.call("should_handle_racer", racer))
 
 func _latest_checkpoint_target(racer: WildDashCharacterController) -> StringName:
 	if racer == null or _graph == null:
