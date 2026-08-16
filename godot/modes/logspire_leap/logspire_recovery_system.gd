@@ -20,7 +20,7 @@ func configure(world: Node, graph: Node) -> void:
 				continue
 			if not area.body_entered.is_connected(_on_recovery_area_body_entered):
 				area.body_entered.connect(_on_recovery_area_body_entered.bind(area))
-	print("LOGSPIRE RECOVERY READY delay=%.2fs absolute_fall_y=%.1f" % [RECOVERY_DELAY_SECONDS, ABSOLUTE_FALL_Y])
+	print("LOGSPIRE RECOVERY READY delay=%.2fs absolute_fall_y=%.1f latest_checkpoint_authority=true" % [RECOVERY_DELAY_SECONDS, ABSOLUTE_FALL_Y])
 
 func _physics_process(_delta: float) -> void:
 	if _graph == null or not RaceManager.active:
@@ -32,8 +32,7 @@ func _physics_process(_delta: float) -> void:
 		var racer_id: int = racer.get_instance_id()
 		if _pending.has(racer_id):
 			continue
-		var target_value: Variant = _graph.call("get_last_checkpoint_id", RaceManager.get_checkpoint_progress(racer))
-		var target_id := StringName(target_value) if target_value is StringName or target_value is String else &""
+		var target_id: StringName = _latest_checkpoint_target(racer)
 		_queue_recovery(racer, target_id, "absolute_fall")
 
 func _on_recovery_area_body_entered(body: Node3D, area: Area3D) -> void:
@@ -43,9 +42,24 @@ func _on_recovery_area_body_entered(body: Node3D, area: Area3D) -> void:
 	var racer_id: int = racer.get_instance_id()
 	if _pending.has(racer_id):
 		return
-	var meta_value: Variant = area.get_meta(&"logspire_recovery_target", &"")
-	var target_id := StringName(meta_value) if meta_value is StringName or meta_value is String else &""
+	var target_id: StringName = _latest_checkpoint_target(racer)
+	if target_id == &"":
+		var meta_value: Variant = area.get_meta(&"logspire_recovery_target", &"")
+		if meta_value is StringName:
+			target_id = meta_value
+		elif meta_value is String:
+			target_id = StringName(meta_value)
 	_queue_recovery(racer, target_id, String(area.name))
+
+func _latest_checkpoint_target(racer: WildDashCharacterController) -> StringName:
+	if racer == null or _graph == null:
+		return &""
+	var target_value: Variant = _graph.call("get_last_checkpoint_id", RaceManager.get_checkpoint_progress(racer))
+	if target_value is StringName:
+		return target_value
+	if target_value is String:
+		return StringName(target_value)
+	return &""
 
 func _queue_recovery(racer: WildDashCharacterController, target_id: StringName, source: String) -> void:
 	if racer == null or target_id == &"":
