@@ -191,6 +191,7 @@ func _try_body_check(
 	_body_next_by_id[racer_id] = now_seconds + _body_check_cooldown(racer.animal_id)
 	_reserve_target(racer, target, TARGET_RESERVATION_SECONDS)
 	_record_body_event()
+	_record_party_mix(racer, target, true)
 	print("AI BODY CHECK attacker=%s target=%s distance=%.1f rank=%d chance=%.2f impact=%s knockback=%.2f cooldown=%.2f" % [
 		String(racer.animal_id),
 		RaceManager.get_racer_label(target),
@@ -204,37 +205,4 @@ func _try_body_check(
 	return true
 
 func _on_item_hit(target: Node, source: Node, effect_id: StringName, blocked: bool) -> void:
-	super._on_item_hit(target, source, effect_id, blocked)
-	if blocked:
-		return
-	var victim: WildDashCharacterController = target as WildDashCharacterController
-	var attacker: WildDashCharacterController = source as WildDashCharacterController
-	if victim == null or attacker == null or victim == attacker:
-		return
-	if not RaceManager.racers.has(victim) or not RaceManager.racers.has(attacker):
-		return
-
-	var mix: String = "AI_VS_AI"
-	if attacker.is_player and not victim.is_player:
-		_party_player_vs_ai_hits += 1
-		mix = "PLAYER_VS_AI"
-	elif not attacker.is_player and victim.is_player:
-		_party_ai_vs_player_hits += 1
-		mix = "AI_VS_PLAYER"
-	else:
-		_party_ai_vs_ai_hits += 1
-
-	if effect_id == &"body_check":
-		_party_body_hits += 1
-	else:
-		_party_item_hits += 1
-
-	if not attacker.is_player:
-		if effect_id == &"body_check":
-			print("AI BODY CHECK HIT attacker=%s target=%s mix=%s" % [
-				RaceManager.get_racer_label(attacker), RaceManager.get_racer_label(victim), mix,
-			])
-		else:
-			print("AI ITEM HIT attacker=%s target=%s item=%s mix=%s" % [
-				RaceManager.get_racer_label(attacker), RaceManager.get_racer_label(victim), String(effect_id), mix,
-			])
+	super._on_item_hit(target, source, efffV5ñ¥°‰±½­•¤(%¥˜‰±½­•è($%É•ÑÕÉ¸(%Ù…ÈÙ¥Ñ¥´è]¥±‘…Í¡¡…É…Ñ•É½¹ÑÉ½±±•È€ôÑ…É•Ğ…Ì]¥±‘…Í¡¡…É…Ñ•É½¹ÑÉ½±±•È(%Ù…È…ÑÑ…­•Èè]¥±‘…Í¡¡…É…Ñ•É½¹ÑÉ½±±•È€ôÍ½ÕÉ”…Ì]¥±‘…Í¡¡…É…Ñ•É½¹ÑÉ½±±•È(%¥˜Ù¥Ñ¥´€ôô¹Õ±°½È…ÑÑ…­•È€ôô¹Õ±°½ÈÙ¥Ñ¥´€ôô…ÑÑ…­•Èè($%É•ÑÕÉ¸(%¥˜¹½ĞI…•5…¹…•È¹É…•ÉÌ¹¡…Ì¡Ù¥Ñ¥´¤½È¹½ĞI…•5…¹…•È¹É…•ÉÌ¹¡…Ì¡…ÑÑ…­•È¤è($%É•ÑÕÉ¸(%}É•½É‘}Á…ÉÑå}µ¥à¡…ÑÑ…­•È°Ù¥Ñ¥´°™…±Í”¤(%¥˜¹½Ğ…ÑÑ…­•È¹¥Í}Á±…å•Èè($%ÁÉ¥¹Ğ ‰$%Q4!%P…ÑÑ…­•Èô•ÌÑ…É•Ğô•Ì¥Ñ•´ô•Ìµ¥àô•Ìˆ€”l($$%I…•5…¹…•È¹•Ñ}É…•É}±…‰•°¡…ÑÑ…­•È¤°($$%I…•5…¹…•È¹•Ñ}É…•É}±…‰•°¡Ù¥Ñ¥´¤°($$%MÑÉ¥¹œ¡•™™•Ñ}¥¤°($$%}µ¥á}±…‰•°¡…ÑÑ…­•È°Ù¥Ñ¥´¤°($%t¤()™Õ¹Œ}É•½É‘}Á…ÉÑå}µ¥à¡…ÑÑ…­•Èè]¥±‘…Í¡¡…É…Ñ•É½¹ÑÉ½±±•È°Ù¥Ñ¥´è]¥±‘…Í¡¡…É…Ñ•É½¹ÑÉ½±±•È°‰½‘å}¡¥Ğè‰½½°¤€´øÙ½¥è(%¥˜…ÑÑ…­•È€ôô¹Õ±°½ÈÙ¥Ñ¥´€ôô¹Õ±°è($%É•ÑÕÉ¸(%¥˜…ÑÑ…­•È¹¥Í}Á±…å•È…¹¹½ĞÙ¥Ñ¥´¹¥Í}Á±…å•Èè($%}Á…ÉÑå}Á±…å•É}ÙÍ}…¥}¡¥ÑÌ€¬ô€Ä(%•±¥˜¹½Ğ…ÑÑ…­•È¹¥Í}Á±…å•È…¹Ù¥Ñ¥´¹¥Í}Á±…å•Èè($%}Á…ÉÑå}…¥}ÙÍ}Á±…å•É}¡¥ÑÌ€¬ô€Ä(%•±Í”è($%}Á…ÉÑå}…¥}ÙÍ}…¥}¡¥ÑÌ€¬ô€Ä(%¥˜‰½‘å}¡¥Ğè($%}Á…ÉÑå}‰½‘å}¡¥ÑÌ€¬ô€Ä(%•±Í”è($%}Á…ÉÑå}¥Ñ•µ}¡¥ÑÌ€¬ô€Ä()™Õ¹Œ}µ¥á}±…‰•°¡…ÑÑ…­•Èè]¥±‘…Í¡¡…É…Ñ•É½¹ÑÉ½±±•È°Ù¥Ñ¥´è]¥±‘…Í¡¡…É…Ñ•É½¹ÑÉ½±±•È¤€´øMÑÉ¥¹œè(%¥˜…ÑÑ…­•È¹¥Í}Á±…å•È…¹¹½ĞÙ¥Ñ¥´¹¥Í}Á±…å•Èè($%É•ÑÕÉ¸€‰A1eI}YM}$ˆ(%¥˜¹½Ğ…ÑÑ…­•È¹¥Í}Á±…å•È…¹Ù¥Ñ¥´¹¥Í}Á±…å•Èè($%É•ÑÕÉ¸€‰%}YM}A1eHˆ(%É•ÑÕÉ¸€‰%}YM}$ˆ(
