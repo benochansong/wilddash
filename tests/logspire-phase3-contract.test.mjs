@@ -5,6 +5,7 @@ import test from "node:test";
 const gameManager = readFileSync("godot/scripts/game_manager.gd", "utf8");
 const logspireScene = readFileSync("godot/modes/logspire_leap/logspire_leap.tscn", "utf8");
 const phase3 = readFileSync("godot/modes/logspire_leap/logspire_phase3_director.gd", "utf8");
+const phase3Perf = readFileSync("godot/modes/logspire_leap/logspire_phase3_director_v2_performance.gd", "utf8");
 const graph = readFileSync("godot/modes/logspire_leap/logspire_platform_graph.gd", "utf8");
 const ai = readFileSync("godot/modes/logspire_leap/logspire_platform_ai.gd", "utf8");
 const neonScene = readFileSync("godot/modes/neon_harbor_race/neon_harbor_race.tscn", "utf8");
@@ -43,8 +44,9 @@ test("production campaign is Grand Prix -> Fruit -> Logspire -> Rumble -> Wild T
   assert.match(gameManager, /final_round=neon_harbor_race/);
 });
 
-test("Logspire scene wires the production spectacle director and authored world state", () => {
-  assert.match(logspireScene, /logspire_phase3_director\.gd/);
+test("Logspire scene wires the production spectacle director through the performance adapter", () => {
+  assert.match(logspireScene, /logspire_phase3_director_v2_performance\.gd/);
+  assert.match(phase3Perf, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director\.gd"/);
   assert.match(logspireScene, /Phase3Director/);
   for (const marker of [
     "LOGSPIRE LIVING TREE EVENT START",
