@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const scene = readFileSync("godot/modes/logspire_leap/logspire_leap.tscn", "utf8");
+const modeV3 = readFileSync("godot/modes/logspire_leap/logspire_leap_v3_recovery_camera.gd", "utf8");
+const recoveryCamera = readFileSync("godot/modes/logspire_leap/logspire_recovery_chase_camera.gd", "utf8");
 const worldDeep = readFileSync("godot/modes/logspire_leap/logspire_world_v2_deep_water.gd", "utf8");
 const depthGuard = readFileSync("godot/modes/logspire_leap/logspire_water_depth_guard.gd", "utf8");
 const water = readFileSync("godot/modes/logspire_leap/logspire_water_recovery.gd", "utf8");
@@ -11,6 +13,7 @@ const waterV5 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_
 const waterV6 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v6_nearest_ladder.gd", "utf8");
 const waterV7 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v7_jumpout_safe_exit.gd", "utf8");
 const waterV8 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v8_traversal_ux.gd", "utf8");
+const waterV9 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v9_priority_camera.gd", "utf8");
 const swim = readFileSync("godot/modes/logspire_leap/logspire_swim_controller.gd", "utf8");
 const ladder = readFileSync("godot/modes/logspire_leap/logspire_ladder_system.gd", "utf8");
 const ladderV4 = readFileSync("godot/modes/logspire_leap/logspire_ladder_system_v4_safe_exit.gd", "utf8");
@@ -21,27 +24,41 @@ const recoveryV2 = readFileSync("godot/modes/logspire_leap/logspire_recovery_sys
 const graph = readFileSync("godot/modes/logspire_leap/logspire_platform_graph.gd", "utf8");
 const character = readFileSync("godot/characters/character_controller.gd", "utf8");
 
-test("Logspire scene wires traversal UX V8 and authored root paths", () => {
-  assert.match(scene, /logspire_water_recovery_v8_traversal_ux\.gd/);
+test("Logspire scene wires final V9 recovery UX, authored root paths and scoped camera", () => {
+  assert.match(scene, /logspire_leap_v3_recovery_camera\.gd/);
+  assert.match(scene, /logspire_water_recovery_v9_priority_camera\.gd/);
   assert.match(scene, /logspire_ladder_system_v5_traversal_paths\.gd/);
   assert.match(scene, /logspire_water_depth_guard\.gd/);
   assert.match(scene, /logspire_recovery_system_v2_ladder_only\.gd/);
   assert.match(scene, /logspire_combat_safety_v2_recovery_protection\.gd/);
-  assert.match(waterV8, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v7_jumpout_safe_exit\.gd"/);
+  assert.match(waterV9, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v8_traversal_ux\.gd"/);
   assert.match(ladderV5, /extends "res:\/\/modes\/logspire_leap\/logspire_ladder_system_v4_safe_exit\.gd"/);
+  assert.match(modeV3, /logspire_recovery_chase_camera\.gd/);
+  assert.match(modeV3, /round3_only=true/);
 });
 
-test("Swimming is camera-relative and keeps crocodile full-speed identity", () => {
+test("Swimming is camera-relative and recovery camera yaw remains user-controlled", () => {
   assert.match(swim, /func get_player_direction\(camera: Camera3D = null\)/);
   assert.match(swim, /camera_forward := -camera\.global_transform\.basis\.z/);
   assert.match(swim, /camera_right := camera\.global_transform\.basis\.x/);
   assert.match(swim, /camera_forward \* \(-axis\.y\)/);
   assert.match(swim, /SWIM_TURN_SPEED: float = 7\.0/);
+  assert.match(recoveryCamera, /func set_recovery_focus\(world_point: Vector3\)/);
+  assert.match(recoveryCamera, /func clear_recovery_focus\(\)/);
+  assert.match(recoveryCamera, /InputEventMouseMotion/);
+  assert.match(recoveryCamera, /JOY_AXIS_RIGHT_X/);
+  assert.match(recoveryCamera, /_recovery_yaw/);
+  assert.match(waterV9, /set_recovery_focus/);
+  assert.match(waterV9, /clear_recovery_focus/);
+  assert.match(waterV9, /OS\.is_debug_build\(\)/);
+  assert.match(waterV9, /LOGSPIRE WATER INPUT/);
+});
+
+test("Crocodile keeps full land-speed swimming while normal racers remain recovery-paced", () => {
   assert.match(swim, /SWIM_SPEED_RATIO: float = 0\.50/);
   assert.match(swim, /CROCODILE_SWIM_SPEED_RATIO: float = 1\.00/);
   assert.match(swim, /racer\.max_speed \* CROCODILE_SWIM_SPEED_RATIO/);
-  assert.match(waterV8, /get_viewport\(\)\.get_camera_3d\(\)/);
-  assert.match(waterV8, /LOGSPIRE WATER INPUT/);
+  assert.match(swim, /CROCODILE_SWIM_ACCELERATION: float = 24\.0/);
 });
 
 test("Low ledges use close auto vault instead of wall pushing", () => {
@@ -49,8 +66,8 @@ test("Low ledges use close auto vault instead of wall pushing", () => {
   assert.match(waterV8, /LOW_LEDGE_AUTO_VAULT_RADIUS: float = 1\.0/);
   assert.match(waterV8, /AUTO_VAULT_DURATION: float = 0\.45/);
   assert.match(waterV8, /AUTO_VAULT_ARC_HEIGHT: float = 0\.70/);
-  assert.match(waterV8, /InputManager\.consume_jump\(\)/);
-  assert.match(waterV8, /_vault_landing_is_safe/);
+  assert.match(waterV9, /InputManager\.consume_jump\(\)/);
+  assert.match(waterV9, /_vault_landing_is_safe/);
   assert.match(waterV8, /LOGSPIRE AUTO VAULT/);
   assert.match(waterV7, /MAX_JUMP_OUT_HEIGHT: float = 1\.70/);
 });
@@ -80,17 +97,47 @@ test("Ladders align smoothly and climb much slower than legacy V6", () => {
   assert.match(waterV8, /&"ladder_exit"/);
 });
 
-test("Recovery congestion ignores racer bodies and AI receives queue offsets", () => {
+test("Recovery targets score distance, type priority, progress, congestion and player yield", () => {
+  assert.match(waterV9, /TARGET_JUMP_OUT/);
+  assert.match(waterV9, /TARGET_ROOT/);
+  assert.match(waterV9, /TARGET_LADDER/);
+  assert.match(waterV9, /TARGET_SWITCH_HYSTERESIS: float = 1\.25/);
+  assert.match(waterV9, /CONGESTION_PENALTY_PER_RACER: float = 1\.10/);
+  assert.match(waterV9, /AI_PLAYER_YIELD_PENALTY: float = 7\.5/);
+  assert.match(waterV9, /BEHIND_PROGRESS_PENALTY: float = 2\.0/);
+  assert.match(waterV9, /_score_recovery_target/);
+  assert.match(waterV9, /_player_is_near/);
+  assert.match(waterV9, /LOGSPIRE RECOVERY TARGET/);
+});
+
+test("Recovery congestion protects player and separates AI queues", () => {
   assert.match(character, /collision_layer = 2/);
   assert.match(character, /collision_mask = 3/);
   assert.match(waterV8, /racer\.collision_mask = 1/);
   assert.match(waterV8, /AI_QUEUE_OFFSET_METERS: float = 1\.2/);
   assert.match(waterV8, /int\(racer_id % 3\) - 1/);
   assert.match(waterV8, /LOGSPIRE RECOVERY CONGESTION/);
+  assert.match(waterV9, /logspire_recovery_player_priority/);
+  assert.match(waterV9, /PLAYER_PRIORITY_RADIUS: float = 5\.0/);
   assert.match(waterV8, /_restore_recovery_collision/);
 });
 
-test("Deep water and ladder-only recovery protections remain intact", () => {
+test("Explicit recovery UX states and traversal action lock cover the full water flow", () => {
+  for (const state of [
+    "RACING", "FALLING", "WATER_ENTRY", "SWIMMING", "JUMP_OUT_APPROACH",
+    "AUTO_VAULT", "ROOT_APPROACH", "ROOT_CLIMB", "LADDER_APPROACH",
+    "LADDER_ALIGN", "LADDER_CLIMB", "SAFE_EXIT",
+  ]) {
+    assert.match(waterV9, new RegExp(state));
+  }
+  assert.match(waterV9, /logspire_traversal_action_lock/);
+  assert.match(waterV9, /_set_traversal_action_lock\(racer, true\)/);
+  assert.match(waterV9, /_set_traversal_action_lock\(racer, false\)/);
+  assert.match(water, /_pause_racer_control/);
+  assert.match(water, /node\.set_physics_process\(false\)/);
+});
+
+test("Deep water and no-restart protections remain intact", () => {
   assert.equal((water.match(/\{"zone": [0-5], "center":/g) || []).length, 6);
   assert.match(worldDeep, /min_depth=3\.25m/);
   assert.match(depthGuard, /BASIN_DEPTH_METERS: float = 7\.0/);
