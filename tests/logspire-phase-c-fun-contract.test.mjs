@@ -24,8 +24,8 @@ test("Safe versus Wild identity keeps the shortcut valuable without increasing S
   assert.match(phaseC, /gap_increase=false/);
   assert.match(phaseC, /platform_shrink=false/);
   assert.match(phaseC, /jump_power_nerf=false/);
-  assert.match(phaseA, /ZONE1_MAX_SURFACE_GAP_M: float = 2\.25/);
-  assert.match(phaseA, /ZONE3_MAX_SURFACE_GAP_M: float = 2\.35/);
+  assert.match(phaseA, /ZONE1_MAX_GAP: float = 2\.25/);
+  assert.match(phaseA, /ZONE3_MAX_GAP: float = 2\.35/);
 });
 
 test("Rolling Grove, Titan Tree and Finale receive readable guidance instead of harder jumps", () => {
