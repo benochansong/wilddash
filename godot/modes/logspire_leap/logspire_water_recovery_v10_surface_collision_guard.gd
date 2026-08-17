@@ -1,8 +1,10 @@
 extends "res://modes/logspire_leap/logspire_water_recovery_v9_priority_camera.gd"
 
-## Player-tested hard guard for the two remaining water failures:
-## 1) a missed handoff must never leave a racer walking on the deep basin floor;
-## 2) scripted recovery traversal must not phase through major world geometry.
+## Player-tested hard guard for water and recovery traversal.
+## - submerged racers are reacquired at the visible water surface
+## - major world geometry cannot be phased through
+## - recovery stairs attach only near the entry and own the full climb
+## - blocked recovery routes return to swimming instead of trapping the racer
 
 const SUBMERGED_REACQUIRE_DEPTH: float = 0.35
 const SURFACE_LOCK_OFFSET: float = 0.52
@@ -10,6 +12,10 @@ const SURFACE_LOCK_TOLERANCE: float = 0.14
 const SURFACE_DESCEND_SPEED: float = 6.0
 const MAJOR_WORLD_QUERY_MASK: int = 4
 const MAJOR_BLOCKED_SCORE_PENALTY: float = 1000.0
+const STAIR_AUTO_ATTACH_RADIUS: float = 1.5
+const STAIR_CLIMB_SPEED_MPS: float = 3.4
+const STAIR_CLIMB_MIN_SECONDS: float = 1.35
+const STAIR_CLIMB_MAX_SECONDS: float = 5.0
 
 var _major_blocked_target_by_id: Dictionary = {}
 var _surface_reacquire_count: int = 0
@@ -19,10 +25,6 @@ func _physics_process(delta: float) -> void:
 	if not _configured or not RaceManager.active:
 		return
 
-	# Final authority after every older water/entry pass. If a racer somehow
-	# reaches the basin below the visible surface without WaterRecovery owning it,
-	# immediately reacquire that racer instead of letting normal ground movement
-	# walk across the seven-metre-deep floor.
 	for value: Variant in RaceManager.racers.duplicate():
 		var racer := value as WildDashCharacterController
 		if racer == null or not is_instance_valid(racer) or racer.finished:
@@ -63,6 +65,75 @@ func _enter_water(racer: WildDashCharacterController, zone: int, water_y: float)
 	if racer != null and is_instance_valid(racer) and is_water_recovering(racer):
 		_enforce_surface_lock(racer, water_y, 0.0)
 
+func _update_swimming(racer: WildDashCharacterController, delta: float) -> void:
+	if racer == null or not is_instance_valid(racer):
+		return
+	var racer_id: int = racer.get_instance_id()
+	var zone: int = int(_zone_by_id.get(racer_id, 0))
+	var target: Dictionary = _choose_recovery_target(racer, zone)
+	if target.is_empty() or StringName(target.get("recovery_type", &"")) != TARGET_ROOT:
+		super(racer, delta)
+		return
+
+	_cancel_stale_checkpoint_recovery(racer)
+	racer.collision_mask = 1
+	var water_y: float = float(_water_y_by_id.get(racer_id, racer.global_position.y))
+	var controlled_by_player: bool = racer.is_player and DisplayServer.get_name() != "headless"
+	var previous_value: Variant = _preferred_target_by_id.get(racer_id, {})
+	var previous: Dictionary = previous_value if previous_value is Dictionary else {}
+	if _target_signature(previous) != _target_signature(target):
+		print("LOGSPIRE RECOVERY TARGET racer=%s from=%s to=%s score=%.2f player_priority=%s" % [
+			RaceManager.get_racer_label(racer),
+			_target_signature(previous),
+			_target_signature(target),
+			float(target.get("target_score", 0.0)),
+			str(racer.is_player),
+		])
+	_preferred_target_by_id[racer_id] = target
+	_update_recovery_camera_focus(racer, target)
+	_set_ux_state(racer, RecoveryUXState.ROOT_APPROACH)
+	var target_distance: float = _distance_to_target(racer, target)
+	if target_distance <= STAIR_AUTO_ATTACH_RADIUS:
+		_begin_root_climb(racer, target)
+		return
+	if controlled_by_player:
+		_set_hud_message("RECOVERY ROUTE · SWIM TO THE STAIRS · %.0fm" % target_distance)
+		_apply_manual_recovery_swim(racer, water_y, delta)
+	else:
+		_apply_ai_recovery_swim(racer, target, water_y, delta)
+
+func _begin_root_climb(racer: WildDashCharacterController, ramp: Dictionary) -> void:
+	if racer == null or not is_instance_valid(racer):
+		return
+	var racer_id: int = racer.get_instance_id()
+	print("LOGSPIRE STAIR ATTACH racer=%s target=%s radius=%.1f" % [
+		RaceManager.get_racer_label(racer),
+		_target_signature(ramp),
+		STAIR_AUTO_ATTACH_RADIUS,
+	])
+	super(racer, ramp)
+	var path_value: Variant = _traversal_path_by_id.get(racer_id, [])
+	var path: Array = path_value if path_value is Array else []
+	var path_length: float = _path_length(path)
+	var duration: float = clampf(path_length / STAIR_CLIMB_SPEED_MPS, STAIR_CLIMB_MIN_SECONDS, STAIR_CLIMB_MAX_SECONDS)
+	_traversal_duration_by_id[racer_id] = duration
+	print("LOGSPIRE STAIR CLIMB racer=%s duration=%.2f speed=%.1f path_points=%d" % [
+		RaceManager.get_racer_label(racer),
+		duration,
+		STAIR_CLIMB_SPEED_MPS,
+		path.size(),
+	])
+
+func _update_root_climb(racer: WildDashCharacterController, delta: float) -> void:
+	if racer == null or not is_instance_valid(racer):
+		return
+	var racer_id: int = racer.get_instance_id()
+	var was_stair: bool = StringName(_traversal_kind_by_id.get(racer_id, &"")) == &"root_climb"
+	super(racer, delta)
+	if was_stair and (not is_instance_valid(racer) or not is_water_recovering(racer) or StringName(_traversal_kind_by_id.get(racer_id, &"")) != &"root_climb"):
+		if is_instance_valid(racer):
+			print("LOGSPIRE STAIR EXIT racer=%s safe=true" % RaceManager.get_racer_label(racer))
+
 func _update_ladder_climb(racer: WildDashCharacterController, delta: float) -> void:
 	if racer == null or not is_instance_valid(racer):
 		return
@@ -82,9 +153,6 @@ func _update_ladder_climb(racer: WildDashCharacterController, delta: float) -> v
 	if not _major_world_motion_blocked(racer, before, after):
 		return
 
-	# Parent traversal uses deterministic positions for responsiveness. Revert the
-	# attempted step if the capsule sweep says a major tree collider is in the way,
-	# then return to swimming and choose a different recovery target next frame.
 	racer.global_position = before
 	racer.velocity = Vector3.ZERO
 	var signature: String = _target_signature(target_before)
@@ -125,8 +193,6 @@ func _enforce_surface_lock(racer: WildDashCharacterController, water_y: float, d
 	var target_y: float = water_y + SURFACE_LOCK_OFFSET
 	var difference: float = target_y - racer.global_position.y
 	if difference > SURFACE_LOCK_TOLERANCE:
-		# Full upward correction is intentional: a swimmer must never remain on the
-		# basin floor. move_and_collide keeps the correction world-collision aware.
 		racer.move_and_collide(Vector3.UP * difference)
 	elif difference < -SURFACE_LOCK_TOLERANCE and delta > 0.0:
 		var descend: float = minf(-difference, SURFACE_DESCEND_SPEED * delta)
@@ -146,8 +212,6 @@ func _major_world_motion_blocked(
 	var saved_position: Vector3 = racer.global_position
 	var saved_mask: int = racer.collision_mask
 	racer.global_position = from_position
-	# Phase3 major geometry is dual-layered: layer 1 for normal gameplay and
-	# layer 3 (mask value 4) exclusively for this scripted traversal sweep.
 	racer.collision_mask = MAJOR_WORLD_QUERY_MASK
 	var hit: KinematicCollision3D = racer.move_and_collide(motion, true)
 	racer.collision_mask = saved_mask
@@ -158,6 +222,14 @@ func _abort_scripted_traversal_to_swim(racer: WildDashCharacterController, reaso
 	if racer == null:
 		return
 	var racer_id: int = racer.get_instance_id()
+	var target_value: Variant = _preferred_target_by_id.get(racer_id, _ladder_by_id.get(racer_id, {}))
+	var target: Dictionary = target_value if target_value is Dictionary else {}
+	var zone: int = int(_zone_by_id.get(racer_id, 0))
+	print("LOGSPIRE RECOVERY PATH BLOCKED object=%s zone=%d reason=%s" % [
+		_target_signature(target),
+		zone + 1,
+		reason,
+	])
 	_state_by_id[racer_id] = WaterState.SWIMMING
 	_traversal_kind_by_id.erase(racer_id)
 	_traversal_elapsed_by_id.erase(racer_id)
