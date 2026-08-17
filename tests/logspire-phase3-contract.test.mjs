@@ -7,6 +7,7 @@ const logspireScene = readFileSync("godot/modes/logspire_leap/logspire_leap.tscn
 const phase3 = readFileSync("godot/modes/logspire_leap/logspire_phase3_director.gd", "utf8");
 const phase3Perf = readFileSync("godot/modes/logspire_leap/logspire_phase3_director_v2_performance.gd", "utf8");
 const phase3Water = readFileSync("godot/modes/logspire_leap/logspire_phase3_director_v3_water_priority.gd", "utf8");
+const phase3Collision = readFileSync("godot/modes/logspire_leap/logspire_phase3_director_v4_major_collision.gd", "utf8");
 const graph = readFileSync("godot/modes/logspire_leap/logspire_platform_graph.gd", "utf8");
 const ai = readFileSync("godot/modes/logspire_leap/logspire_platform_ai.gd", "utf8");
 const neonScene = readFileSync("godot/modes/neon_harbor_race/neon_harbor_race.tscn", "utf8");
@@ -45,8 +46,9 @@ test("production campaign is Grand Prix -> Fruit -> Logspire -> Rumble -> Wild T
   assert.match(gameManager, /final_round=neon_harbor_race/);
 });
 
-test("Logspire scene wires production spectacle through performance and water-priority adapters", () => {
-  assert.match(logspireScene, /logspire_phase3_director_v3_water_priority\.gd/);
+test("Logspire scene wires production spectacle through performance, water-priority and major-collision adapters", () => {
+  assert.match(logspireScene, /logspire_phase3_director_v4_major_collision\.gd/);
+  assert.match(phase3Collision, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director_v3_water_priority\.gd"/);
   assert.match(phase3Water, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director_v2_performance\.gd"/);
   assert.match(phase3Perf, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director\.gd"/);
   assert.match(logspireScene, /Phase3Director/);
@@ -61,6 +63,7 @@ test("Logspire scene wires production spectacle through performance and water-pr
     assert.ok(phase3.includes(marker), `missing Phase 3 telemetry: ${marker}`);
   }
   assert.match(phase3Water, /FINAL RECOVERY CANCELLED BY WATER/);
+  assert.match(phase3Collision, /LOGSPIRE MAJOR WORLD COLLISION READY/);
   assert.match(graph, /set_world_state/);
   assert.match(graph, /cached_routes_valid=true/);
   assert.match(ai, /notify_phase3_state/);
