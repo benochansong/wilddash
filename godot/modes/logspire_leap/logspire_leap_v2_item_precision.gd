@@ -1,13 +1,14 @@
 extends "res://modes/logspire_leap/logspire_leap.gd"
 
-## Round 3 item precision pass.
-## Item stations remain readable and useful, but one racer should not sweep an
-## entire three-box row from several meters away or replace a held item instantly.
+## Round 3 item pickup correction.
+## Keep visible boxes forgiving enough to collect while racing. Prevent a racer
+## from sweeping a whole row with a short global pickup lock instead of tiny
+## detection volumes. Held items may be replaced so a valid box never feels dead.
 
-const LOGSPIRE_PICKUP_RADIUS_SCALE: float = 0.50
-const LOGSPIRE_PICKUP_VERTICAL_SCALE: float = 0.72
-const LOGSPIRE_PICKUP_LOCK_MSEC: int = 1100
-const LOGSPIRE_PICKUP_COLLISION_RADIUS: float = 1.35
+const LOGSPIRE_PICKUP_RADIUS_SCALE: float = 0.82
+const LOGSPIRE_PICKUP_VERTICAL_SCALE: float = 0.90
+const LOGSPIRE_PICKUP_LOCK_MSEC: int = 900
+const LOGSPIRE_PICKUP_COLLISION_RADIUS: float = 1.85
 
 func _spawn_item_station(platform_id: StringName, offsets: Array, route_id: StringName, respawn: float) -> void:
 	var point_value: Variant = _world.call("get_platform_position", platform_id)
@@ -34,7 +35,7 @@ func _spawn_item_station(platform_id: StringName, offsets: Array, route_id: Stri
 			LOGSPIRE_PICKUP_RADIUS_SCALE,
 			LOGSPIRE_PICKUP_VERTICAL_SCALE,
 			LOGSPIRE_PICKUP_LOCK_MSEC,
-			false,
+			true,
 			LOGSPIRE_PICKUP_COLLISION_RADIUS
 		)
 		add_child(box)
@@ -42,7 +43,7 @@ func _spawn_item_station(platform_id: StringName, offsets: Array, route_id: Stri
 
 func _ready() -> void:
 	await super()
-	print("LOGSPIRE ITEM PRECISION READY pickup_scale=%.2f collision_radius=%.2fm lock=%.2fs one_item_at_a_time=true" % [
+	print("LOGSPIRE ITEM PICKUP READY pickup_scale=%.2f collision_radius=%.2fm anti_sweep_lock=%.2fs replace_allowed=true easy_pickup=true" % [
 		LOGSPIRE_PICKUP_RADIUS_SCALE,
 		LOGSPIRE_PICKUP_COLLISION_RADIUS,
 		float(LOGSPIRE_PICKUP_LOCK_MSEC) / 1000.0,
