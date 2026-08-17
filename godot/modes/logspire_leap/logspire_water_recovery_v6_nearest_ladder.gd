@@ -17,6 +17,7 @@ var _climb_duration_by_id: Dictionary = {}
 func _update_swimming(racer: WildDashCharacterController, delta: float) -> void:
 	if racer == null or not is_instance_valid(racer):
 		return
+	_cancel_stale_checkpoint_recovery(racer)
 	var racer_id: int = racer.get_instance_id()
 	var nearest: Dictionary = _nearest_physical_ladder(racer)
 	if not nearest.is_empty():
@@ -54,6 +55,7 @@ func _update_swimming(racer: WildDashCharacterController, delta: float) -> void:
 func _begin_ladder_climb(racer: WildDashCharacterController, ladder: Dictionary) -> void:
 	if racer == null or not is_instance_valid(racer):
 		return
+	_cancel_stale_checkpoint_recovery(racer)
 	var racer_id: int = racer.get_instance_id()
 	var bottom_value: Variant = ladder.get("bottom", racer.global_position)
 	var exit_value: Variant = ladder.get("exit", racer.global_position + Vector3.UP * 4.0)
@@ -75,6 +77,7 @@ func _begin_ladder_climb(racer: WildDashCharacterController, ladder: Dictionary)
 func _update_ladder_climb(racer: WildDashCharacterController, delta: float) -> void:
 	if racer == null or not is_instance_valid(racer):
 		return
+	_cancel_stale_checkpoint_recovery(racer)
 	var racer_id: int = racer.get_instance_id()
 	var elapsed: float = float(_climb_elapsed_by_id.get(racer_id, 0.0)) + delta
 	_climb_elapsed_by_id[racer_id] = elapsed
