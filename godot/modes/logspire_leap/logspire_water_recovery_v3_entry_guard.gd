@@ -20,6 +20,29 @@ func _pool_layout() -> Array[Dictionary]:
 		{"zone": 5, "center": Vector3(0.0, 48.25, -720.0), "size": Vector2(100.0, 190.0), "water_y": 48.25},
 	]
 
+func _physics_process(delta: float) -> void:
+	super(delta)
+	if not _configured or not RaceManager.active:
+		return
+	# Area3D signals are useful for effects, but the authoritative transition is
+	# also checked from the racer body every physics frame. This prevents a start
+	# overlap rejection from swallowing a later real fall in the same water pool.
+	for value: Variant in RaceManager.racers.duplicate():
+		var racer := value as WildDashCharacterController
+		if racer == null or not is_instance_valid(racer) or racer.finished:
+			continue
+		var racer_id: int = racer.get_instance_id()
+		var state: int = int(_state_by_id.get(racer_id, WaterState.RACING))
+		if state not in [WaterState.RACING, WaterState.FALLING]:
+			continue
+		var pool: Dictionary = _pool_for_position(racer.global_position)
+		if pool.is_empty():
+			continue
+		var water_y: float = float(pool.get("water_y", -999.0))
+		if not _is_real_water_entry(racer, water_y):
+			continue
+		_enter_water(racer, int(pool.get("zone", 0)), water_y)
+
 func _on_water_body_entered(body: Node3D, zone: int, water_y: float) -> void:
 	var racer := body as WildDashCharacterController
 	if not _is_real_water_entry(racer, water_y):
