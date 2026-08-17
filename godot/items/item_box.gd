@@ -6,6 +6,8 @@ extends Area3D
 ## resolved directly from the wilddash_racer group every physics tick. AI still
 ## uses the shared race roster on a throttled scan. A successful pickup hides the
 ## box immediately, defers collision-state changes safely, then respawns it.
+##
+## Rounds may now apply a tighter pickup profile without changing other modes.
 
 const AI_RADIUS := 3.45
 const PLAYER_RADIUS := 5.50
@@ -20,6 +22,11 @@ const DENIED_LOG_MSEC := 350
 const PICKUP_LOCK_META: StringName = &"wilddash_item_box_pickup_until_msec"
 
 @export var respawn_seconds := 5.0
+@export var pickup_radius_scale: float = 1.0
+@export var pickup_vertical_scale: float = 1.0
+@export var pickup_global_lock_msec: int = GLOBAL_LOCK_MSEC
+@export var allow_player_replace_held: bool = true
+@export var pickup_collision_radius: float = 2.35
 
 var _active := true
 var _visual: Node3D
@@ -39,9 +46,24 @@ func _ready() -> void:
 	_build_visual()
 	if not body_entered.is_connected(_on_body_entered):
 		body_entered.connect(_on_body_entered)
-	print("YELLOW ITEM BOX READY box=%s player_direct_scan=true detectors=body+swept+proximity disappear_on_success=true radius=%.2f" % [
-		name, PLAYER_RADIUS + PLAYER_FALLBACK,
+	print("YELLOW ITEM BOX READY box=%s player_direct_scan=true detectors=body+swept+proximity disappear_on_success=true radius=%.2f scale=%.2f replace=%s" % [
+		name, (PLAYER_RADIUS + PLAYER_FALLBACK) * pickup_radius_scale, pickup_radius_scale, str(allow_player_replace_held),
 	])
+
+func configure_pickup_profile(
+	radius_scale: float,
+	vertical_scale: float,
+	global_lock_msec: int,
+	allow_replace: bool,
+	collision_radius: float
+) -> void:
+	pickup_radius_scale = clampf(radius_scale, 0.25, 1.0)
+	pickup_vertical_scale = clampf(vertical_scale, 0.35, 1.0)
+	pickup_global_lock_msec = maxi(GLOBAL_LOCK_MSEC, global_lock_msec)
+	allow_player_replace_held = allow_replace
+	pickup_collision_radius = clampf(collision_radius, 0.8, 2.35)
+	if _collision != null and _collision.shape is SphereShape3D:
+		(_collision.shape as SphereShape3D).radius = pickup_collision_radius
 
 func _process(delta: float) -> void:
 	_time += delta
@@ -53,8 +75,6 @@ func _physics_process(delta: float) -> void:
 	if not _active:
 		return
 
-	# P0 guarantee: scan the human racer directly from the racer group every
-	# physics tick. This does not rely on RaceManager.racers being populated yet.
 	var player_racer := _resolve_player_racer()
 	if player_racer != null and _scan_racer(player_racer, true):
 		return
@@ -83,9 +103,9 @@ func _scan_racer(racer: WildDashCharacterController, human: bool) -> bool:
 	var radius := PLAYER_RADIUS if human else AI_RADIUS
 	if racer.has_method("get_interaction_radius"):
 		radius = float(racer.call("get_interaction_radius", radius))
-	radius = ItemSystem.get_pickup_radius(racer, radius)
-	var vertical := PLAYER_VERTICAL if human else AI_VERTICAL
-	var fallback := PLAYER_FALLBACK if human else AI_FALLBACK
+	radius = ItemSystem.get_pickup_radius(racer, radius) * pickup_radius_scale
+	var vertical := (PLAYER_VERTICAL if human else AI_VERTICAL) * pickup_vertical_scale
+	var fallback := (PLAYER_FALLBACK if human else AI_FALLBACK) * pickup_radius_scale
 	var swept := _swept_hit(global_position, previous, probe, radius, vertical)
 	var proximity := _proximity_hit(global_position, probe, radius + fallback, vertical)
 	var overlap := overlaps_body(racer)
@@ -158,8 +178,9 @@ func _try_party_pickup(racer: WildDashCharacterController, trigger: String) -> b
 		if not racer.is_player:
 			_log_denied(racer, "HELD_ITEM_AI", trigger)
 			return false
-		# RC9 player guarantee: a stale/held item must never make a yellow box look
-		# broken. Replace it atomically and restore it if the new grant fails.
+		if not allow_player_replace_held:
+			_log_denied(racer, "HELD_ITEM_PLAYER", trigger)
+			return false
 		racer.set_held_item(&"")
 		replaced = true
 
@@ -169,7 +190,7 @@ func _try_party_pickup(racer: WildDashCharacterController, trigger: String) -> b
 		_log_denied(racer, "GRANT_FAILED", trigger)
 		return false
 
-	racer.set_meta(PICKUP_LOCK_META, now + GLOBAL_LOCK_MSEC)
+	racer.set_meta(PICKUP_LOCK_META, now + pickup_global_lock_msec)
 	_same_box_until[id] = now + SAME_BOX_LOCK_MSEC
 	_success(racer, replaced, trigger)
 	_deactivate()
@@ -186,6 +207,9 @@ func _try_legacy_pickup(body: Node, trigger: String) -> bool:
 		if not human:
 			_log_denied(body, "HELD_ITEM_AI", trigger)
 			return false
+		if not allow_player_replace_held:
+			_log_denied(body, "HELD_ITEM_PLAYER", trigger)
+			return false
 		body.call("set_held_item", &"")
 		replaced = true
 	if not ItemSystem.grant_weighted_item(body):
@@ -194,7 +218,7 @@ func _try_legacy_pickup(body: Node, trigger: String) -> bool:
 		_log_denied(body, "GRANT_FAILED", trigger)
 		return false
 	if human:
-		body.set_meta(PICKUP_LOCK_META, Time.get_ticks_msec() + GLOBAL_LOCK_MSEC)
+		body.set_meta(PICKUP_LOCK_META, Time.get_ticks_msec() + pickup_global_lock_msec)
 	if body is WildDashCharacterController:
 		_success(body as WildDashCharacterController, replaced, trigger)
 	_deactivate()
@@ -243,8 +267,6 @@ func _deactivate() -> void:
 	_active = false
 	if _visual != null:
 		_visual.visible = false
-	# Never mutate physics-query state directly from body_entered/physics scan.
-	# Deferred toggles avoid Godot's flushing-queries state-change error.
 	set_deferred("monitoring", false)
 	if _collision != null:
 		_collision.set_deferred("disabled", true)
@@ -301,6 +323,6 @@ func _build_visual() -> void:
 	_visual.add_child(ring)
 	_collision = CollisionShape3D.new()
 	var shape := SphereShape3D.new()
-	shape.radius = 2.35
+	shape.radius = pickup_collision_radius
 	_collision.shape = shape
 	add_child(_collision)
