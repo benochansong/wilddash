@@ -1,7 +1,7 @@
 [gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_leap.gd" id="1_mode"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_world.gd" id="2_world"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_world_v2_deep_water.gd" id="2_world"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_rebalance.gd" id="2b_jump_rebalance"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_gap_guard.gd" id="2c_gap_guard"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_platform_graph.gd" id="3_graph"]
@@ -11,8 +11,8 @@
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_combat_safety.gd" id="7_combat"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_mushroom_feedback.gd" id="8_mushroom"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_phase3_director.gd" id="9_phase3"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_ladder_system.gd" id="10_ladder"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_recovery_v3_entry_guard.gd" id="11_water"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_ladder_system_v2.gd" id="10_ladder"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_recovery_v4_deep_swim.gd" id="11_water"]
 
 [node name="LogspireLeap" type="Node3D"]
 script = ExtResource("1_mode")
