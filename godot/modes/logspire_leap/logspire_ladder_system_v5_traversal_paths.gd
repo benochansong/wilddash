@@ -6,7 +6,7 @@ extends "res://modes/logspire_leap/logspire_ladder_system_v4_safe_exit.gd"
 ## High ladder decks are moved farther away from large overhead geometry and
 ## exit at the deck centre before reconnecting to the race route.
 
-const ROOT_PATH_POINT_COUNT: int = 7
+const ROOT_PATH_POINT_COUNT: int = 5
 const STAIR_MAX_RISE: float = 0.48
 const STAIR_WIDTH: float = 5.6
 const STAIR_MIN_STEP_LENGTH: float = 2.0
