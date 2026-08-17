@@ -47,9 +47,6 @@ func _start_checkpoint_fallback(racer: WildDashCharacterController, reason: Stri
 				RaceManager.get_racer_label(racer), reason, String(ladder.get("id", &"")),
 			])
 			return
-		# A valid Logspire water zone should always have a ladder. If initialization
-		# is momentarily incomplete, keep the racer afloat and retry next frame
-		# rather than teleporting them back to the race start/checkpoint.
 		_water_elapsed_by_id[racer_id] = 0.0
 		_state_by_id[racer_id] = WaterState.SWIMMING
 		print("LOGSPIRE WATER NO RESTART racer=%s reason=%s ladder=SEARCHING checkpoint_respawn=false" % [
@@ -63,8 +60,10 @@ func _resolve_water_ladder(racer: WildDashCharacterController) -> Dictionary:
 		return {}
 	var racer_id: int = racer.get_instance_id()
 	var current_value: Variant = _ladder_by_id.get(racer_id, {})
-	if current_value is Dictionary and not (current_value as Dictionary).is_empty():
-		return current_value as Dictionary
+	if current_value is Dictionary:
+		var current: Dictionary = current_value
+		if not current.is_empty():
+			return current
 	var zone: int = int(_zone_by_id.get(racer_id, 0))
 	var candidates: Array = _ladder_system.call("get_ladders_for_zone", zone)
 	if candidates.is_empty():
@@ -76,4 +75,6 @@ func _resolve_water_ladder(racer: WildDashCharacterController) -> Dictionary:
 		candidates,
 		RaceManager.get_checkpoint_progress(racer)
 	)
-	return result if result is Dictionary else {}
+	if result is Dictionary:
+		return result
+	return {}
