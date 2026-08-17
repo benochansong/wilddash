@@ -3,12 +3,20 @@ extends "res://modes/logspire_leap/logspire_water_recovery_v4_deep_swim.gd"
 ## Water recovery must resolve through a ladder during normal play.
 ## Time spent swimming is never, by itself, a reason to restart at a checkpoint.
 ## Reaching the visible front of a ladder captures the racer immediately.
+## Any recovery timer queued before the splash is cancelled as soon as water owns the racer.
 
 const INSTANT_LADDER_CAPTURE_RADIUS: float = 4.25
+
+func _enter_water(racer: WildDashCharacterController, zone: int, water_y: float) -> void:
+	_cancel_stale_checkpoint_recovery(racer)
+	super(racer, zone, water_y)
+	if racer != null and is_instance_valid(racer) and bool(racer.get_meta(WATER_META, false)):
+		_cancel_stale_checkpoint_recovery(racer)
 
 func _update_swimming(racer: WildDashCharacterController, delta: float) -> void:
 	if racer == null or not is_instance_valid(racer):
 		return
+	_cancel_stale_checkpoint_recovery(racer)
 	var racer_id: int = racer.get_instance_id()
 	var ladder: Dictionary = _resolve_water_ladder(racer)
 	if not ladder.is_empty():
@@ -31,10 +39,15 @@ func _update_swimming(racer: WildDashCharacterController, delta: float) -> void:
 			return
 	super(racer, delta)
 
+func _update_ladder_climb(racer: WildDashCharacterController, delta: float) -> void:
+	_cancel_stale_checkpoint_recovery(racer)
+	super(racer, delta)
+
 func _start_checkpoint_fallback(racer: WildDashCharacterController, reason: String) -> void:
 	if racer == null or not is_instance_valid(racer):
 		return
 	if bool(racer.get_meta(WATER_META, false)):
+		_cancel_stale_checkpoint_recovery(racer)
 		var racer_id: int = racer.get_instance_id()
 		var ladder: Dictionary = _resolve_water_ladder(racer)
 		if not ladder.is_empty():
@@ -78,3 +91,9 @@ func _resolve_water_ladder(racer: WildDashCharacterController) -> Dictionary:
 	if result is Dictionary:
 		return result
 	return {}
+
+func _cancel_stale_checkpoint_recovery(racer: WildDashCharacterController) -> void:
+	if racer == null or not is_instance_valid(racer):
+		return
+	if _recovery != null and is_instance_valid(_recovery) and _recovery.has_method("cancel_pending_for_water"):
+		_recovery.call("cancel_pending_for_water", racer)
