@@ -8,7 +8,7 @@ const SWIM_SPEED_RATIO: float = 0.50
 const CROCODILE_SWIM_SPEED_RATIO: float = 1.00
 const SWIM_ACCELERATION: float = 16.0
 const CROCODILE_SWIM_ACCELERATION: float = 24.0
-const SWIM_TURN_SPEED: float = 5.5
+const SWIM_TURN_SPEED: float = 7.0
 const SURFACE_BODY_OFFSET: float = 0.52
 
 const LIGHT_RACERS: Array[StringName] = [&"rabbit", &"cat", &"fox"]
@@ -23,15 +23,32 @@ func get_swim_speed(racer: WildDashCharacterController) -> float:
 	elif HEAVY_RACERS.has(racer.animal_id):
 		species_scale = 0.92
 	if racer.animal_id == &"crocodile":
-		# Keep the earlier crocodile identity multiplier for telemetry/compatibility,
-		# but make its authored water identity a full-speed recovery exception.
-		species_scale *= 1.10
+		# Crocodile keeps its full-speed water identity: water pace ~= ground max.
 		return maxf(3.8, racer.max_speed * CROCODILE_SWIM_SPEED_RATIO)
 	return maxf(3.8, racer.max_speed * SWIM_SPEED_RATIO * species_scale)
 
-func get_player_direction() -> Vector3:
+func get_player_direction(camera: Camera3D = null) -> Vector3:
 	var axis: Vector2 = InputManager.get_move_vector()
-	var direction := Vector3(axis.x, 0.0, axis.y)
+	if axis.length_squared() <= 0.001:
+		return Vector3.ZERO
+	if camera == null:
+		var fallback := Vector3(axis.x, 0.0, axis.y)
+		return fallback.normalized() if fallback.length_squared() > 0.001 else Vector3.ZERO
+	# Godot cameras look down local -Z. InputManager uses negative Y for W/Up,
+	# so -axis.y maps the player's forward input onto camera_forward.
+	var camera_forward := -camera.global_transform.basis.z
+	var camera_right := camera.global_transform.basis.x
+	camera_forward.y = 0.0
+	camera_right.y = 0.0
+	if camera_forward.length_squared() <= 0.001:
+		camera_forward = Vector3.FORWARD
+	else:
+		camera_forward = camera_forward.normalized()
+	if camera_right.length_squared() <= 0.001:
+		camera_right = Vector3.RIGHT
+	else:
+		camera_right = camera_right.normalized()
+	var direction := camera_right * axis.x + camera_forward * (-axis.y)
 	if direction.length_squared() <= 0.001:
 		return Vector3.ZERO
 	return direction.normalized()
