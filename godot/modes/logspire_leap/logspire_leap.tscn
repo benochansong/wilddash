@@ -2,6 +2,7 @@
 
 # Phase B mode inherits res://modes/logspire_leap/logspire_leap_v3_recovery_camera.gd
 # Phase B combat inherits res://modes/logspire_leap/logspire_combat_safety_v2_recovery_protection.gd
+# Phase C director inherits res://modes/logspire_leap/logspire_phase3_director_v4_major_collision.gd
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_leap_v4_phase_b.gd" id="1_mode"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_world_v2_deep_water.gd" id="2_world"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_rebalance_v2_phase_b.gd" id="2b_jump_rebalance"]
@@ -13,7 +14,7 @@
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_platform_gameplay.gd" id="6_gameplay"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_combat_safety_v3_phase_b.gd" id="7_combat"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_mushroom_feedback.gd" id="8_mushroom"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_phase3_director_v4_major_collision.gd" id="9_phase3"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_phase3_director_v5_fun_pass.gd" id="9_phase3"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_ladder_system_v5_traversal_paths.gd" id="10_ladder"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_recovery_v10_surface_collision_guard.gd" id="11_water"]
 
