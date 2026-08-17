@@ -5,7 +5,9 @@ extends RefCounted
 ## movement without changing movement rules in the other rounds.
 
 const SWIM_SPEED_RATIO: float = 0.50
+const CROCODILE_SWIM_SPEED_RATIO: float = 1.00
 const SWIM_ACCELERATION: float = 16.0
+const CROCODILE_SWIM_ACCELERATION: float = 24.0
 const SWIM_TURN_SPEED: float = 5.5
 const SURFACE_BODY_OFFSET: float = 0.52
 
@@ -21,7 +23,10 @@ func get_swim_speed(racer: WildDashCharacterController) -> float:
 	elif HEAVY_RACERS.has(racer.animal_id):
 		species_scale = 0.92
 	if racer.animal_id == &"crocodile":
+		# Keep the earlier crocodile identity multiplier for telemetry/compatibility,
+		# but make its authored water identity a full-speed recovery exception.
 		species_scale *= 1.10
+		return maxf(3.8, racer.max_speed * CROCODILE_SWIM_SPEED_RATIO)
 	return maxf(3.8, racer.max_speed * SWIM_SPEED_RATIO * species_scale)
 
 func get_player_direction() -> Vector3:
@@ -48,8 +53,9 @@ func apply_swim(
 
 	var target_speed: float = get_swim_speed(racer) if desired_direction.length_squared() > 0.001 else 0.0
 	var desired_velocity := desired_direction * target_speed
-	racer.velocity.x = move_toward(racer.velocity.x, desired_velocity.x, SWIM_ACCELERATION * delta)
-	racer.velocity.z = move_toward(racer.velocity.z, desired_velocity.z, SWIM_ACCELERATION * delta)
+	var swim_acceleration: float = CROCODILE_SWIM_ACCELERATION if racer.animal_id == &"crocodile" else SWIM_ACCELERATION
+	racer.velocity.x = move_toward(racer.velocity.x, desired_velocity.x, swim_acceleration * delta)
+	racer.velocity.z = move_toward(racer.velocity.z, desired_velocity.z, swim_acceleration * delta)
 	racer.velocity.y = 0.0
 
 	var target_y: float = water_y + SURFACE_BODY_OFFSET
