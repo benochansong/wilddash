@@ -36,6 +36,13 @@ const BEHIND_PROGRESS_PENALTY: float = 2.0
 var _ux_state_by_id: Dictionary = {}
 var _preferred_target_by_id: Dictionary = {}
 
+func _track_fall_state(racer: WildDashCharacterController) -> void:
+	super(racer)
+	if racer == null or not is_instance_valid(racer):
+		return
+	var state: int = int(_state_by_id.get(racer.get_instance_id(), WaterState.RACING))
+	_set_ux_state(racer, RecoveryUXState.FALLING if state == WaterState.FALLING else RecoveryUXState.RACING)
+
 func _enter_water(racer: WildDashCharacterController, zone: int, water_y: float) -> void:
 	if racer != null and is_instance_valid(racer):
 		_set_ux_state(racer, RecoveryUXState.WATER_ENTRY)
@@ -63,6 +70,16 @@ func _update_swimming(racer: WildDashCharacterController, delta: float) -> void:
 			_apply_manual_recovery_swim(racer, water_y, delta)
 		return
 
+	var previous_value: Variant = _preferred_target_by_id.get(racer_id, {})
+	var previous: Dictionary = previous_value if previous_value is Dictionary else {}
+	if _target_signature(previous) != _target_signature(target):
+		print("LOGSPIRE RECOVERY TARGET racer=%s from=%s to=%s score=%.2f player_priority=%s" % [
+			RaceManager.get_racer_label(racer),
+			_target_signature(previous),
+			_target_signature(target),
+			float(target.get("target_score", 0.0)),
+			str(racer.is_player),
+		])
 	_preferred_target_by_id[racer_id] = target
 	_update_recovery_camera_focus(racer, target)
 	var recovery_type := StringName(target.get("recovery_type", &""))
@@ -113,6 +130,28 @@ func _update_swimming(racer: WildDashCharacterController, delta: float) -> void:
 			if controlled_by_player:
 				_apply_manual_recovery_swim(racer, water_y, delta)
 
+func _apply_manual_recovery_swim(racer: WildDashCharacterController, water_y: float, delta: float) -> void:
+	var racer_id: int = racer.get_instance_id()
+	var camera: Camera3D = get_viewport().get_camera_3d()
+	var direction_value: Variant = _swim.call("get_player_direction", camera)
+	var direction: Vector3 = direction_value if direction_value is Vector3 else Vector3.ZERO
+	_swim.call("apply_swim", racer, direction, water_y, delta)
+	_water_elapsed_by_id[racer_id] = float(_water_elapsed_by_id.get(racer_id, 0.0)) + delta
+	var log_elapsed: float = float(_water_input_log_elapsed_by_id.get(racer_id, 0.0)) + delta
+	if OS.is_debug_build() and log_elapsed >= WATER_INPUT_LOG_INTERVAL:
+		log_elapsed = 0.0
+		var axis: Vector2 = InputManager.get_move_vector()
+		var camera_forward := Vector3.FORWARD
+		if camera != null:
+			camera_forward = -camera.global_transform.basis.z
+			camera_forward.y = 0.0
+			if camera_forward.length_squared() > 0.001:
+				camera_forward = camera_forward.normalized()
+		print("LOGSPIRE WATER INPUT racer=%s camera_forward=(%.2f,%.2f) input=(%.2f,%.2f) move_direction=(%.2f,%.2f)" % [
+			RaceManager.get_racer_label(racer), camera_forward.x, camera_forward.z, axis.x, axis.y, direction.x, direction.z,
+		])
+	_water_input_log_elapsed_by_id[racer_id] = log_elapsed
+
 func _begin_auto_vault(racer: WildDashCharacterController, entry: Dictionary) -> void:
 	_set_ux_state(racer, RecoveryUXState.AUTO_VAULT)
 	_set_traversal_action_lock(racer, true)
@@ -148,6 +187,7 @@ func _finish_water_recovery(racer: WildDashCharacterController) -> void:
 	_set_ux_state(racer, RecoveryUXState.SAFE_EXIT)
 	_clear_recovery_camera_focus_if_needed(racer)
 	_set_traversal_action_lock(racer, false)
+	racer.remove_meta(&"logspire_recovery_player_priority")
 	super(racer)
 	_set_ux_state(racer, RecoveryUXState.RACING)
 	_clear_v9_runtime(racer.get_instance_id())
@@ -158,6 +198,7 @@ func _finish_assisted_recovery(racer: WildDashCharacterController, exit_position
 	_set_ux_state(racer, RecoveryUXState.SAFE_EXIT)
 	_clear_recovery_camera_focus_if_needed(racer)
 	_set_traversal_action_lock(racer, false)
+	racer.remove_meta(&"logspire_recovery_player_priority")
 	super(racer, exit_position, message)
 	_set_ux_state(racer, RecoveryUXState.RACING)
 	_clear_v9_runtime(racer.get_instance_id())
@@ -166,6 +207,7 @@ func _start_checkpoint_fallback(racer: WildDashCharacterController, reason: Stri
 	if racer != null:
 		_clear_recovery_camera_focus_if_needed(racer)
 		_set_traversal_action_lock(racer, false)
+		racer.remove_meta(&"logspire_recovery_player_priority")
 	super(racer, reason)
 
 func get_recovery_ux_state(racer: WildDashCharacterController) -> StringName:
@@ -224,12 +266,14 @@ func _choose_recovery_target(racer: WildDashCharacterController, zone: int) -> D
 
 	var racer_id: int = racer.get_instance_id()
 	var current_value: Variant = _preferred_target_by_id.get(racer_id, {})
-	if current_value is Dictionary and not (current_value as Dictionary).is_empty():
-		var current: Dictionary = (current_value as Dictionary).duplicate(true)
-		var current_score: float = _score_recovery_target(racer, current, zone)
-		if current_score <= best_score + TARGET_SWITCH_HYSTERESIS:
-			current["target_score"] = current_score
-			return current
+	if current_value is Dictionary:
+		var current: Dictionary = current_value
+		if not current.is_empty():
+			current = current.duplicate(true)
+			var current_score: float = _score_recovery_target(racer, current, zone)
+			if current_score <= best_score + TARGET_SWITCH_HYSTERESIS:
+				current["target_score"] = current_score
+				return current
 	return best
 
 func _score_recovery_target(racer: WildDashCharacterController, target: Dictionary, current_zone: int) -> float:
@@ -268,6 +312,13 @@ func _target_point(target: Dictionary, fallback: Vector3) -> Vector3:
 	var recovery_type := StringName(target.get("recovery_type", &""))
 	var value: Variant = target.get("bottom", fallback) if recovery_type == TARGET_LADDER else target.get("entry", fallback)
 	return value if value is Vector3 else fallback
+
+func _target_signature(target: Dictionary) -> String:
+	if target.is_empty():
+		return "none"
+	var recovery_type := StringName(target.get("recovery_type", &""))
+	var target_id: String = String(target.get("id", target.get("platform_id", &"unknown")))
+	return "%s:%s" % [String(recovery_type), target_id]
 
 func _count_recovery_racers_near(point: Vector3, self_racer: WildDashCharacterController) -> int:
 	var count: int = 0
