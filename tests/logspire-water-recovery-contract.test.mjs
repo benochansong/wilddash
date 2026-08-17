@@ -91,13 +91,13 @@ test("Swimming stays a recovery route instead of a shortcut", () => {
   assert.match(waterV4, /visual\.play_state\(&"Jump", true\)/);
 });
 
-test("Nearby physical ladder beats a stale far-away ladder target", () => {
+test("Nearby physical ladder beats a stale far-away ladder target across zone boundaries", () => {
   assert.match(waterV6, /NEARBY_LADDER_CAPTURE_RADIUS: float = 5\.25/);
   assert.match(waterV6, /NEARBY_LADDER_SWITCH_ADVANTAGE: float = 6\.0/);
   assert.match(waterV6, /_nearest_physical_ladder\(racer\)/);
   assert.match(waterV6, /LOGSPIRE LADDER TARGET SWITCH/);
   assert.match(waterV6, /LOGSPIRE LADDER NEAREST CAPTURE/);
-  assert.match(waterV6, /get_ladders_for_zone/);
+  assert.match(waterV6, /get_all_ladders/);
 });
 
 test("Tall ladders scale climb duration by height and lock the racer to the ladder axis", () => {
@@ -108,6 +108,7 @@ test("Tall ladders scale climb duration by height and lock the racer to the ladd
   assert.match(waterV6, /position\.x = from\.x/);
   assert.match(waterV6, /position\.z = from\.z/);
   assert.match(waterV6, /LOGSPIRE LADDER CLIMB PROFILE/);
+  assert.match(waterV6, /_cancel_stale_checkpoint_recovery\(racer\)/);
 });
 
 test("Ladder network has 20 exits and easy auto capture", () => {
