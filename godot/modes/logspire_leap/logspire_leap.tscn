@@ -1,11 +1,12 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=15 format=3]
 
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_leap_v2_item_precision.gd" id="1_mode"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_world_v2_deep_water.gd" id="2_world"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_rebalance.gd" id="2b_jump_rebalance"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_gap_guard.gd" id="2c_gap_guard"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_depth_guard.gd" id="2d_depth_guard"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_platform_graph.gd" id="3_graph"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_recovery_system.gd" id="4_recovery"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_recovery_system_v2_ladder_only.gd" id="4_recovery"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_mobility_assist.gd" id="5_mobility"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_platform_gameplay.gd" id="6_gameplay"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_combat_safety.gd" id="7_combat"]
@@ -25,6 +26,9 @@ script = ExtResource("2b_jump_rebalance")
 
 [node name="JumpGapGuard" type="Node" parent="."]
 script = ExtResource("2c_gap_guard")
+
+[node name="WaterDepthGuard" type="Node" parent="."]
+script = ExtResource("2d_depth_guard")
 
 [node name="PlatformGraph" type="Node" parent="."]
 script = ExtResource("3_graph")
