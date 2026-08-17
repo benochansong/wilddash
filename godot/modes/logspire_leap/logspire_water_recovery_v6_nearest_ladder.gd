@@ -101,11 +101,10 @@ func _update_ladder_climb(racer: WildDashCharacterController, delta: float) -> v
 func _nearest_physical_ladder(racer: WildDashCharacterController) -> Dictionary:
 	if racer == null or _ladder_system == null:
 		return {}
-	var racer_id: int = racer.get_instance_id()
-	var zone: int = int(_zone_by_id.get(racer_id, -1))
-	var candidates: Array = _ladder_system.call("get_ladders_for_zone", zone)
-	if candidates.is_empty():
-		candidates = _ladder_system.call("get_all_ladders")
+	# Physical proximity wins across all 20 ladders. This intentionally ignores
+	# cached zone ownership so a racer at a zone boundary can use the ladder they
+	# are actually touching instead of a far-away route-selected target.
+	var candidates: Array = _ladder_system.call("get_all_ladders")
 	var best: Dictionary = {}
 	var best_distance: float = INF
 	for value: Variant in candidates:
