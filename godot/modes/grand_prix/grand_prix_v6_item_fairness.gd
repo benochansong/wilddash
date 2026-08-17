@@ -3,20 +3,24 @@ extends "res://modes/grand_prix/grand_prix_v5_item_chaos.gd"
 ## Round 1 V6 — shared item fairness relay.
 ## A front runner may consume the visible box, but a trailing racer who reaches
 ## the same station shortly afterwards can still receive one catch-up item.
-## This is mode-local so other rounds keep the shared ItemBox behavior.
+##
+## Pickup feel correction:
+## - visible boxes must remain easy to collect at race speed;
+## - anti-sweep is handled by a short station/global lock, not by tiny hitboxes;
+## - held items may be replaced again so a valid box never feels broken.
 
 const FAIR_RESPAWN_DEFAULT: float = 2.25
 const FAIR_RESPAWN_15: float = 1.95
 const FAIR_RESPAWN_18: float = 1.65
 const FAIR_RELAY_WINDOW_MSEC: int = 2600
 const FAIR_STATION_LOCK_MSEC: int = 6000
-const FAIR_RELAY_RADIUS: float = 2.60
-const FAIR_RELAY_VERTICAL: float = 3.00
-const FAIR_GLOBAL_LOCK_MSEC: int = 1100
+const FAIR_RELAY_RADIUS: float = 3.10
+const FAIR_RELAY_VERTICAL: float = 3.40
+const FAIR_GLOBAL_LOCK_MSEC: int = 900
 const FAIR_ITEM_LOCK_META: StringName = &"wilddash_item_box_pickup_until_msec"
-const ROUND1_PICKUP_RADIUS_SCALE: float = 0.50
-const ROUND1_PICKUP_VERTICAL_SCALE: float = 0.72
-const ROUND1_PICKUP_COLLISION_RADIUS: float = 1.35
+const ROUND1_PICKUP_RADIUS_SCALE: float = 0.82
+const ROUND1_PICKUP_VERTICAL_SCALE: float = 0.90
+const ROUND1_PICKUP_COLLISION_RADIUS: float = 1.85
 
 var _fair_box_inactive_since: Dictionary = {}
 var _fair_box_was_active: Dictionary = {}
@@ -38,12 +42,12 @@ func _ready() -> void:
 			ROUND1_PICKUP_RADIUS_SCALE,
 			ROUND1_PICKUP_VERTICAL_SCALE,
 			FAIR_GLOBAL_LOCK_MSEC,
-			false,
+			true,
 			ROUND1_PICKUP_COLLISION_RADIUS
 		)
 		_fair_box_was_active[box.get_instance_id()] = box.is_active()
-	print("ROUND1 FAIR ITEM READY boxes=%d respawn=%.2fs relay_window=%.2fs relay_radius=%.2fm pickup_scale=%.2f one_item_at_a_time=true leader_excluded=true trailing_shared=true" % [
-		_item_boxes.size(), respawn, float(FAIR_RELAY_WINDOW_MSEC) / 1000.0, FAIR_RELAY_RADIUS, ROUND1_PICKUP_RADIUS_SCALE,
+	print("ROUND1 FAIR ITEM READY boxes=%d respawn=%.2fs relay_window=%.2fs relay_radius=%.2fm pickup_scale=%.2f easy_pickup=true anti_sweep_lock=%.2fs leader_excluded=true trailing_shared=true" % [
+		_item_boxes.size(), respawn, float(FAIR_RELAY_WINDOW_MSEC) / 1000.0, FAIR_RELAY_RADIUS, ROUND1_PICKUP_RADIUS_SCALE, float(FAIR_GLOBAL_LOCK_MSEC) / 1000.0,
 	])
 
 func _process(delta: float) -> void:
