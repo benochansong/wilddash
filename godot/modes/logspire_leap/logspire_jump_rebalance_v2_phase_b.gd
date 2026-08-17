@@ -19,7 +19,7 @@ var _ledge_catch_logged: bool = false
 var _water_recovery: Node
 
 func _ready() -> void:
-	await super()
+	super()
 	_water_recovery = get_parent().get_node_or_null("WaterRecovery")
 	print("LOGSPIRE PHASE B PLAYER ASSIST READY landing_assist=%.2fm ledge_catch=%.2fs extra_range=%.2fm teleport=false" % [
 		LANDING_ASSIST_MAX_METERS, LEDGE_CATCH_WINDOW_SECONDS, LEDGE_CATCH_EXTRA_RANGE,
