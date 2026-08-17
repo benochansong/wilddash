@@ -14,6 +14,7 @@ const ladder = readFileSync("godot/modes/logspire_leap/logspire_ladder_system.gd
 const ladderV2 = readFileSync("godot/modes/logspire_leap/logspire_ladder_system_v2.gd", "utf8");
 const ladderV3 = readFileSync("godot/modes/logspire_leap/logspire_ladder_system_v3_easy_attach.gd", "utf8");
 const phase3Perf = readFileSync("godot/modes/logspire_leap/logspire_phase3_director_v2_performance.gd", "utf8");
+const phase3Water = readFileSync("godot/modes/logspire_leap/logspire_phase3_director_v3_water_priority.gd", "utf8");
 const waterAI = readFileSync("godot/modes/logspire_leap/logspire_water_ai.gd", "utf8");
 const recovery = readFileSync("godot/modes/logspire_leap/logspire_recovery_system.gd", "utf8");
 const graph = readFileSync("godot/modes/logspire_leap/logspire_platform_graph.gd", "utf8");
@@ -23,7 +24,8 @@ test("Logspire scene wires deep water, easy ladders, performance pass and ladder
   assert.match(scene, /logspire_world_v2_deep_water\.gd/);
   assert.match(scene, /logspire_water_recovery_v5_ladder_priority\.gd/);
   assert.match(scene, /logspire_ladder_system_v3_easy_attach\.gd/);
-  assert.match(scene, /logspire_phase3_director_v2_performance\.gd/);
+  assert.match(scene, /logspire_phase3_director_v3_water_priority\.gd/);
+  assert.match(phase3Water, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director_v2_performance\.gd"/);
   assert.match(scene, /WaterRecovery/);
   assert.match(scene, /LadderSystem/);
   assert.match(scene, /RecoverySystem/);
@@ -43,6 +45,24 @@ test("Canopy River keeps normal water recovery on ladders instead of checkpoint 
   assert.match(waterV5, /_state_by_id\[racer_id\] = WaterState\.SWIMMING/);
   assert.match(recovery, /set_water_recovery/);
   assert.match(recovery, /_water_should_handle/);
+});
+
+test("Water entry invalidates checkpoint recovery timers queued before the splash", () => {
+  assert.match(recovery, /func cancel_pending_for_water\(/);
+  assert.match(recovery, /_recovery_token_counter/);
+  assert.match(recovery, /LOGSPIRE RECOVERY STALE TIMER DROPPED/);
+  assert.match(recovery, /LOGSPIRE RECOVERY TIMER CANCELLED BY WATER/);
+  assert.match(recovery, /if _water_should_handle\(racer\):\n\t\t_pending\.erase\(racer_id\)/);
+  assert.match(waterV5, /func _enter_water\(/);
+  assert.match(waterV5, /_cancel_stale_checkpoint_recovery\(racer\)/);
+  assert.match(waterV5, /func _update_ladder_climb\(/);
+});
+
+test("Finale delayed recovery cannot override active swimming", () => {
+  assert.match(phase3Water, /logspire_water_recovery_active/);
+  assert.match(phase3Water, /FINAL RECOVERY CANCELLED BY WATER/);
+  assert.match(phase3Water, /WaterRecovery/);
+  assert.match(phase3Perf, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director\.gd"/);
 });
 
 test("Deep-water adapter gives every basin enough vertical clearance to swim", () => {
