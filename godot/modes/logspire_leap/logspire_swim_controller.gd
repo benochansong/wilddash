@@ -10,6 +10,8 @@ const SWIM_ACCELERATION: float = 16.0
 const CROCODILE_SWIM_ACCELERATION: float = 24.0
 const SWIM_TURN_SPEED: float = 7.0
 const SURFACE_BODY_OFFSET: float = 0.52
+const SURFACE_LOCK_TOLERANCE: float = 0.12
+const SURFACE_DESCEND_SPEED: float = 5.5
 
 const LIGHT_RACERS: Array[StringName] = [&"rabbit", &"cat", &"fox"]
 const HEAVY_RACERS: Array[StringName] = [&"boar", &"bear", &"crocodile", &"elephant"]
@@ -61,6 +63,19 @@ func apply_swim(
 ) -> void:
 	if racer == null:
 		return
+
+	# Buoyancy owns Y while swimming. If a missed water-entry frame or collision
+	# recovery leaves the capsule below the surface, lift it back using a
+	# collision-aware body move instead of letting the ground controller walk on
+	# the basin floor. Downward settling is deliberately gentle.
+	var target_y: float = water_y + SURFACE_BODY_OFFSET
+	var vertical_delta: float = target_y - racer.global_position.y
+	if vertical_delta > SURFACE_LOCK_TOLERANCE:
+		racer.move_and_collide(Vector3.UP * vertical_delta)
+	elif vertical_delta < -SURFACE_LOCK_TOLERANCE:
+		var descend: float = minf(-vertical_delta, SURFACE_DESCEND_SPEED * delta)
+		racer.move_and_collide(Vector3.DOWN * descend)
+
 	var desired_direction := direction
 	desired_direction.y = 0.0
 	if desired_direction.length_squared() > 0.001:
@@ -73,11 +88,15 @@ func apply_swim(
 	var swim_acceleration: float = CROCODILE_SWIM_ACCELERATION if racer.animal_id == &"crocodile" else SWIM_ACCELERATION
 	racer.velocity.x = move_toward(racer.velocity.x, desired_velocity.x, swim_acceleration * delta)
 	racer.velocity.z = move_toward(racer.velocity.z, desired_velocity.z, swim_acceleration * delta)
+	# No gravity / ground-walk vertical velocity is allowed while WaterRecovery
+	# owns the racer.
 	racer.velocity.y = 0.0
-
-	var target_y: float = water_y + SURFACE_BODY_OFFSET
-	var position := racer.global_position
-	position.y = move_toward(position.y, target_y, 7.5 * delta)
-	racer.global_position = position
 	racer.move_and_slide()
+
+	# Collision recovery can nudge a capsule down. Correct the remainder before
+	# the next frame, while still respecting world collision on the way up.
+	var remaining_surface_delta: float = target_y - racer.global_position.y
+	if remaining_surface_delta > SURFACE_LOCK_TOLERANCE:
+		racer.move_and_collide(Vector3.UP * remaining_surface_delta)
+	racer.velocity.y = 0.0
 	racer.current_speed = Vector2(racer.velocity.x, racer.velocity.z).length()
