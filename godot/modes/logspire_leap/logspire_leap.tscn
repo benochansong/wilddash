@@ -10,7 +10,7 @@
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_platform_gameplay.gd" id="6_gameplay"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_combat_safety.gd" id="7_combat"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_mushroom_feedback.gd" id="8_mushroom"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_phase3_director_v2_performance.gd" id="9_phase3"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_phase3_director_v3_water_priority.gd" id="9_phase3"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_ladder_system_v3_easy_attach.gd" id="10_ladder"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_recovery_v5_ladder_priority.gd" id="11_water"]
 
