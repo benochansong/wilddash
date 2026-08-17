@@ -40,7 +40,9 @@ func configure(world: Node, graph: Node, water_heights: Dictionary) -> void:
 		else:
 			forward = forward.normalized()
 		var right := Vector3(-forward.z, 0.0, forward.x)
-		var radius_value: Variant = _graph.call("get_platform_landing_radius", platform_id)
+		# PlatformGraph exposes get_landing_radius(); calling the world's method name
+		# here caused Round 3 to stop on entry after Round 2.
+		var radius_value: Variant = _graph.call("get_landing_radius", platform_id)
 		var landing_radius: float = float(radius_value) if radius_value is float or radius_value is int else 4.0
 		var side: float = -1.0 if i % 2 == 0 else 1.0
 		var deck_offset: float = clampf(landing_radius + 1.8, 4.2, 6.8)
