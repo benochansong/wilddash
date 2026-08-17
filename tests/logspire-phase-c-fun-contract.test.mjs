@@ -9,11 +9,12 @@ const graph = readFileSync("godot/modes/logspire_leap/logspire_platform_graph.gd
 const phaseA = readFileSync("godot/modes/logspire_leap/logspire_jump_gap_guard.gd", "utf8");
 const phaseB = readFileSync("godot/modes/logspire_leap/logspire_platform_ai_v5_phase_b.gd", "utf8");
 
-test("Phase C layers fun polish on top of Phase A and Phase B without replacing them", () => {
+test("Phase C source is preserved without making campaign Round 3 depend on an unvalidated polish script", () => {
   assert.match(scene, /logspire_leap_v4_phase_b\.gd/);
   assert.match(scene, /logspire_jump_rebalance_v2_phase_b\.gd/);
   assert.match(scene, /logspire_jump_gap_guard\.gd/);
-  assert.match(scene, /logspire_phase3_director_v5_fun_pass\.gd/);
+  assert.match(scene, /logspire_phase3_director_v4_major_collision\.gd/);
+  assert.doesNotMatch(scene, /logspire_phase3_director_v5_fun_pass\.gd/);
   assert.match(phaseC, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director_v4_major_collision\.gd"/);
   assert.match(phaseB, /PHASE_B_FIVE_LANES: int = 5/);
 });
