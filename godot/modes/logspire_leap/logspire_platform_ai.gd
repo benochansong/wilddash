@@ -20,6 +20,18 @@ const SAFE_TARGET_AFTER_FAILURES: int = 2
 const ROUTE_FALLBACK_AFTER_FAILURES: int = 3
 const FINAL_BRIDGE_JUMP_TRIGGER: float = 7.2
 
+# Zone 1 is a tutorial. AI should run close to the edge before jumping instead
+# of launching from the middle of the previous platform. Early Zone 2 remains
+# forgiving, then the normal Platform AI rules take over.
+const TUTORIAL_ZONE1_JUMP_TRIGGER: float = 8.6
+const TUTORIAL_ZONE2_JUMP_TRIGGER: float = 9.4
+const TUTORIAL_MIN_JUMP_SCALE: float = 1.11
+const TUTORIAL_SPEED_FLOOR_RATIO: float = 1.04
+const TUTORIAL_AIR_ASSIST_RANGE: float = 11.5
+const TUTORIAL_AIR_STEER_RESPONSE: float = 3.8
+const TUTORIAL_LANDING_STEER_RESPONSE: float = 7.0
+const TUTORIAL_LANDING_RADIUS_BONUS: float = 1.4
+
 var _racer: WildDashCharacterController
 var _driver: WildDashAIController
 var _graph: Node
@@ -66,7 +78,7 @@ func configure(
 	_route_id = route_id
 	_trigger_bias = float((racer.get_instance_id() % 7) - 3) * 0.08 if racer != null else 0.0
 	_was_on_floor = racer != null and racer.is_on_floor()
-	print("LOGSPIRE PLATFORM AI V3 READY racer=%s route=%s nodes=%d difficulty=%s moving_prediction=true rotation_prediction=true failure_counter=true phase3_state=true" % [
+	print("LOGSPIRE PLATFORM AI V4 READY racer=%s route=%s nodes=%d difficulty=%s tutorial_safe=true moving_prediction=true rotation_prediction=true failure_counter=true phase3_state=true" % [
 		RaceManager.get_racer_label(racer),
 		String(_route_id),
 		_route.size(),
@@ -91,6 +103,8 @@ func _physics_process(delta: float) -> void:
 		_state = JumpState.RUN
 	_was_on_floor = on_floor
 
+	if not on_floor:
+		_apply_tutorial_air_assist(delta)
 	if not on_floor or _jump_cooldown > 0.0 or _route.size() < 3:
 		return
 
@@ -103,6 +117,7 @@ func _physics_process(delta: float) -> void:
 	var initial_distance: float = initial_delta.length()
 	var travel_time: float = initial_distance / maxf(6.0, _racer.current_speed)
 	var platform_id: StringName = _platform_id_for_index(target_index)
+	var tutorial_target: bool = _is_tutorial_target(platform_id)
 	var target: Vector3 = _predicted_target(platform_id, static_target, travel_time)
 	var target_velocity: Vector3 = _platform_velocity(platform_id)
 	var target_rotation: Vector3 = _platform_rotation(platform_id)
@@ -120,16 +135,19 @@ func _physics_process(delta: float) -> void:
 	planar_delta.y = 0.0
 	var planar_distance: float = planar_delta.length()
 	var trigger_distance: float = _get_jump_trigger_distance(risk, landing_radius, target_velocity.length(), tilt, shortcut)
+	if tutorial_target:
+		trigger_distance = _tutorial_jump_trigger(platform_id)
 	# Once the Last Tree has settled, racers should use it as the bridge instead of
 	# trying a long early jump to the Crown Nest center. The launch area at the tree
 	# tip then produces the authored final jump for both player and AI.
 	if _final_bridge_ready and platform_id == &"CROWN_NEST":
 		trigger_distance = minf(trigger_distance, FINAL_BRIDGE_JUMP_TRIGGER)
 
-	if planar_distance <= trigger_distance + 2.6 and planar_distance > trigger_distance:
+	var prepare_window: float = 3.2 if tutorial_target else 2.6
+	if planar_distance <= trigger_distance + prepare_window and planar_distance > trigger_distance:
 		_state = JumpState.PREPARE_JUMP
 		_face_target(target)
-	elif planar_distance > trigger_distance + 2.6:
+	elif planar_distance > trigger_distance + prepare_window:
 		_state = JumpState.RUN
 
 	if planar_distance > trigger_distance or planar_distance < MIN_JUMP_DISTANCE:
@@ -140,11 +158,14 @@ func _physics_process(delta: float) -> void:
 	_state = JumpState.JUMP
 	_face_target(target)
 	var jump_scale: float = _get_jump_scale(height_delta, risk, target_velocity.length(), tilt, shortcut)
+	if tutorial_target:
+		jump_scale = maxf(jump_scale, TUTORIAL_MIN_JUMP_SCALE)
 	_racer.velocity.y = maxf(_racer.velocity.y, _racer.jump_velocity * jump_scale)
-	_racer.current_speed = maxf(_racer.current_speed, _racer.cruise_speed * (1.00 if _safer_landing_mode else 0.96))
+	var speed_floor: float = TUTORIAL_SPEED_FLOOR_RATIO if tutorial_target else (1.00 if _safer_landing_mode else 0.96)
+	_racer.current_speed = maxf(_racer.current_speed, _racer.cruise_speed * speed_floor)
 	_jump_cooldown = JUMP_COOLDOWN_SECONDS
 	_jump_count += 1
-	print("LOGSPIRE JUMP AI racer=%s from=%d target=%d platform=%s route=%s distance=%.2f height=%.2f radius=%.2f risk=%.2f moving=%.2f tilt=%.3f shortcut=%s shortcut_value=%.1fs safer=%s world_state=%s final_bridge=%s" % [
+	print("LOGSPIRE JUMP AI racer=%s from=%d target=%d platform=%s route=%s distance=%.2f height=%.2f radius=%.2f risk=%.2f moving=%.2f tilt=%.3f shortcut=%s shortcut_value=%.1fs safer=%s tutorial_safe=%s trigger=%.2f world_state=%s final_bridge=%s" % [
 		RaceManager.get_racer_label(_racer),
 		maxi(0, target_index - 1),
 		target_index,
@@ -159,6 +180,8 @@ func _physics_process(delta: float) -> void:
 		str(shortcut),
 		shortcut_value,
 		str(_safer_landing_mode),
+		str(tutorial_target),
+		trigger_distance,
 		String(_phase3_world_state),
 		str(_final_bridge_ready),
 	])
@@ -201,9 +224,10 @@ func notify_recovered() -> void:
 		_last_failed_target = failed_target
 		_same_target_failures = 1
 
-	_safer_landing_mode = _same_target_failures >= SAFE_TARGET_AFTER_FAILURES or _phase3_grace_seconds > 0.0
-	print("LOGSPIRE AI RECOVERY racer=%s route=%s target=%d same_target_failures=%d safer_landing=%s" % [
-		RaceManager.get_racer_label(_racer), String(_route_id), failed_target, _same_target_failures, str(_safer_landing_mode),
+	var failed_platform: StringName = _platform_id_for_index(failed_target)
+	_safer_landing_mode = _is_tutorial_target(failed_platform) or _same_target_failures >= SAFE_TARGET_AFTER_FAILURES or _phase3_grace_seconds > 0.0
+	print("LOGSPIRE AI RECOVERY racer=%s route=%s target=%d same_target_failures=%d safer_landing=%s tutorial_target=%s" % [
+		RaceManager.get_racer_label(_racer), String(_route_id), failed_target, _same_target_failures, str(_safer_landing_mode), str(_is_tutorial_target(failed_platform)),
 	])
 
 	if _same_target_failures >= ROUTE_FALLBACK_AFTER_FAILURES and _safe_route.size() >= 2:
@@ -327,6 +351,39 @@ func _platform_risk(platform_id: StringName) -> float:
 
 func _is_shortcut(platform_id: StringName) -> bool:
 	return platform_id != &"" and _graph != null and bool(_graph.call("is_shortcut", platform_id))
+
+func _is_tutorial_target(platform_id: StringName) -> bool:
+	var id_text: String = String(platform_id)
+	if id_text.begins_with("Z1_"):
+		return true
+	return platform_id == &"Z2_01" or platform_id == &"Z2_02" or platform_id == &"Z2_03"
+
+func _tutorial_jump_trigger(platform_id: StringName) -> float:
+	return TUTORIAL_ZONE1_JUMP_TRIGGER if String(platform_id).begins_with("Z1_") else TUTORIAL_ZONE2_JUMP_TRIGGER
+
+func _apply_tutorial_air_assist(delta: float) -> void:
+	if _racer == null or _driver == null or _route.is_empty():
+		return
+	var target_index: int = clampi(_driver.get_route_index(), 1, _route.size() - 1)
+	var platform_id: StringName = _platform_id_for_index(target_index)
+	if not _is_tutorial_target(platform_id):
+		return
+	var target: Vector3 = _route[target_index]
+	var planar := target - _racer.global_position
+	planar.y = 0.0
+	var distance: float = planar.length()
+	if distance <= 0.001 or distance > TUTORIAL_AIR_ASSIST_RANGE:
+		return
+	var direction: Vector3 = planar / distance
+	var desired_speed: float = minf(_racer.max_speed, maxf(_racer.current_speed, _racer.cruise_speed))
+	var desired_velocity := direction * desired_speed
+	var current_velocity := Vector3(_racer.velocity.x, 0.0, _racer.velocity.z)
+	var landing_radius: float = _landing_radius(platform_id) + TUTORIAL_LANDING_RADIUS_BONUS
+	var response: float = TUTORIAL_LANDING_STEER_RESPONSE if _racer.velocity.y <= 0.0 and distance <= landing_radius else TUTORIAL_AIR_STEER_RESPONSE
+	var blend: float = clampf(delta * response, 0.0, 0.22)
+	var adjusted := current_velocity.lerp(desired_velocity, blend)
+	_racer.velocity.x = adjusted.x
+	_racer.velocity.z = adjusted.z
 
 func _face_target(target: Vector3) -> void:
 	if _racer == null:
