@@ -56,7 +56,7 @@ func _attach_platform_ai(
 
 	if racer != null and not racer.is_player:
 		var ai_number: int = _phase_b_ai_number(racer)
-		var lane_index: int = posmod(ai_number - 1, PHASE_B_LANE_COUNT) if ai_number > 0 else posmod(int(racer.get_instance_id()), PHASE_B_LANE_COUNT)
+		var lane_index: int = ((ai_number - 1) % PHASE_B_LANE_COUNT) if ai_number > 0 else int(racer.get_instance_id() % PHASE_B_LANE_COUNT)
 		driver.preferred_lane = float(lane_index - 2) * PHASE_B_LANE_SPACING
 		driver.lane_wander = minf(driver.lane_wander, 0.05)
 		driver.steering_strength = maxf(driver.steering_strength, 8.0)
