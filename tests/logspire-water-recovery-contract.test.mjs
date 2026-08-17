@@ -9,6 +9,7 @@ const waterV2 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_
 const waterV3 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v3_entry_guard.gd", "utf8");
 const waterV4 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v4_deep_swim.gd", "utf8");
 const waterV5 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v5_ladder_priority.gd", "utf8");
+const waterV6 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v6_nearest_ladder.gd", "utf8");
 const swim = readFileSync("godot/modes/logspire_leap/logspire_swim_controller.gd", "utf8");
 const ladder = readFileSync("godot/modes/logspire_leap/logspire_ladder_system.gd", "utf8");
 const ladderV2 = readFileSync("godot/modes/logspire_leap/logspire_ladder_system_v2.gd", "utf8");
@@ -20,9 +21,10 @@ const recovery = readFileSync("godot/modes/logspire_leap/logspire_recovery_syste
 const graph = readFileSync("godot/modes/logspire_leap/logspire_platform_graph.gd", "utf8");
 const character = readFileSync("godot/characters/character_controller.gd", "utf8");
 
-test("Logspire scene wires deep water, easy ladders, performance pass and ladder-priority recovery", () => {
+test("Logspire scene wires deep water, easy ladders, performance pass and nearest-ladder recovery", () => {
   assert.match(scene, /logspire_world_v2_deep_water\.gd/);
-  assert.match(scene, /logspire_water_recovery_v5_ladder_priority\.gd/);
+  assert.match(scene, /logspire_water_recovery_v6_nearest_ladder\.gd/);
+  assert.match(waterV6, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v5_ladder_priority\.gd"/);
   assert.match(scene, /logspire_ladder_system_v3_easy_attach\.gd/);
   assert.match(scene, /logspire_phase3_director_v3_water_priority\.gd/);
   assert.match(phase3Water, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director_v2_performance\.gd"/);
@@ -89,14 +91,32 @@ test("Swimming stays a recovery route instead of a shortcut", () => {
   assert.match(waterV4, /visual\.play_state\(&"Jump", true\)/);
 });
 
-test("Ladder network has 20 exits and immediate 4.25m auto capture", () => {
+test("Nearby physical ladder beats a stale far-away ladder target", () => {
+  assert.match(waterV6, /NEARBY_LADDER_CAPTURE_RADIUS: float = 5\.25/);
+  assert.match(waterV6, /NEARBY_LADDER_SWITCH_ADVANTAGE: float = 6\.0/);
+  assert.match(waterV6, /_nearest_physical_ladder\(racer\)/);
+  assert.match(waterV6, /LOGSPIRE LADDER TARGET SWITCH/);
+  assert.match(waterV6, /LOGSPIRE LADDER NEAREST CAPTURE/);
+  assert.match(waterV6, /get_ladders_for_zone/);
+});
+
+test("Tall ladders scale climb duration by height and lock the racer to the ladder axis", () => {
+  assert.match(waterV6, /LADDER_CLIMB_SPEED_MPS: float = 8\.0/);
+  assert.match(waterV6, /LADDER_CLIMB_MIN_SECONDS: float = 1\.4/);
+  assert.match(waterV6, /LADDER_CLIMB_MAX_SECONDS: float = 5\.5/);
+  assert.match(waterV6, /climb_height \/ LADDER_CLIMB_SPEED_MPS/);
+  assert.match(waterV6, /position\.x = from\.x/);
+  assert.match(waterV6, /position\.z = from\.z/);
+  assert.match(waterV6, /LOGSPIRE LADDER CLIMB PROFILE/);
+});
+
+test("Ladder network has 20 exits and easy auto capture", () => {
   const entries = ladderV2.match(/\{"zone": \d, "platform": &"[^"]+"\}/g) || [];
   assert.equal(entries.length, 20);
   assert.match(ladderV2, /\{"zone": 0, "platform": &"START"\}/);
   assert.match(ladder, /DECK_SIZE := Vector3\(6\.0, 0\.45, 6\.0\)/);
   assert.match(ladderV3, /EASY_ATTACH_RADIUS: float = 4\.25/);
   assert.match(waterV5, /INSTANT_LADDER_CAPTURE_RADIUS: float = 4\.25/);
-  assert.match(waterV5, /LOGSPIRE LADDER INSTANT CAPTURE/);
   assert.match(ladder, /CLIMB ↑/);
 });
 
