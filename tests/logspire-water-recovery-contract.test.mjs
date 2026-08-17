@@ -8,18 +8,22 @@ const water = readFileSync("godot/modes/logspire_leap/logspire_water_recovery.gd
 const waterV2 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v2.gd", "utf8");
 const waterV3 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v3_entry_guard.gd", "utf8");
 const waterV4 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v4_deep_swim.gd", "utf8");
+const waterV5 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v5_ladder_priority.gd", "utf8");
 const swim = readFileSync("godot/modes/logspire_leap/logspire_swim_controller.gd", "utf8");
 const ladder = readFileSync("godot/modes/logspire_leap/logspire_ladder_system.gd", "utf8");
 const ladderV2 = readFileSync("godot/modes/logspire_leap/logspire_ladder_system_v2.gd", "utf8");
+const ladderV3 = readFileSync("godot/modes/logspire_leap/logspire_ladder_system_v3_easy_attach.gd", "utf8");
+const phase3Perf = readFileSync("godot/modes/logspire_leap/logspire_phase3_director_v2_performance.gd", "utf8");
 const waterAI = readFileSync("godot/modes/logspire_leap/logspire_water_ai.gd", "utf8");
 const recovery = readFileSync("godot/modes/logspire_leap/logspire_recovery_system.gd", "utf8");
 const graph = readFileSync("godot/modes/logspire_leap/logspire_platform_graph.gd", "utf8");
 const character = readFileSync("godot/characters/character_controller.gd", "utf8");
 
-test("Logspire scene wires deep Canopy River and ladder-first recovery without replacing core systems", () => {
+test("Logspire scene wires deep water, easy ladders, performance pass and ladder-priority recovery", () => {
   assert.match(scene, /logspire_world_v2_deep_water\.gd/);
-  assert.match(scene, /logspire_water_recovery_v4_deep_swim\.gd/);
-  assert.match(scene, /logspire_ladder_system_v2\.gd/);
+  assert.match(scene, /logspire_water_recovery_v5_ladder_priority\.gd/);
+  assert.match(scene, /logspire_ladder_system_v3_easy_attach\.gd/);
+  assert.match(scene, /logspire_phase3_director_v2_performance\.gd/);
   assert.match(scene, /WaterRecovery/);
   assert.match(scene, /LadderSystem/);
   assert.match(scene, /RecoverySystem/);
@@ -27,16 +31,17 @@ test("Logspire scene wires deep Canopy River and ladder-first recovery without r
   assert.match(scene, /Phase3Director/);
 });
 
-test("Canopy River keeps water-first recovery and only uses checkpoint fallback for invalid states", () => {
+test("Canopy River keeps normal water recovery on ladders instead of checkpoint restart", () => {
   assert.equal((water.match(/\{"zone": [0-5], "center":/g) || []).length, 6);
   assert.match(water, /LADDER_CLIMB_SECONDS: float = 2\.15/);
   assert.match(water, /LOGSPIRE WATER ENTRY/);
   assert.match(water, /LOGSPIRE WATER RECOVERY/);
   assert.match(waterV2, /LOGSPIRE SWIM/);
-  assert.match(waterV4, /reason == "water_timeout" or reason == "ladder_path_failure"/);
   assert.match(waterV4, /checkpoint_respawn=false/);
+  assert.match(waterV5, /LOGSPIRE WATER NO RESTART/);
+  assert.match(waterV5, /checkpoint_respawn=false/);
+  assert.match(waterV5, /_state_by_id\[racer_id\] = WaterState\.SWIMMING/);
   assert.match(recovery, /set_water_recovery/);
-  assert.match(recovery, /force_checkpoint_recovery/);
   assert.match(recovery, /_water_should_handle/);
 });
 
@@ -64,13 +69,23 @@ test("Swimming stays a recovery route instead of a shortcut", () => {
   assert.match(waterV4, /visual\.play_state\(&"Jump", true\)/);
 });
 
-test("Ladder network includes a near-start exit and 20 local recovery exits", () => {
+test("Ladder network has 20 exits and immediate 4.25m auto capture", () => {
   const entries = ladderV2.match(/\{"zone": \d, "platform": &"[^"]+"\}/g) || [];
   assert.equal(entries.length, 20);
   assert.match(ladderV2, /\{"zone": 0, "platform": &"START"\}/);
   assert.match(ladder, /DECK_SIZE := Vector3\(6\.0, 0\.45, 6\.0\)/);
-  assert.match(ladder, /MultiMesh\.TRANSFORM_3D/);
+  assert.match(ladderV3, /EASY_ATTACH_RADIUS: float = 4\.25/);
+  assert.match(waterV5, /INSTANT_LADDER_CAPTURE_RADIUS: float = 4\.25/);
+  assert.match(waterV5, /LOGSPIRE LADDER INSTANT CAPTURE/);
   assert.match(ladder, /CLIMB ↑/);
+});
+
+test("Titan Tree performance pass removes expensive dynamic shadows and lowers sphere tessellation", () => {
+  assert.match(phase3Perf, /_sun\.shadow_enabled = false/);
+  assert.match(phase3Perf, /sphere\.radial_segments = 18/);
+  assert.match(phase3Perf, /sphere\.rings = 9/);
+  assert.match(phase3Perf, /SHADOW_CASTING_SETTING_OFF/);
+  assert.match(phase3Perf, /LOGSPIRE TITAN PERFORMANCE READY/);
 });
 
 test("Ladder system calls the actual PlatformGraph landing-radius API", () => {
