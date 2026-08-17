@@ -12,7 +12,7 @@
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_mushroom_feedback.gd" id="8_mushroom"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_phase3_director.gd" id="9_phase3"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_ladder_system.gd" id="10_ladder"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_recovery_v2.gd" id="11_water"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_recovery_v3_entry_guard.gd" id="11_water"]
 
 [node name="LogspireLeap" type="Node3D"]
 script = ExtResource("1_mode")
