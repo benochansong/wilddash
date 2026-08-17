@@ -12,8 +12,8 @@
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_combat_safety_v2_recovery_protection.gd" id="7_combat"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_mushroom_feedback.gd" id="8_mushroom"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_phase3_director_v3_water_priority.gd" id="9_phase3"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_ladder_system_v4_safe_exit.gd" id="10_ladder"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_recovery_v7_jumpout_safe_exit.gd" id="11_water"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_ladder_system_v5_traversal_paths.gd" id="10_ladder"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_recovery_v8_traversal_ux.gd" id="11_water"]
 
 [node name="LogspireLeap" type="Node3D"]
 script = ExtResource("1_mode")
