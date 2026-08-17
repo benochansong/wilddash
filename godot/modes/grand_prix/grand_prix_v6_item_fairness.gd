@@ -10,10 +10,13 @@ const FAIR_RESPAWN_15: float = 1.95
 const FAIR_RESPAWN_18: float = 1.65
 const FAIR_RELAY_WINDOW_MSEC: int = 2600
 const FAIR_STATION_LOCK_MSEC: int = 6000
-const FAIR_RELAY_RADIUS: float = 3.85
-const FAIR_RELAY_VERTICAL: float = 4.20
-const FAIR_GLOBAL_LOCK_MSEC: int = 300
+const FAIR_RELAY_RADIUS: float = 2.60
+const FAIR_RELAY_VERTICAL: float = 3.00
+const FAIR_GLOBAL_LOCK_MSEC: int = 1100
 const FAIR_ITEM_LOCK_META: StringName = &"wilddash_item_box_pickup_until_msec"
+const ROUND1_PICKUP_RADIUS_SCALE: float = 0.50
+const ROUND1_PICKUP_VERTICAL_SCALE: float = 0.72
+const ROUND1_PICKUP_COLLISION_RADIUS: float = 1.35
 
 var _fair_box_inactive_since: Dictionary = {}
 var _fair_box_was_active: Dictionary = {}
@@ -31,9 +34,16 @@ func _ready() -> void:
 		if box == null or not is_instance_valid(box):
 			continue
 		box.respawn_seconds = respawn
+		box.configure_pickup_profile(
+			ROUND1_PICKUP_RADIUS_SCALE,
+			ROUND1_PICKUP_VERTICAL_SCALE,
+			FAIR_GLOBAL_LOCK_MSEC,
+			false,
+			ROUND1_PICKUP_COLLISION_RADIUS
+		)
 		_fair_box_was_active[box.get_instance_id()] = box.is_active()
-	print("ROUND1 FAIR ITEM READY boxes=%d respawn=%.2fs relay_window=%.2fs leader_excluded=true one_per_station=true trailing_shared=true" % [
-		_item_boxes.size(), respawn, float(FAIR_RELAY_WINDOW_MSEC) / 1000.0,
+	print("ROUND1 FAIR ITEM READY boxes=%d respawn=%.2fs relay_window=%.2fs relay_radius=%.2fm pickup_scale=%.2f one_item_at_a_time=true leader_excluded=true trailing_shared=true" % [
+		_item_boxes.size(), respawn, float(FAIR_RELAY_WINDOW_MSEC) / 1000.0, FAIR_RELAY_RADIUS, ROUND1_PICKUP_RADIUS_SCALE,
 	])
 
 func _process(delta: float) -> void:
@@ -73,8 +83,6 @@ func _grant_fair_relay_near_box(box: WildDashItemBox, now: int, inactive_age: in
 		if racer == null or not is_instance_valid(racer) or racer.finished:
 			continue
 		var rank: int = RaceManager.get_rank(racer)
-		# The current leader already has first access to every visible station.
-		# Relay inventory is reserved for the pack behind the leader.
 		if rank <= 1:
 			continue
 		if racer.get_held_item() != &"":
