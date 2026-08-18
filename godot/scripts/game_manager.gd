@@ -11,6 +11,7 @@ enum GameState {
 	COUNTDOWN,
 	RACE,
 	ROUND_BREAK,
+	ROUND_RECAP,
 	ARENA,
 	FINAL,
 	RESULT,
@@ -36,6 +37,7 @@ const ROUND_SCENES: Array[String] = [
 const LOBBY_SCENE := "res://scenes/lobby.tscn"
 const CHARACTER_SELECT_SCENE := "res://scenes/character_select.tscn"
 const SETTINGS_SCENE := "res://scenes/settings.tscn"
+const ROUND_RECAP_SCENE := "res://scenes/round_recap.tscn"
 const RESULT_SCENE := "res://scenes/result.tscn"
 
 const CASUAL_AI_COUNT := 9
@@ -123,9 +125,8 @@ func start_campaign() -> void:
 	# Character Select is always the start of a NEW campaign. During editor/manual
 	# testing it is possible to return here while the autoload still carries a stale
 	# campaign_running=true flag from a previous interrupted run. The old behavior
-	# silently returned, making the START button appear dead (often noticed after
-	# choosing a different racer such as Raccoon). Recover only from Character Select;
-	# duplicate start requests during live gameplay are still ignored.
+	# silently returned, making the START button appear dead. Recover only from
+	# Character Select; duplicate start requests during live gameplay are ignored.
 	if campaign_running:
 		if state != GameState.CHARACTER_SELECT:
 			print("CAMPAIGN START IGNORED state=%s already_running=true" % str(state))
@@ -179,8 +180,6 @@ func begin_round(mode_id: StringName) -> void:
 			set_state(GameState.RACE)
 			print("CAMPAIGN ROUND 5 NEON HARBOR")
 		&"tidal_clash":
-			# Reserve/free-play compatibility. TIDAL CLASH is no longer in the base
-			# five-round campaign, but its scene and systems remain intact for Round 6.
 			set_state(GameState.RACE)
 			print("RC_FLOW Bonus TIDAL CLASH reserve_round_6=true")
 		_:
@@ -201,6 +200,12 @@ func get_current_round_id() -> StringName:
 	if current_round_index < 0 or current_round_index >= ROUND_IDS.size():
 		return &""
 	return ROUND_IDS[current_round_index]
+
+func get_next_round_id() -> StringName:
+	var next_index: int = current_round_index + 1
+	if next_index < 0 or next_index >= ROUND_IDS.size():
+		return &""
+	return ROUND_IDS[next_index]
 
 func is_gameplay_state() -> bool:
 	return state in [GameState.COUNTDOWN, GameState.RACE, GameState.ROUND_BREAK, GameState.ARENA, GameState.FINAL]
@@ -239,17 +244,60 @@ func _load_current_round() -> void:
 	if error != OK:
 		campaign_running = false
 		current_round_index = -1
+		_transition_pending = false
 		push_error("Failed to load round scene %s: %s" % [scene_path, error_string(error)])
 
 func _transition_after_round() -> void:
-	var delay: float = 0.05 if DisplayServer.get_name() == "headless" else 1.2
+	# Leave a very short beat on the finished round, then hand control to the
+	# dedicated recap scene. The completed round index is intentionally retained
+	# while recap is visible so all result data and next-round preview stay stable.
+	var delay: float = 0.04 if DisplayServer.get_name() == "headless" else 0.75
 	await get_tree().create_timer(delay).timeout
-	_transition_pending = false
 	if current_round_index + 1 < ROUND_SCENES.size():
-		current_round_index += 1
-		set_state(GameState.ROUND_BREAK)
-		_load_current_round()
+		set_state(GameState.ROUND_RECAP)
+		print("ROUND RECAP LOAD completed_round=%d mode=%s next=%s" % [
+			current_round_index + 1,
+			String(get_current_round_id()),
+			String(get_next_round_id()),
+		])
+		var recap_error: Error = get_tree().change_scene_to_file(ROUND_RECAP_SCENE)
+		if recap_error != OK:
+			push_error("Failed to load Round Recap: %s; advancing safely" % error_string(recap_error))
+			_advance_round_without_recap()
 		return
+	_finish_campaign_to_result()
+
+func advance_from_round_recap() -> void:
+	if not campaign_running:
+		return
+	if state != GameState.ROUND_RECAP:
+		push_warning("Round recap advance ignored outside ROUND_RECAP state")
+		return
+	if current_round_index + 1 >= ROUND_SCENES.size():
+		_finish_campaign_to_result()
+		return
+	var completed_round: int = current_round_index + 1
+	current_round_index += 1
+	_transition_pending = false
+	set_state(GameState.ROUND_BREAK)
+	print("ROUND RECAP COMPLETE completed_round=%d loading_round=%d id=%s" % [
+		completed_round,
+		current_round_index + 1,
+		String(get_current_round_id()),
+	])
+	call_deferred("_load_current_round")
+
+func _advance_round_without_recap() -> void:
+	if current_round_index + 1 >= ROUND_SCENES.size():
+		_finish_campaign_to_result()
+		return
+	current_round_index += 1
+	_transition_pending = false
+	set_state(GameState.ROUND_BREAK)
+	call_deferred("_load_current_round")
+
+func _finish_campaign_to_result() -> void:
+	_transition_pending = false
 	campaign_running = false
 	set_state(GameState.RESULT)
 	print("CAMPAIGN COMPLETE rounds=%d clears=%d final_round=neon_harbor_race" % [ResultManager.round_results.size(), ResultManager.get_success_count()])
@@ -300,7 +348,7 @@ func _update_audio_for_state(next_state: GameState) -> void:
 			audio.call("play_theme", _arena_theme_for_current_round())
 		GameState.ROUND_BREAK:
 			audio.call("play_theme", "arena")
-		GameState.RESULT:
+		GameState.ROUND_RECAP, GameState.RESULT:
 			audio.call("play_theme", "result")
 		_:
 			pass
