@@ -64,6 +64,13 @@ func apply_swim(
 	if racer == null:
 		return
 
+	# Graphics Phase 3 gets a read-only swim heartbeat. The feedback node uses it
+	# for splash and wake presentation only; swim speed and recovery ownership stay
+	# entirely in this existing gameplay helper.
+	var feedback := racer.get_node_or_null("RacerFeedback")
+	if feedback != null and feedback.has_method("notify_swimming"):
+		feedback.call("notify_swimming", water_y, racer.animal_id == &"crocodile")
+
 	# Buoyancy owns Y while swimming. If a missed water-entry frame or collision
 	# recovery leaves the capsule below the surface, lift it back using a
 	# collision-aware body move instead of letting the ground controller walk on
