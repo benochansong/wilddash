@@ -3,12 +3,43 @@ extends Node
 signal round_result_recorded(mode_id: StringName, success: bool, score: int)
 signal highlight_event_recorded(mode_id: StringName, event: Dictionary)
 
+const HIGHLIGHT_NORMAL: int = 10
+const HIGHLIGHT_COOL: int = 30
+const HIGHLIGHT_EPIC: int = 60
+const HIGHLIGHT_LEGENDARY: int = 100
+
+const REPLAY_SAMPLE_INTERVAL: float = 0.10
+const REPLAY_SECONDS: float = 4.0
+const REPLAY_MAX_SAMPLES: int = 40
+const REPLAY_MAX_RACERS: int = 5
+
 var round_results: Array[Dictionary] = []
 var _pending_highlights_by_mode: Dictionary = {}
+var _replay_samples: Array[Dictionary] = []
+var _replay_sample_elapsed: float = 0.0
+var _replay_mode_id: StringName = &""
+
+func _process(delta: float) -> void:
+	if not _should_sample_replay():
+		_replay_sample_elapsed = 0.0
+		return
+	var mode_id: StringName = GameManager.get_current_round_id()
+	if mode_id != _replay_mode_id:
+		_replay_mode_id = mode_id
+		_replay_samples.clear()
+		_replay_sample_elapsed = 0.0
+	_replay_sample_elapsed += delta
+	if _replay_sample_elapsed < REPLAY_SAMPLE_INTERVAL:
+		return
+	_replay_sample_elapsed = fmod(_replay_sample_elapsed, REPLAY_SAMPLE_INTERVAL)
+	_capture_replay_sample(mode_id)
 
 func reset_campaign() -> void:
 	round_results.clear()
 	_pending_highlights_by_mode.clear()
+	_replay_samples.clear()
+	_replay_sample_elapsed = 0.0
+	_replay_mode_id = &""
 
 func record_highlight_event(mode_id: StringName, event: Dictionary) -> void:
 	if event.is_empty():
@@ -18,14 +49,30 @@ func record_highlight_event(mode_id: StringName, event: Dictionary) -> void:
 	var existing: Array = existing_value if existing_value is Array else []
 	var copy: Dictionary = event.duplicate(true)
 	copy["mode_id"] = mode_id
-	if not copy.has("importance"):
-		copy["importance"] = 10
-	if not copy.has("description"):
-		copy["description"] = "WILD MOMENT!"
+	copy["type"] = StringName(copy.get("type", &"wild_moment"))
+	copy["racer"] = String(copy.get("racer", "PLAYER"))
+	copy["target"] = String(copy.get("target", ""))
+	copy["timestamp"] = float(copy.get("timestamp", _highlight_timestamp()))
+	copy["importance"] = clampi(int(copy.get("importance", HIGHLIGHT_NORMAL)), HIGHLIGHT_NORMAL, HIGHLIGHT_LEGENDARY)
+	copy["zone"] = String(copy.get("zone", ""))
+	copy["title"] = String(copy.get("title", "WILD MOMENT!"))
+	copy["description"] = String(copy.get("description", "Great play!"))
+	var metadata_value: Variant = copy.get("metadata", {})
+	copy["metadata"] = metadata_value.duplicate(true) if metadata_value is Dictionary else {}
+	copy["round"] = GameManager.current_round_index + 1
+	if int(copy["importance"]) >= HIGHLIGHT_EPIC:
+		var clip: Array = _snapshot_replay_clip(mode_id)
+		if not clip.is_empty():
+			copy["replay_clip"] = clip
+			copy["replay_ready"] = true
 	existing.append(copy)
 	while existing.size() > 16:
 		existing.pop_front()
 	_pending_highlights_by_mode[key] = existing
+	print("WILD HIGHLIGHT EVENT type=%s importance=%d round=%d racer=%s target=%s zone=%s replay=%s" % [
+		String(copy["type"]), int(copy["importance"]), int(copy["round"]), String(copy["racer"]),
+		String(copy["target"]), String(copy["zone"]), str(bool(copy.get("replay_ready", false))),
+	])
 	highlight_event_recorded.emit(mode_id, copy)
 
 func record_round_result(mode_id: StringName, success: bool, score: int, details: Dictionary = {}) -> void:
@@ -55,6 +102,80 @@ func _consume_pending_highlights(mode_id: StringName) -> Array:
 			if item is Dictionary:
 				result.append((item as Dictionary).duplicate(true))
 	return result
+
+func _should_sample_replay() -> bool:
+	if DisplayServer.get_name() == "headless":
+		return false
+	if not GameManager.campaign_running or not GameManager.round_active:
+		return false
+	if not GameManager.is_gameplay_state() or not RaceManager.active:
+		return false
+	return not RaceManager.racers.is_empty()
+
+func _capture_replay_sample(mode_id: StringName) -> void:
+	var player_racer: WildDashCharacterController = null
+	for value: Variant in RaceManager.racers:
+		var racer := value as WildDashCharacterController
+		if racer != null and is_instance_valid(racer) and racer.is_player:
+			player_racer = racer
+			break
+	if player_racer == null:
+		return
+	var nearby: Array = []
+	for value: Variant in RaceManager.racers:
+		var racer := value as WildDashCharacterController
+		if racer == null or not is_instance_valid(racer) or racer == player_racer:
+			continue
+		nearby.append({
+			"racer": racer,
+			"distance": player_racer.global_position.distance_squared_to(racer.global_position),
+		})
+	nearby.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a.get("distance", INF)) < float(b.get("distance", INF))
+	)
+	var racers_data: Array = [_replay_racer_state(player_racer)]
+	for i: int in range(mini(REPLAY_MAX_RACERS - 1, nearby.size())):
+		var racer_value: Variant = (nearby[i] as Dictionary).get("racer", null)
+		var racer := racer_value as WildDashCharacterController
+		if racer != null and is_instance_valid(racer):
+			racers_data.append(_replay_racer_state(racer))
+	_replay_samples.append({
+		"mode_id": mode_id,
+		"timestamp": _highlight_timestamp(),
+		"racers": racers_data,
+	})
+	while _replay_samples.size() > REPLAY_MAX_SAMPLES:
+		_replay_samples.pop_front()
+
+func _replay_racer_state(racer: WildDashCharacterController) -> Dictionary:
+	return {
+		"name": RaceManager.get_racer_label(racer),
+		"player": racer.is_player,
+		"position": racer.global_position,
+		"rotation": racer.rotation,
+		"action": _replay_action_state(racer),
+	}
+
+func _replay_action_state(racer: WildDashCharacterController) -> String:
+	if racer.finished:
+		return "finished"
+	if not racer.is_on_floor():
+		return "airborne"
+	if racer.current_speed > 1.0:
+		return "moving"
+	return "idle"
+
+func _snapshot_replay_clip(mode_id: StringName) -> Array:
+	var result: Array = []
+	for sample: Dictionary in _replay_samples:
+		if StringName(sample.get("mode_id", &"")) == mode_id:
+			result.append(sample.duplicate(true))
+	return result
+
+func _highlight_timestamp() -> float:
+	if RaceManager.active:
+		return RaceManager.get_elapsed_seconds()
+	return float(Time.get_ticks_msec()) / 1000.0
 
 func get_latest_round_result() -> Dictionary:
 	if round_results.is_empty():
@@ -195,10 +316,18 @@ func get_highlights_for_entry(entry: Dictionary, max_count: int = 2) -> Array[Di
 		if item is Dictionary:
 			sorted.append((item as Dictionary).duplicate(true))
 	sorted.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		return int(a.get("importance", 0)) > int(b.get("importance", 0))
+		var ai: int = int(a.get("importance", 0))
+		var bi: int = int(b.get("importance", 0))
+		if ai == bi:
+			return float(a.get("timestamp", 0.0)) > float(b.get("timestamp", 0.0))
+		return ai > bi
 	)
 	for item: Dictionary in sorted:
 		result.append(item)
+		print("WILD HIGHLIGHT SELECTED type=%s importance=%d round=%d racer=%s" % [
+			String(item.get("type", &"wild_moment")), int(item.get("importance", 0)),
+			int(item.get("round", GameManager.current_round_index + 1)), String(item.get("racer", "PLAYER")),
+		])
 		if result.size() >= max_count:
 			break
 	return result
