@@ -1,6 +1,10 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scenes/round_recap.gd" id="1_recap"]
+[ext_resource type="Script" path="res://ui/round_recap_motion_polish.gd" id="2_motion"]
 
 [node name="RoundRecap" type="Node3D"]
 script = ExtResource("1_recap")
+
+[node name="GraphicsPhase3RecapMotion" type="Node" parent="."]
+script = ExtResource("2_motion")
