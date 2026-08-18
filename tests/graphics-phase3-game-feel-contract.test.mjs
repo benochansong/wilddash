@@ -9,10 +9,12 @@ const motion = read('godot/characters/character_motion_polish.gd');
 const camera = read('godot/camera/chase_camera.gd');
 const cameraCue = read('godot/camera/player_camera_cue.gd');
 const roundVfx = read('godot/effects/round_vfx_director.gd');
+const roundVfxSafeLoader = read('godot/effects/round_vfx_safe_loader.gd');
 const hud = read('godot/ui/mode_hud.gd');
 const recap = read('godot/ui/round_recap_motion_polish.gd');
 const audio = read('godot/scripts/audio_manager.gd');
 const racerScene = read('godot/characters/test_racer.tscn');
+const gameManager = read('godot/scripts/game_manager.gd');
 
 const roundScenes = {
   grand_prix: read('godot/modes/grand_prix/grand_prix.tscn'),
@@ -70,12 +72,17 @@ test('HUD is styled and reuses nodes while rank and item feedback animate', () =
   assert.doesNotMatch(processBody, /\.new\(\)/, 'HUD process must not allocate UI nodes every frame');
 });
 
-test('all five production rounds keep Phase 2 and add the correct Phase 3 profile', () => {
+test('all five production rounds keep Phase 2 and safe-load the correct Phase 3 profile', () => {
   for (const [profile, scene] of Object.entries(roundScenes)) {
     assert.match(scene, /GraphicsPhase2WorldArt/);
     assert.match(scene, /GraphicsPhase3RoundVFX/);
+    assert.match(scene, /round_vfx_safe_loader\.gd/);
+    assert.doesNotMatch(scene, /ext_resource[^\n]*round_vfx_director\.gd/);
     assert.ok(scene.includes(`round_profile = "${profile}"`), `${profile} profile missing`);
   }
+  assert.match(roundVfxSafeLoader, /call_deferred\("_attach_optional_director"\)/);
+  assert.match(roundVfxSafeLoader, /ResourceLoader\.load\(DIRECTOR_PATH/);
+  assert.match(roundVfxSafeLoader, /gameplay_continues=true/);
   assert.match(roundVfx, /START_PRESENTATION_SECONDS := 1\.45/);
   assert.match(roundVfx, /WORLD_POOL_SIZE := 12/);
   assert.match(roundVfx, /FINAL FESTIVAL/);
@@ -83,6 +90,15 @@ test('all five production rounds keep Phase 2 and add the correct Phase 3 profil
   assert.match(roundVfx, /confetti/);
   assert.doesNotMatch(roundVfx, /StaticBody3D\.new/);
   assert.doesNotMatch(roundVfx, /CollisionShape3D\.new/);
+});
+
+test('character select campaign start recovers stale run state and loads Round 1 deferred', () => {
+  assert.match(gameManager, /if campaign_running:/);
+  assert.match(gameManager, /state != GameState\.CHARACTER_SELECT/);
+  assert.match(gameManager, /CAMPAIGN START RECOVERY stale_campaign=true/);
+  assert.match(gameManager, /current_round_index = 0/);
+  assert.match(gameManager, /call_deferred\("_load_current_round"\)/);
+  assert.match(gameManager, /change_scene_to_file\(scene_path\)/);
 });
 
 test('common racer scene attaches only visual feedback layers around unchanged capsule', () => {
