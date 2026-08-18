@@ -1,4 +1,4 @@
-[gd_scene load_steps=34 format=3]
+[gd_scene load_steps=35 format=3]
 
 # Wild Moments V7 inherits res://modes/grand_prix/grand_prix_v6_item_fairness.gd
 [ext_resource type="Script" path="res://modes/grand_prix/grand_prix_v7_wild_moments.gd" id="1_mode"]
@@ -34,6 +34,7 @@
 [ext_resource type="Script" path="res://tracks/grand_prix_v4_route_signage.gd" id="36_route_signage"]
 [ext_resource type="Script" path="res://tracks/grand_prix_v5_road_corridor_clearance.gd" id="37_road_clearance"]
 [ext_resource type="Script" path="res://systems/race_combat_ai_director_party_turbo.gd" id="38_combat_ai"]
+[ext_resource type="Script" path="res://tracks/graphics_phase2_world_art.gd" id="39_graphics_phase2"]
 
 [node name="GrandPrix" type="Node3D"]
 script = ExtResource("1_mode")
@@ -138,3 +139,7 @@ script = ExtResource("4_items")
 
 [node name="NetworkRaceSync" type="Node" parent="."]
 script = ExtResource("9_network")
+
+[node name="GraphicsPhase2WorldArt" type="Node3D" parent="."]
+script = ExtResource("39_graphics_phase2")
+round_profile = "grand_prix"
