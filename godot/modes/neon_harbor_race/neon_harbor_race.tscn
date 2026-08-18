@@ -18,7 +18,7 @@
 [ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_jump_guard.gd" id="20_jump_guard"]
 [ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_water_visibility_boost.gd" id="21_water_visibility"]
 [ext_resource type="Script" path="res://tracks/graphics_phase2_world_art.gd" id="22_graphics_phase2"]
-[ext_resource type="Script" path="res://effects/round_vfx_director.gd" id="23_round_vfx"]
+[ext_resource type="Script" path="res://effects/round_vfx_safe_loader.gd" id="23_round_vfx"]
 
 [node name="NeonHarborRace" type="Node3D"]
 script = ExtResource("1_mode")
