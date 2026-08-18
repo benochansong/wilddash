@@ -3,8 +3,8 @@ extends "res://modes/logspire_leap/logspire_ladder_system_v4_safe_exit.gd"
 ## Traversable recovery-route audit after real player testing.
 ## Root stairs are rebuilt as shallow visual steps over one continuous collision
 ## slope, so they remain readable but cannot trap a racer on individual risers.
-## High ladder decks are moved farther away from large overhead geometry and
-## exit at the deck centre before reconnecting to the race route.
+## Every water basin now has at least one broad root recovery route before the
+## ladder fallback, and high ladder decks stay clear of overhead geometry.
 
 const ROOT_PATH_POINT_COUNT: int = 5
 const STAIR_MAX_RISE: float = 0.48
@@ -20,19 +20,45 @@ const EXIT_HEAD_CLEARANCE_METERS: float = 3.2
 
 var _rebuilt_stair_count: int = 0
 var _repositioned_exit_count: int = 0
+var _added_basin_root_count: int = 0
 
 func configure(world: Node, graph: Node, water_heights: Dictionary) -> void:
 	super(world, graph, water_heights)
+	_ensure_broad_root_ramp_per_basin()
 	_reposition_recovery_decks_for_clearance()
 	_rebuild_root_stairs_as_traversable_routes()
-	print("LOGSPIRE RECOVERY PATH AUDIT READY stairs=%d exits_repositioned=%d max_step_rise=%.2fm stair_width=%.1fm forward_clearance=%.1fm head_clearance=%.1fm" % [
+	print("LOGSPIRE RECOVERY PATH AUDIT READY stairs=%d added_basin_roots=%d exits_repositioned=%d max_step_rise=%.2fm stair_width=%.1fm forward_clearance=%.1fm head_clearance=%.1fm root_first=true" % [
 		_rebuilt_stair_count,
+		_added_basin_root_count,
 		_repositioned_exit_count,
 		STAIR_MAX_RISE,
 		STAIR_WIDTH,
 		EXIT_FORWARD_CLEARANCE_METERS,
 		EXIT_HEAD_CLEARANCE_METERS,
 	])
+
+func _ensure_broad_root_ramp_per_basin() -> void:
+	# V4 already authors broad root routes for Zones 1, 2 and Titan Tree.
+	# Fill the remaining major basins with one conservative Safe-route root each.
+	var specs: Array = [
+		{"zone": 2, "platform": &"Z3_05", "side": -1.0},
+		{"zone": 3, "platform": &"Z4_SAFE_03", "side": 1.0},
+		{"zone": 5, "platform": &"Z6_START", "side": -1.0},
+	]
+	for value: Variant in specs:
+		var spec: Dictionary = value
+		var zone: int = int(spec.get("zone", -1))
+		if zone < 0:
+			continue
+		if not get_root_ramps_for_zone(zone).is_empty():
+			continue
+		var platform_id := StringName(spec.get("platform", &""))
+		var side: float = float(spec.get("side", -1.0))
+		_add_root_ramp_only(zone, platform_id, side)
+		_added_basin_root_count += 1
+		print("LOGSPIRE BASIN ROOT READY zone=%d platform=%s broad=true width=%.1fm ladder_fallback=true" % [
+			zone + 1, String(platform_id), STAIR_WIDTH,
+		])
 
 func _reposition_recovery_decks_for_clearance() -> void:
 	for i: int in range(_ladders.size()):
