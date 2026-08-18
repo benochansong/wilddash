@@ -35,7 +35,7 @@
 [ext_resource type="Script" path="res://tracks/grand_prix_v5_road_corridor_clearance.gd" id="37_road_clearance"]
 [ext_resource type="Script" path="res://systems/race_combat_ai_director_party_turbo.gd" id="38_combat_ai"]
 [ext_resource type="Script" path="res://tracks/graphics_phase2_world_art.gd" id="39_graphics_phase2"]
-[ext_resource type="Script" path="res://effects/round_vfx_director.gd" id="40_round_vfx"]
+[ext_resource type="Script" path="res://effects/round_vfx_safe_loader.gd" id="40_round_vfx"]
 
 [node name="GrandPrix" type="Node3D"]
 script = ExtResource("1_mode")
