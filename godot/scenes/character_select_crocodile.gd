@@ -4,13 +4,62 @@ extends "res://scenes/character_select.gd"
 ## ninth basic slot swaps archived Panda for the new Crocodile Water Bruiser.
 ##
 ## P0 START FLOW GUARD:
-## The active Character Select scene uses this adapter, not character_select.gd
-## directly. Start is guarded here. The normal GameManager path gets first chance
-## to transition. If the scene is still Character Select two frames later, the
-## production Round 1 scene is checked and loaded explicitly. There is no visual
-## fallback scene: production failure stays visible and retryable here.
+## The canonical GameManager transition always gets first chance. If it fails,
+## production Round 1 is reloaded with CACHE_MODE_IGNORE_DEEP so stale editor
+## resource-cache entries cannot keep a previously broken dependency alive.
+## If the fresh load still fails, the critical Round 1 dependency chain is probed
+## one resource at a time and the first failing path is shown in Character Select.
+## There is intentionally no stripped gameplay fallback scene.
 
 const ROUND1_SCENE_PATH := "res://modes/grand_prix/grand_prix.tscn"
+const ROUND1_CRITICAL_DEPENDENCIES := [
+	"res://modes/grand_prix/grand_prix_v7_wild_moments.gd",
+	"res://modes/grand_prix/grand_prix_v6_item_fairness.gd",
+	"res://modes/grand_prix/grand_prix_mode.gd",
+	"res://modes/mode_base.gd",
+	"res://characters/test_racer.tscn",
+	"res://characters/character_controller.gd",
+	"res://ui/mode_hud.gd",
+	"res://tracks/grand_prix_track.tscn",
+	"res://tracks/grand_prix_v2_track_runtime_safe.gd",
+	"res://items/item_box.tscn",
+	"res://items/item_box.gd",
+	"res://camera/chase_camera.gd",
+	"res://items/ai_item_brain.gd",
+	"res://characters/ai_pack_tactics.gd",
+	"res://systems/racing_feel_controller.gd",
+	"res://items/item_combat_expansion_v3_long_bomb.gd",
+	"res://tracks/grand_prix_v2_course_guidance.gd",
+	"res://modes/grand_prix/grand_prix_rival_pressure.gd",
+	"res://network/network_race_sync.gd",
+	"res://systems/racing_action_controller.gd",
+	"res://systems/elephant_trunk_lunge_controller.gd",
+	"res://systems/race_combat_core_v3_power.gd",
+	"res://systems/bear_combat_v2_controller.gd",
+	"res://systems/terrain_movement_controller.gd",
+	"res://tracks/grand_prix_v2_terrain_gameplay.gd",
+	"res://tracks/grand_prix_v2_stage3_controller.gd",
+	"res://tracks/grand_prix_v2_ai_terrain_strategy.gd",
+	"res://tracks/grand_prix_v2_difficulty_controller.gd",
+	"res://tracks/grand_prix_v2_terrain_shell.gd",
+	"res://tracks/grand_prix_v2_grounding_world.gd",
+	"res://tracks/grand_prix_v2_hard_reset_controller.gd",
+	"res://tracks/grand_prix_v3_obstacle_recovery.gd",
+	"res://modes/grand_prix/grand_prix_v3_combat_accessibility.gd",
+	"res://tracks/grand_prix_v3_offroad_controller.gd",
+	"res://tracks/grand_prix_v3_mountain_clearance.gd",
+	"res://tracks/grand_prix_v3_world_foundation.gd",
+	"res://tracks/grand_prix_v3_offroad_stop_guard.gd",
+	"res://tracks/grand_prix_v3_water_reentry.gd",
+	"res://tracks/grand_prix_v4_landscape_shell.gd",
+	"res://tracks/grand_prix_v4_obstacle_expansion.gd",
+	"res://modes/grand_prix/grand_prix_v4_combat_frequency.gd",
+	"res://tracks/grand_prix_v4_environment_dressing.gd",
+	"res://tracks/grand_prix_v4_direction_guidance.gd",
+	"res://tracks/grand_prix_v4_route_signage.gd",
+	"res://tracks/grand_prix_v5_road_corridor_clearance.gd",
+	"res://systems/race_combat_ai_director_party_turbo.gd",
+]
 
 var _start_attempt_in_progress := false
 
@@ -18,7 +67,7 @@ func _ready() -> void:
 	super()
 	_replace_panda_button_with_crocodile()
 	print("CHARACTER SELECT RC9 ROSTER active=12 panda_archived=true crocodile_playable=true")
-	print("CHARACTER SELECT P0 START GUARD READY active_adapter=true round1_checked_load=true fallback=false")
+	print("CHARACTER SELECT P0 START GUARD READY active_adapter=true deep_cache_retry=true dependency_probe=true fallback=false")
 
 func _start_run() -> void:
 	if _start_attempt_in_progress:
@@ -65,8 +114,8 @@ func _verify_start_transition() -> void:
 		print("CHARACTER SELECT P0 START stage=normal_transition status=success")
 		return
 
-	push_warning("CHARACTER SELECT P0 START stage=verify status=still_on_character_select forcing_checked_round1_load=true")
-	_set_start_status("ROUND 1 did not transition · validating production scene...")
+	push_warning("CHARACTER SELECT P0 START stage=verify status=still_on_character_select deep_cache_retry=true")
+	_set_start_status("ROUND 1 did not transition · retrying with fresh resources...")
 	_force_checked_round1_load()
 
 func _force_checked_round1_load() -> void:
@@ -79,19 +128,49 @@ func _force_checked_round1_load() -> void:
 		return
 
 	print("CHARACTER SELECT P0 START stage=resource_exists path=%s" % ROUND1_SCENE_PATH)
-	var resource: Resource = ResourceLoader.load(ROUND1_SCENE_PATH)
+	print("CHARACTER SELECT P0 START stage=deep_cache_reload mode=IGNORE_DEEP")
+	var resource: Resource = ResourceLoader.load(
+		ROUND1_SCENE_PATH,
+		"PackedScene",
+		ResourceLoader.CACHE_MODE_IGNORE_DEEP
+	)
 	var packed := resource as PackedScene
 	if packed == null:
-		_start_failed("Production Round 1 PackedScene failed to load")
+		push_error("CHARACTER SELECT P0 production Round 1 fresh PackedScene load failed; probing dependencies")
+		_set_start_status("ROUND 1 load failed · checking production dependencies...")
+		var dependency_failure: String = _probe_round1_dependencies()
+		if dependency_failure.is_empty():
+			_start_failed("Round 1 fresh load failed; dependencies individually load. Check first red parser error in Output")
+		else:
+			_start_failed(dependency_failure)
 		return
 
-	print("CHARACTER SELECT P0 START stage=packed_scene_loaded path=%s" % ROUND1_SCENE_PATH)
+	print("CHARACTER SELECT P0 START stage=packed_scene_loaded cache=fresh path=%s" % ROUND1_SCENE_PATH)
 	var error: Error = get_tree().change_scene_to_packed(packed)
 	if error == OK:
-		print("CHARACTER SELECT P0 START stage=forced_transition status=success production=true")
+		print("CHARACTER SELECT P0 START stage=forced_transition status=success production=true cache=fresh")
 		return
 
 	_start_failed("Production Round 1 scene change failed: %s" % error_string(error))
+
+func _probe_round1_dependencies() -> String:
+	print("CHARACTER SELECT P0 START stage=dependency_probe count=%d" % ROUND1_CRITICAL_DEPENDENCIES.size())
+	for dependency_path: String in ROUND1_CRITICAL_DEPENDENCIES:
+		if not ResourceLoader.exists(dependency_path):
+			push_error("CHARACTER SELECT P0 DEPENDENCY MISSING path=%s" % dependency_path)
+			return "Missing R1 dependency: %s" % dependency_path
+		var type_hint: String = "Script" if dependency_path.ends_with(".gd") else "PackedScene"
+		var dependency: Resource = ResourceLoader.load(
+			dependency_path,
+			type_hint,
+			ResourceLoader.CACHE_MODE_IGNORE_DEEP
+		)
+		if dependency == null:
+			push_error("CHARACTER SELECT P0 DEPENDENCY FAILED path=%s type=%s" % [dependency_path, type_hint])
+			return "R1 dependency failed: %s" % dependency_path
+		print("CHARACTER SELECT P0 DEPENDENCY OK path=%s" % dependency_path)
+	print("CHARACTER SELECT P0 START stage=dependency_probe status=all_critical_dependencies_load")
+	return ""
 
 func _start_failed(message: String) -> void:
 	GameManager.campaign_running = false
@@ -99,7 +178,7 @@ func _start_failed(message: String) -> void:
 	GameManager.round_active = false
 	_start_attempt_in_progress = false
 	push_error("CHARACTER SELECT P0 START FAILED %s" % message)
-	_set_start_status("START ERROR · %s · Output 창의 P0 START 로그를 확인하세요." % message)
+	_set_start_status("START ERROR · %s" % message)
 	if _start_button != null:
 		_start_button.disabled = false
 		_start_button.text = "RETRY START"
