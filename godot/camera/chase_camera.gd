@@ -123,6 +123,8 @@ func _resolve_obstructed_position(anchor: Vector3, desired_position: Vector3) ->
 	query.to = desired_position
 	query.collision_mask = obstruction_mask
 	query.collide_with_areas = false
+	# Critical for stacked mountain switchbacks: the desired camera point can
+	# already be inside the upper road/terrain collider.
 	query.hit_from_inside = true
 	if _target is CollisionObject3D:
 		query.exclude = [(_target as CollisionObject3D).get_rid()]
@@ -145,6 +147,8 @@ func _resolve_forward_visibility(
 	if _has_clear_forward_view(current_position, look_target):
 		return current_position
 
+	# First try a tight shoulder-camera position. This is deliberately lower than
+	# the old elevated candidates and works under stacked roads / overhead masses.
 	var close_candidate: Vector3 = (
 		_target.global_position
 		- forward * emergency_close_distance
@@ -175,6 +179,9 @@ func _resolve_forward_visibility(
 		_forward_visibility_adjusted = true
 		return high_candidate
 
+	# Final fallback: stay very close to the animal rather than leaving the camera
+	# buried behind a giant foreground polygon. This keeps gameplay readable in a
+	# real tunnel as well, without teleporting the racer or changing collision.
 	var fallback: Vector3 = _target.global_position - forward * 2.2 + Vector3.UP * 3.2
 	fallback = _resolve_obstructed_position(anchor, fallback)
 	_forward_visibility_adjusted = true
@@ -188,6 +195,8 @@ func _has_clear_forward_view(camera_position: Vector3, look_target: Vector3) -> 
 	query.to = look_target
 	query.collision_mask = obstruction_mask
 	query.collide_with_areas = false
+	# Detect the exact failure seen in mountain switchbacks: camera starts inside
+	# an upper road/terrain collision volume.
 	query.hit_from_inside = true
 	if _target is CollisionObject3D:
 		query.exclude = [(_target as CollisionObject3D).get_rid()]
