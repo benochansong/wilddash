@@ -5,13 +5,12 @@ extends "res://scenes/character_select.gd"
 ##
 ## P0 START FLOW GUARD:
 ## The active Character Select scene uses this adapter, not character_select.gd
-## directly. Start is therefore guarded here. The normal GameManager path gets
-## first chance to transition. If the scene is still Character Select two frames
-## later, Round 1 is loaded explicitly as a PackedScene. A minimal Grand Prix
-## fallback is used only when the production scene itself cannot be loaded.
+## directly. Start is guarded here. The normal GameManager path gets first chance
+## to transition. If the scene is still Character Select two frames later, the
+## production Round 1 scene is checked and loaded explicitly. There is no visual
+## fallback scene: production failure stays visible and retryable here.
 
 const ROUND1_SCENE_PATH := "res://modes/grand_prix/grand_prix.tscn"
-const ROUND1_FALLBACK_SCENE_PATH := "res://modes/grand_prix/grand_prix_start_fallback.tscn"
 
 var _start_attempt_in_progress := false
 
@@ -19,7 +18,7 @@ func _ready() -> void:
 	super()
 	_replace_panda_button_with_crocodile()
 	print("CHARACTER SELECT RC9 ROSTER active=12 panda_archived=true crocodile_playable=true")
-	print("CHARACTER SELECT P0 START GUARD READY active_adapter=true round1_checked_load=true fallback=true")
+	print("CHARACTER SELECT P0 START GUARD READY active_adapter=true round1_checked_load=true fallback=false")
 
 func _start_run() -> void:
 	if _start_attempt_in_progress:
@@ -54,8 +53,6 @@ func _start_run() -> void:
 			String(_difficulty),
 		])
 
-	# Keep the canonical campaign setup path first. The verification below only
-	# intervenes when that path leaves us visibly stuck on Character Select.
 	GameManager.start_campaign()
 	call_deferred("_verify_start_transition")
 
@@ -69,27 +66,23 @@ func _verify_start_transition() -> void:
 		return
 
 	push_warning("CHARACTER SELECT P0 START stage=verify status=still_on_character_select forcing_checked_round1_load=true")
-	_set_start_status("ROUND 1 did not transition · forcing checked load...")
+	_set_start_status("ROUND 1 did not transition · validating production scene...")
 	_force_checked_round1_load()
 
 func _force_checked_round1_load() -> void:
-	# Keep campaign state coherent even if GameManager's first load attempt reset
-	# it after a resource error.
 	GameManager.campaign_running = true
 	GameManager.current_round_index = 0
 	GameManager.round_active = false
 
 	if not ResourceLoader.exists(ROUND1_SCENE_PATH):
-		push_error("CHARACTER SELECT P0 production Round 1 path missing: %s" % ROUND1_SCENE_PATH)
-		_load_round1_fallback("production path missing")
+		_start_failed("Production Round 1 path is missing")
 		return
 
 	print("CHARACTER SELECT P0 START stage=resource_exists path=%s" % ROUND1_SCENE_PATH)
 	var resource: Resource = ResourceLoader.load(ROUND1_SCENE_PATH)
 	var packed := resource as PackedScene
 	if packed == null:
-		push_error("CHARACTER SELECT P0 production Round 1 PackedScene load failed")
-		_load_round1_fallback("production PackedScene load failed")
+		_start_failed("Production Round 1 PackedScene failed to load")
 		return
 
 	print("CHARACTER SELECT P0 START stage=packed_scene_loaded path=%s" % ROUND1_SCENE_PATH)
@@ -98,32 +91,7 @@ func _force_checked_round1_load() -> void:
 		print("CHARACTER SELECT P0 START stage=forced_transition status=success production=true")
 		return
 
-	push_error("CHARACTER SELECT P0 production change_scene_to_packed failed: %s" % error_string(error))
-	_load_round1_fallback("production scene change failed: %s" % error_string(error))
-
-func _load_round1_fallback(reason: String) -> void:
-	push_warning("CHARACTER SELECT P0 START fallback requested reason=%s" % reason)
-	_set_start_status("Production Round 1 failed · starting safe Grand Prix fallback...")
-
-	if not ResourceLoader.exists(ROUND1_FALLBACK_SCENE_PATH):
-		_start_failed("Round 1 and fallback scene are both unavailable")
-		return
-
-	var resource: Resource = ResourceLoader.load(ROUND1_FALLBACK_SCENE_PATH)
-	var packed := resource as PackedScene
-	if packed == null:
-		_start_failed("Fallback Grand Prix PackedScene failed to load")
-		return
-
-	GameManager.campaign_running = true
-	GameManager.current_round_index = 0
-	GameManager.round_active = false
-	var error: Error = get_tree().change_scene_to_packed(packed)
-	if error == OK:
-		print("CHARACTER SELECT P0 START stage=fallback_transition status=success reason=%s" % reason)
-		return
-
-	_start_failed("Fallback Grand Prix scene change failed: %s" % error_string(error))
+	_start_failed("Production Round 1 scene change failed: %s" % error_string(error))
 
 func _start_failed(message: String) -> void:
 	GameManager.campaign_running = false
