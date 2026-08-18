@@ -6,6 +6,7 @@ const ROUND_COMPLETE_END: float = 1.2
 const ROUND_RESULT_END: float = 3.5
 const WILD_MOMENTS_END: float = 7.0
 const SKIP_UNLOCK_SECONDS: float = 1.5
+const OVERLAY_ALPHA: float = 0.68
 
 var _elapsed: float = 0.0
 var _finished: bool = false
@@ -47,11 +48,9 @@ func _ready() -> void:
 		_highlights.size(),
 		String(GameManager.get_next_round_id()),
 	])
-
 	if DisplayServer.get_name() == "headless":
 		call_deferred("_headless_finish")
 		return
-
 	RenderingServer.set_default_clear_color(Color(0.018, 0.025, 0.055))
 	_build_preview_stage()
 	_build_ui()
@@ -68,7 +67,7 @@ func _process(delta: float) -> void:
 		_preview_racer.rotation.y += delta * 0.42
 	if _background != null:
 		var pulse: float = 0.025 + sin(_elapsed * 1.45) * 0.008
-		_background.color = Color(0.018 + pulse, 0.025 + pulse * 0.55, 0.055 + pulse * 1.3, 1.0)
+		_background.color = Color(0.018 + pulse, 0.025 + pulse * 0.55, 0.055 + pulse * 1.3, OVERLAY_ALPHA)
 	_refresh_phase(false)
 	if _elapsed >= RECAP_TOTAL_SECONDS:
 		_finish_recap()
@@ -110,14 +109,12 @@ func _build_preview_stage() -> void:
 	key_light.light_energy = 1.45
 	key_light.shadow_enabled = true
 	add_child(key_light)
-
 	var fill := OmniLight3D.new()
 	fill.position = Vector3(-2.8, 4.4, 4.8)
 	fill.light_energy = 3.2
 	fill.omni_range = 13.0
 	fill.light_color = _round_accent(StringName(_entry.get("mode_id", &"unknown")))
 	add_child(fill)
-
 	var floor := CSGCylinder3D.new()
 	floor.radius = 3.6
 	floor.height = 0.38
@@ -130,14 +127,12 @@ func _build_preview_stage() -> void:
 	floor_material.roughness = 0.58
 	floor.material = floor_material
 	add_child(floor)
-
 	var camera := Camera3D.new()
 	camera.position = Vector3(-3.8, 2.8, 7.2)
 	camera.fov = 48.0
 	camera.current = true
 	add_child(camera)
 	camera.look_at(Vector3(-3.8, 1.0, 0.0), Vector3.UP)
-
 	_preview_racer = RACER_SCENE.instantiate() as WildDashCharacterController
 	if _preview_racer == null:
 		return
@@ -154,28 +149,23 @@ func _build_preview_stage() -> void:
 func _build_ui() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
-
 	_background = ColorRect.new()
-	_background.color = Color(0.043, 0.039, 0.088, 1.0)
+	_background.color = Color(0.043, 0.039, 0.088, OVERLAY_ALPHA)
 	_background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(_background)
-	layer.move_child(_background, 0)
-
 	var left_shade := ColorRect.new()
-	left_shade.color = Color(0.01, 0.018, 0.038, 0.28)
+	left_shade.color = Color(0.01, 0.018, 0.038, 0.18)
 	left_shade.set_anchors_preset(Control.PRESET_LEFT_WIDE)
 	left_shade.offset_right = 555.0
 	left_shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(left_shade)
-
 	_accent_bar = ColorRect.new()
 	_accent_bar.color = _round_accent(StringName(_entry.get("mode_id", &"unknown")))
 	_accent_bar.set_anchors_preset(Control.PRESET_RIGHT_WIDE)
 	_accent_bar.offset_left = -10.0
 	_accent_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(_accent_bar)
-
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	margin.add_theme_constant_override("margin_left", 56)
@@ -183,77 +173,62 @@ func _build_ui() -> void:
 	margin.add_theme_constant_override("margin_top", 46)
 	margin.add_theme_constant_override("margin_bottom", 42)
 	layer.add_child(margin)
-
 	var layout := HBoxContainer.new()
 	layout.add_theme_constant_override("separation", 36)
 	margin.add_child(layout)
-
 	var portrait_space := VBoxContainer.new()
 	portrait_space.custom_minimum_size = Vector2(500, 0)
 	portrait_space.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	layout.add_child(portrait_space)
+	portrait_space.add_spacer(false)
 	var racer_name := Label.new()
 	var definition := WildDashAnimalCatalog.get_definition(GameManager.selected_animal)
-	racer_name.text = definition.display_name.to_upper()
+	racer_name.text = "YOUR RACER · %s" % definition.display_name.to_upper()
 	racer_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	racer_name.add_theme_font_size_override("font_size", 24)
 	racer_name.add_theme_color_override("font_color", Color(0.88, 0.94, 1.0))
-	portrait_space.add_spacer(false)
 	portrait_space.add_child(racer_name)
-
 	var panel := PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	layout.add_child(panel)
-
 	var panel_margin := MarginContainer.new()
 	panel_margin.add_theme_constant_override("margin_left", 42)
 	panel_margin.add_theme_constant_override("margin_right", 42)
 	panel_margin.add_theme_constant_override("margin_top", 34)
 	panel_margin.add_theme_constant_override("margin_bottom", 30)
 	panel.add_child(panel_margin)
-
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 12)
 	panel_margin.add_child(box)
-
 	_eyebrow = Label.new()
-	_eyebrow.text = "ROUND COMPLETE"
 	_eyebrow.add_theme_font_size_override("font_size", 18)
 	_eyebrow.add_theme_color_override("font_color", _round_accent(StringName(_entry.get("mode_id", &"unknown"))))
 	box.add_child(_eyebrow)
-
 	_title = Label.new()
 	_title.add_theme_font_size_override("font_size", 38)
 	_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_title)
-
 	_hero = Label.new()
 	_hero.add_theme_font_size_override("font_size", 34)
 	_hero.add_theme_color_override("font_color", Color(1.0, 0.84, 0.30))
 	_hero.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_hero)
-
-	var divider := HSeparator.new()
-	box.add_child(divider)
-
+	box.add_child(HSeparator.new())
 	_details = Label.new()
 	_details.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_details.add_theme_font_size_override("font_size", 20)
 	_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_details)
-
 	_campaign_label = Label.new()
 	_campaign_label.add_theme_font_size_override("font_size", 22)
 	_campaign_label.add_theme_color_override("font_color", Color(0.52, 0.92, 1.0))
 	box.add_child(_campaign_label)
-
 	_next_label = Label.new()
 	_next_label.add_theme_font_size_override("font_size", 18)
 	_next_label.add_theme_color_override("font_color", Color(0.78, 0.86, 0.96))
 	_next_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_next_label)
-
 	_skip_label = Label.new()
 	_skip_label.text = "SPACE / ENTER  ·  SKIP AFTER %.1fs" % SKIP_UNLOCK_SECONDS
 	_skip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -312,8 +287,7 @@ func _update_score_countup() -> void:
 	var span: float = maxf(0.01, ROUND_RESULT_END - ROUND_COMPLETE_END)
 	var t: float = clampf((_elapsed - ROUND_COMPLETE_END) / span, 0.0, 1.0)
 	var shown_round: int = roundi(float(_round_points) * t)
-	var shown_total: int = _previous_total + shown_round
-	_campaign_label.text = "ROUND SCORE  +%d PTS     CAMPAIGN TOTAL  %d PTS" % [shown_round, shown_total]
+	_campaign_label.text = "ROUND SCORE  +%d PTS     CAMPAIGN TOTAL  %d PTS" % [shown_round, _previous_total + shown_round]
 
 func _show_wild_moments() -> void:
 	if not _highlights.is_empty():
@@ -328,10 +302,7 @@ func _show_wild_moments() -> void:
 		_details.text = "\n".join(moment_lines)
 	else:
 		_hero.text = "SOLID RUN!"
-		if _summary_lines.is_empty():
-			_details.text = "ROUND COMPLETE · KEEP THE MOMENTUM GOING"
-		else:
-			_details.text = "ROUND MOMENT\n%s" % _summary_lines[0]
+		_details.text = "ROUND COMPLETE · KEEP THE MOMENTUM GOING" if _summary_lines.is_empty() else "ROUND MOMENT\n%s" % _summary_lines[0]
 	_campaign_label.text = "CAMPAIGN TOTAL  %d PTS" % _campaign_total
 	_next_label.text = "WILD MOMENTS recorder ready · event highlights plug in here"
 
@@ -343,8 +314,7 @@ func _update_next_round_countdown() -> void:
 		_details.text = "FINAL RESULT INCOMING"
 		_next_label.text = ""
 		return
-	var next_round_number: int = GameManager.current_round_index + 2
-	_title.text = "ROUND %d · %s" % [next_round_number, ResultManager.get_round_display_name(next_id)]
+	_title.text = "ROUND %d · %s" % [GameManager.current_round_index + 2, ResultManager.get_round_display_name(next_id)]
 	_hero.text = ResultManager.get_round_tagline(next_id)
 	var remaining: float = maxf(0.0, RECAP_TOTAL_SECONDS - _elapsed)
 	var count: int = clampi(int(ceil(remaining)), 1, 3)
