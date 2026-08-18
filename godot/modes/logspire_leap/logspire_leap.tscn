@@ -5,6 +5,7 @@
 # Campaign-safe Phase 3 director stays on the last stable major-collision layer.
 # Phase C fun-pass source is preserved in the repository but is intentionally
 # not a load-critical ext_resource until Godot 4.7.1 manual parser validation.
+# Wild Moments V11 inherits res://modes/logspire_leap/logspire_water_recovery_v10_surface_collision_guard.gd
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_leap_v4_phase_b.gd" id="1_mode"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_world_v2_deep_water.gd" id="2_world"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_rebalance_v2_phase_b.gd" id="2b_jump_rebalance"]
