@@ -1,11 +1,10 @@
-[gd_scene load_steps=17 format=3]
+[gd_scene load_steps=15 format=3]
 
-# Phase B mode inherits res://modes/logspire_leap/logspire_leap_v3_recovery_camera.gd
-# Phase B combat inherits res://modes/logspire_leap/logspire_combat_safety_v2_recovery_protection.gd
-# Campaign-safe Phase 3 director stays on the last stable major-collision layer.
-# Phase C fun-pass source is preserved in the repository but is intentionally
-# not a load-critical ext_resource until Godot 4.7.1 manual parser validation.
-# Wild Moments V11 inherits res://modes/logspire_leap/logspire_water_recovery_v10_surface_collision_guard.gd
+# P0 CAMPAIGN-SAFE ROUND 3
+# Keep Phase A/B gameplay and the last stable recovery/collision layers load-critical.
+# Graphics Phase 2/3 and the Wild Moments water adapter remain in the repository,
+# but are intentionally not required to enter Round 3 until manual Godot validation.
+# Stable water recovery: res://modes/logspire_leap/logspire_water_recovery_v10_surface_collision_guard.gd
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_leap_v4_phase_b.gd" id="1_mode"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_world_v2_deep_water.gd" id="2_world"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_rebalance_v2_phase_b.gd" id="2b_jump_rebalance"]
@@ -19,9 +18,7 @@
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_mushroom_feedback.gd" id="8_mushroom"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_phase3_director_v4_major_collision.gd" id="9_phase3"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_ladder_system_v5_traversal_paths.gd" id="10_ladder"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_recovery_v11_wild_moments.gd" id="11_water"]
-[ext_resource type="Script" path="res://tracks/graphics_phase2_world_art.gd" id="12_graphics_phase2"]
-[ext_resource type="Script" path="res://effects/round_vfx_safe_loader.gd" id="13_round_vfx"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_recovery_v10_surface_collision_guard.gd" id="11_water"]
 
 [node name="LogspireLeap" type="Node3D"]
 script = ExtResource("1_mode")
@@ -64,11 +61,3 @@ script = ExtResource("8_mushroom")
 
 [node name="Phase3Director" type="Node" parent="."]
 script = ExtResource("9_phase3")
-
-[node name="GraphicsPhase2WorldArt" type="Node3D" parent="."]
-script = ExtResource("12_graphics_phase2")
-round_profile = "logspire"
-
-[node name="GraphicsPhase3RoundVFX" type="Node3D" parent="."]
-script = ExtResource("13_round_vfx")
-round_profile = "logspire"
