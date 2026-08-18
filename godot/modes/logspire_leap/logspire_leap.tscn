@@ -21,7 +21,7 @@
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_ladder_system_v5_traversal_paths.gd" id="10_ladder"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_recovery_v11_wild_moments.gd" id="11_water"]
 [ext_resource type="Script" path="res://tracks/graphics_phase2_world_art.gd" id="12_graphics_phase2"]
-[ext_resource type="Script" path="res://effects/round_vfx_director.gd" id="13_round_vfx"]
+[ext_resource type="Script" path="res://effects/round_vfx_safe_loader.gd" id="13_round_vfx"]
 
 [node name="LogspireLeap" type="Node3D"]
 script = ExtResource("1_mode")
