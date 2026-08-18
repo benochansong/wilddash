@@ -25,12 +25,25 @@ extends Camera3D
 @export var forward_visibility_high_lift := 4.8
 @export var forward_visibility_endpoint_tolerance := 1.25
 
+@export_group("Game Feel Camera")
+@export var impulse_max_offset := 0.24
+@export var impulse_decay := 13.0
+@export var finish_pullback_max := 3.8
+@export var focus_blend_max := 0.34
+
 var _target: Node3D
 var _camera_obstructed := false
 var _forward_visibility_adjusted := false
 var _last_desired_position := Vector3.ZERO
 var _last_resolved_position := Vector3.ZERO
 var _emergency_snap_count := 0
+var _game_feel_impulse := Vector3.ZERO
+var _finish_pullback_remaining := 0.0
+var _finish_pullback_duration := 0.0
+var _finish_pullback_amount := 0.0
+var _focus_point := Vector3.ZERO
+var _focus_remaining := 0.0
+var _focus_duration := 0.0
 
 func _ready() -> void:
 	if not target_path.is_empty():
@@ -54,8 +67,11 @@ func set_target(target: Node3D) -> void:
 func _process(delta: float) -> void:
 	if _target == null:
 		return
+	_update_game_feel(delta)
 	var forward := -_target.global_transform.basis.z.normalized()
-	var desired_position := _target.global_position - forward * follow_distance + Vector3.UP * follow_height
+	var pullback := _get_finish_pullback()
+	var desired_position := _target.global_position - forward * (follow_distance + pullback) + Vector3.UP * follow_height
+	desired_position += _game_feel_impulse
 	var anchor := _get_camera_anchor()
 	var base_look_target := _build_look_target(forward, false)
 	var current_view_blocked: bool = not _has_clear_forward_view(global_position, base_look_target)
@@ -87,6 +103,27 @@ func _process(delta: float) -> void:
 	var look_target := _build_look_target(forward, _forward_visibility_adjusted)
 	look_at(look_target, Vector3.UP)
 
+func add_game_feel_impulse(direction: Vector3, strength: float) -> void:
+	if direction.length_squared() <= 0.0001 or strength <= 0.0:
+		return
+	var amount := minf(impulse_max_offset, strength)
+	var world_direction := direction.normalized()
+	# Tiny positional impulse only. No rotational shake is used so readability and
+	# motion comfort remain stable during repeated body checks and landings.
+	_game_feel_impulse += world_direction * amount
+	if _game_feel_impulse.length() > impulse_max_offset:
+		_game_feel_impulse = _game_feel_impulse.normalized() * impulse_max_offset
+
+func request_finish_pullback(duration: float = 1.6, amount: float = 3.2) -> void:
+	_finish_pullback_duration = maxf(0.05, duration)
+	_finish_pullback_remaining = _finish_pullback_duration
+	_finish_pullback_amount = clampf(amount, 0.0, finish_pullback_max)
+
+func request_target_focus(world_position: Vector3, duration: float = 0.75) -> void:
+	_focus_point = world_position
+	_focus_duration = maxf(0.05, duration)
+	_focus_remaining = _focus_duration
+
 func is_camera_obstructed() -> bool:
 	return _camera_obstructed or _forward_visibility_adjusted
 
@@ -99,6 +136,18 @@ func get_last_resolved_position() -> Vector3:
 func get_emergency_snap_count() -> int:
 	return _emergency_snap_count
 
+func _update_game_feel(delta: float) -> void:
+	_game_feel_impulse = _game_feel_impulse.lerp(Vector3.ZERO, 1.0 - exp(-impulse_decay * delta))
+	_finish_pullback_remaining = maxf(0.0, _finish_pullback_remaining - delta)
+	_focus_remaining = maxf(0.0, _focus_remaining - delta)
+
+func _get_finish_pullback() -> float:
+	if _finish_pullback_remaining <= 0.0 or _finish_pullback_duration <= 0.0:
+		return 0.0
+	var normalized := _finish_pullback_remaining / _finish_pullback_duration
+	var envelope := sin((1.0 - normalized) * PI)
+	return _finish_pullback_amount * maxf(0.0, envelope)
+
 func _get_camera_anchor() -> Vector3:
 	if _target == null:
 		return global_position
@@ -109,7 +158,12 @@ func _build_look_target(forward: Vector3, visibility_adjusted: bool) -> Vector3:
 		return global_position + forward
 	var extra_look: float = 1.0 if visibility_adjusted else 0.0
 	var look_height: float = 1.30 if visibility_adjusted else (0.88 if _camera_obstructed else 1.0)
-	return _target.global_position + forward * (look_ahead + extra_look) + Vector3.UP * look_height
+	var base_target := _target.global_position + forward * (look_ahead + extra_look) + Vector3.UP * look_height
+	if _focus_remaining > 0.0 and _focus_duration > 0.0:
+		var normalized := _focus_remaining / _focus_duration
+		var envelope := sin((1.0 - normalized) * PI)
+		return base_target.lerp(_focus_point, clampf(envelope * focus_blend_max, 0.0, focus_blend_max))
+	return base_target
 
 func _resolve_obstructed_position(anchor: Vector3, desired_position: Vector3) -> Vector3:
 	if not obstruction_enabled or _target == null or get_world_3d() == null:
