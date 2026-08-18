@@ -14,9 +14,10 @@ const roundScenes = [
   readFileSync("godot/modes/neon_harbor_race/neon_harbor_race.tscn", "utf8"),
 ];
 
-test("Phase 2 premium character source remains available without gameplay collision edits", () => {
-  assert.match(racerScene, /premium_character_art\.gd/);
-  assert.match(racerScene, /PremiumCharacterArt/);
+test("Phase 2 premium character source is preserved but disabled in the shared production racer", () => {
+  assert.doesNotMatch(racerScene, /premium_character_art\.gd/);
+  assert.doesNotMatch(racerScene, /PremiumCharacterArt/);
+  assert.match(racerScene, /VisualSlot/);
   assert.match(characterArt, /Graphics Phase 2 visual-only character layer/);
   assert.doesNotMatch(characterArt, /CollisionShape3D|StaticBody3D|Area3D/);
   assert.doesNotMatch(characterArt, /jump_velocity\s*=|max_speed\s*=|cruise_speed\s*=|collision_radius\s*=/);
