@@ -11,6 +11,7 @@ const OVERLAY_ALPHA: float = 0.68
 var _elapsed: float = 0.0
 var _finished: bool = false
 var _phase: int = -1
+var _wild_moment_slot: int = -1
 var _entry: Dictionary = {}
 var _round_points: int = 0
 var _campaign_total: int = 0
@@ -251,6 +252,8 @@ func _refresh_phase(force: bool) -> void:
 		_on_phase_changed()
 	if _phase == 1:
 		_update_score_countup()
+	elif _phase == 2:
+		_update_wild_moment_slot()
 	elif _phase == 3:
 		_update_next_round_countdown()
 	if _skip_label != null:
@@ -275,9 +278,9 @@ func _on_phase_changed() -> void:
 			_update_score_countup()
 			_next_label.text = "PLAYER · %s" % _player_display_name()
 		2:
-			_eyebrow.text = "ROUND %d REPLAY CARD" % round_number
+			_wild_moment_slot = -1
 			_title.text = "★ WILD MOMENTS ★"
-			_show_wild_moments()
+			_update_wild_moment_slot()
 		3:
 			_eyebrow.text = "NEXT ROUND"
 			_campaign_label.text = "CAMPAIGN TOTAL  %d PTS" % _campaign_total
@@ -289,22 +292,56 @@ func _update_score_countup() -> void:
 	var shown_round: int = roundi(float(_round_points) * t)
 	_campaign_label.text = "ROUND SCORE  +%d PTS     CAMPAIGN TOTAL  %d PTS" % [shown_round, _previous_total + shown_round]
 
-func _show_wild_moments() -> void:
-	if not _highlights.is_empty():
-		var first: Dictionary = _highlights[0]
-		_hero.text = String(first.get("title", "WILD MOMENT!")).to_upper()
-		var moment_lines: Array[String] = [String(first.get("description", "Great play!"))]
-		if _highlights.size() > 1:
-			var second: Dictionary = _highlights[1]
-			moment_lines.append("")
-			moment_lines.append(String(second.get("title", "ANOTHER WILD MOMENT!")).to_upper())
-			moment_lines.append(String(second.get("description", "Keep it wild!")))
-		_details.text = "\n".join(moment_lines)
-	else:
+func _update_wild_moment_slot() -> void:
+	if _highlights.is_empty():
+		if _wild_moment_slot == 0:
+			return
+		_wild_moment_slot = 0
+		_eyebrow.text = "WILD MOMENT"
 		_hero.text = "SOLID RUN!"
 		_details.text = "ROUND COMPLETE · KEEP THE MOMENTUM GOING" if _summary_lines.is_empty() else "ROUND MOMENT\n%s" % _summary_lines[0]
+		_campaign_label.text = "CAMPAIGN TOTAL  %d PTS" % _campaign_total
+		_next_label.text = "NO MAJOR HIGHLIGHT · CLEAN ROUND"
+		print("WILD RECAP PLAY type=solid_run importance=0 round=%d racer=%s slot=1" % [GameManager.current_round_index + 1, _player_display_name()])
+		return
+
+	var slot: int = 0
+	if _highlights.size() > 1:
+		var midpoint: float = (ROUND_RESULT_END + WILD_MOMENTS_END) * 0.5
+		slot = 0 if _elapsed < midpoint else 1
+	if slot == _wild_moment_slot:
+		return
+	_wild_moment_slot = slot
+	_show_wild_moment(slot)
+
+func _show_wild_moment(index: int) -> void:
+	if index < 0 or index >= _highlights.size():
+		return
+	var moment: Dictionary = _highlights[index]
+	var importance: int = int(moment.get("importance", ResultManager.HIGHLIGHT_NORMAL))
+	var importance_name: String = _importance_name(importance)
+	_eyebrow.text = "WILD MOMENT %d / %d · %s" % [index + 1, _highlights.size(), importance_name]
+	_title.text = "★ WILD MOMENTS ★"
+	_hero.text = String(moment.get("title", "WILD MOMENT!")).to_upper()
+	_details.text = String(moment.get("description", "Great play!"))
 	_campaign_label.text = "CAMPAIGN TOTAL  %d PTS" % _campaign_total
-	_next_label.text = "WILD MOMENTS recorder ready · event highlights plug in here"
+	_next_label.text = "REPLAY LITE BUFFER READY" if bool(moment.get("replay_ready", false)) else "HIGHLIGHT EVENT"
+	var audio: Node = get_node_or_null("/root/AudioManager")
+	if audio != null:
+		audio.call("play_sfx_id", "skill" if importance >= ResultManager.HIGHLIGHT_EPIC else "ui", 0.72)
+	print("WILD RECAP PLAY type=%s importance=%d round=%d racer=%s slot=%d replay=%s" % [
+		String(moment.get("type", &"wild_moment")), importance, GameManager.current_round_index + 1,
+		String(moment.get("racer", _player_display_name())), index + 1, str(bool(moment.get("replay_ready", false))),
+	])
+
+func _importance_name(importance: int) -> String:
+	if importance >= ResultManager.HIGHLIGHT_LEGENDARY:
+		return "LEGENDARY"
+	if importance >= ResultManager.HIGHLIGHT_EPIC:
+		return "EPIC"
+	if importance >= ResultManager.HIGHLIGHT_COOL:
+		return "COOL"
+	return "NORMAL"
 
 func _update_next_round_countdown() -> void:
 	var next_id: StringName = GameManager.get_next_round_id()
