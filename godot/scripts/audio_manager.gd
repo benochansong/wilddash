@@ -170,7 +170,7 @@ func _build_procedural_audio() -> void:
 	_themes["race_neon_harbor"] = _themes["race"]
 	_themes["race_snowpeak"] = _themes["race"]
 	# LOGSPIRE starts with light forest percussion-like pitches, becomes warmer at
-	# Titan Tree, then widens for the sky finale. External WAV/OGG can replace these
+	# Titan Tree, then widens for the sky finale. External audio can replace these
 	# procedural hooks later without changing gameplay code.
 	_themes["race_logspire"] = _make_theme([196.0, 293.66, 392.0, 523.25], 3.6, 0.17)
 	_themes["race_logspire_titan"] = _make_theme([146.83, 220.0, 293.66, 440.0], 3.2, 0.19)
@@ -183,11 +183,23 @@ func _build_procedural_audio() -> void:
 	_sfx_library["jump"] = _make_sweep(360.0, 720.0, 0.12, 0.28)
 	_sfx_library["skill"] = _make_sweep(520.0, 220.0, 0.16, 0.30)
 	_sfx_library["item"] = _make_tone(880.0, 0.10, 0.26)
+	_sfx_library["item_gold"] = _make_sweep(740.0, 1180.0, 0.16, 0.29)
 	_sfx_library["hit"] = _make_sweep(180.0, 95.0, 0.09, 0.30)
 	_sfx_library["finish"] = _make_sweep(440.0, 880.0, 0.22, 0.34)
+	_sfx_library["boost"] = _make_sweep(260.0, 940.0, 0.17, 0.31)
+	_sfx_library["landing"] = _make_sweep(170.0, 118.0, 0.075, 0.20)
+	_sfx_library["recovery"] = _make_sweep(310.0, 570.0, 0.13, 0.22)
+	# Surface footsteps are deliberately short and quiet. They are only requested
+	# for the local racer, keeping a crowded 15 to 18-racer race sonically clean.
+	_sfx_library["foot_grass"] = _make_sweep(190.0, 145.0, 0.045, 0.12)
+	_sfx_library["foot_dirt"] = _make_sweep(155.0, 105.0, 0.045, 0.13)
+	_sfx_library["foot_wood"] = _make_sweep(290.0, 205.0, 0.040, 0.12)
+	_sfx_library["foot_sand"] = _make_sweep(135.0, 92.0, 0.050, 0.11)
+	_sfx_library["foot_water"] = _make_sweep(370.0, 210.0, 0.055, 0.11)
+	_sfx_library["foot_metal"] = _make_sweep(520.0, 340.0, 0.035, 0.10)
 	_sfx_library["fart"] = _make_cartoon_fart()
-	# Wild Tide event IDs stay inside the shared AudioManager pool. Final WAV/OGG
-	# assets can replace these procedural placeholders without changing gameplay.
+	# Wild Tide event IDs stay inside the shared AudioManager pool. Final assets
+	# can replace these procedural placeholders without changing gameplay.
 	_sfx_library["monster_roar"] = _make_sweep(108.0, 46.0, 0.56, 0.36)
 	_sfx_library["wave"] = _make_sweep(210.0, 72.0, 0.42, 0.27)
 	_sfx_library["splash"] = _make_sweep(390.0, 105.0, 0.28, 0.30)
@@ -252,8 +264,8 @@ func _make_sweep(start_frequency: float, end_frequency: float, duration: float, 
 	return stream
 
 func _make_cartoon_fart() -> AudioStreamWAV:
-	# Deliberately synthetic/clean: a tiny low buzz + pitch wobble. This keeps the
-	# gag readable without adding external assets or creating a realistic sound.
+	# Deliberately synthetic and clean: a tiny low buzz plus pitch wobble. This
+	# keeps the gag readable without an external sound asset.
 	var sample_rate := 22050
 	var duration := 0.22
 	var sample_count := maxi(1, int(duration * float(sample_rate)))
