@@ -6,7 +6,7 @@
 [ext_resource type="Script" path="res://modes/fruit_collection/fruit_frenzy_fx.gd" id="3_fx"]
 [ext_resource type="Script" path="res://modes/fruit_collection/fruit_frenzy_v2_visibility_guard.gd" id="4_visibility"]
 [ext_resource type="Script" path="res://tracks/graphics_phase2_world_art.gd" id="5_graphics_phase2"]
-[ext_resource type="Script" path="res://effects/round_vfx_director.gd" id="6_round_vfx"]
+[ext_resource type="Script" path="res://effects/round_vfx_safe_loader.gd" id="6_round_vfx"]
 
 [node name="FruitCollection" type="Node3D"]
 script = ExtResource("1_mode")
