@@ -2,7 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const ROOT = 'godot/modes/grand_prix/grand_prix.tscn';
+const ROOTS = [
+  'godot/modes/grand_prix/grand_prix.tscn',
+  // Godot resolves these through class_name rather than a textual res:// preload
+  // in the Grand Prix scene, so seed them explicitly as part of R1 validation.
+  'godot/ui/mode_hud.gd',
+  'godot/characters/ai_controller.gd',
+];
 const TEXT_EXTENSIONS = new Set(['.gd', '.tscn', '.tres']);
 const RESOURCE_PATTERN = /res:\/\/[A-Za-z0-9_./-]+\.(?:gd|tscn|tres|png|jpg|jpeg|webp|svg|glb|gltf|ogg|wav|mp3)/g;
 
@@ -15,10 +21,10 @@ function extension(path) {
   return dot >= 0 ? path.slice(dot) : '';
 }
 
-function collectDependencies(startPath) {
+function collectDependencies(startPaths) {
   const visited = new Set();
   const missing = [];
-  const queue = [startPath];
+  const queue = [...startPaths];
 
   while (queue.length > 0) {
     const file = queue.shift();
@@ -46,13 +52,14 @@ function collectDependencies(startPath) {
   return { visited, missing };
 }
 
-test('Round 1 production scene has a complete on-disk resource dependency graph', () => {
-  const { visited, missing } = collectDependencies(ROOT);
+test('Round 1 production resources and global-class seeds have a complete on-disk dependency graph', () => {
+  const { visited, missing } = collectDependencies(ROOTS);
   assert.deepEqual(missing, [], `missing Round 1 resources:\n${missing.join('\n')}`);
   assert.ok(visited.has('godot/modes/grand_prix/grand_prix_v7_wild_moments.gd'));
   assert.ok(visited.has('godot/modes/grand_prix/grand_prix_mode.gd'));
   assert.ok(visited.has('godot/tracks/grand_prix_track.tscn'));
   assert.ok(visited.has('godot/characters/test_racer.tscn'));
   assert.ok(visited.has('godot/ui/mode_hud.gd'));
+  assert.ok(visited.has('godot/characters/ai_controller.gd'));
   assert.ok(visited.size >= 20, `unexpectedly shallow Round 1 graph: ${visited.size}`);
 });
