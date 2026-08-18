@@ -52,17 +52,19 @@ test("premium racers use sculpted fur and lightweight secondary motion", () => {
   assert.doesNotMatch(characterArt, /RigidBody3D|PhysicalBone|SoftBody3D/);
 });
 
-test("all five production rounds wire the shared visual-only world art director", () => {
+test("Phase 2 world art remains available while Logspire uses campaign-safe visual rollback", () => {
   for (const [scene, profile] of [
     [grandPrix, "grand_prix"],
     [fruit, "fruit_frenzy"],
-    [logspire, "logspire"],
     [rumble, "wild_rumble"],
     [neon, "neon_harbor"],
   ]) {
     assert.match(scene, /graphics_phase2_world_art\.gd/);
     assert.match(scene, new RegExp(`round_profile = "${profile}"`));
   }
+  assert.doesNotMatch(logspire, /graphics_phase2_world_art\.gd/);
+  assert.match(logspire, /P0 CAMPAIGN-SAFE ROUND 3/);
+  assert.match(worldArt, /&"logspire"|"logspire"/);
 });
 
 test("world art uses four depth layers and instancing without gameplay collision", () => {
@@ -89,7 +91,7 @@ test("each round owns at least three named visual landmarks", () => {
   }
 });
 
-test("Logspire decor wraps the safe route visually without editing route or recovery data", () => {
+test("Logspire decor source remains available without editing route or recovery data", () => {
   assert.match(worldArt, /get_main_route_points/);
   assert.match(worldArt, /VisualRootSleeve/);
   assert.match(worldArt, /MossHighlight/);
