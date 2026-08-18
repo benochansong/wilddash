@@ -1,11 +1,16 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://modes/push_out/wild_rumble_round4_wild_moments.gd" id="1_mode"]
 [ext_resource type="Script" path="res://tracks/graphics_phase2_world_art.gd" id="2_graphics_phase2"]
+[ext_resource type="Script" path="res://effects/round_vfx_director.gd" id="3_round_vfx"]
 
 [node name="WildRumble" type="Node3D"]
 script = ExtResource("1_mode")
 
 [node name="GraphicsPhase2WorldArt" type="Node3D" parent="."]
 script = ExtResource("2_graphics_phase2")
+round_profile = "wild_rumble"
+
+[node name="GraphicsPhase3RoundVFX" type="Node3D" parent="."]
+script = ExtResource("3_round_vfx")
 round_profile = "wild_rumble"
