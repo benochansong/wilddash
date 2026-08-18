@@ -16,6 +16,7 @@ func _finish_assisted_recovery(
 		duration = float(_recovery_elapsed_by_id.get(racer_id, 0.0))
 		kind = StringName(_traversal_kind_by_id.get(racer_id, &"recovery"))
 		zone = int(_zone_by_id.get(racer_id, 0))
+		_notify_recovery_visual(racer, kind)
 		if racer.is_player:
 			_record_recovery_highlight(racer, kind, duration, zone)
 	super(racer, exit_position, message)
@@ -29,9 +30,23 @@ func _finish_water_recovery(racer: WildDashCharacterController) -> void:
 		duration = float(_recovery_elapsed_by_id.get(racer_id, 0.0))
 		kind = StringName(_traversal_kind_by_id.get(racer_id, &"ladder"))
 		zone = int(_zone_by_id.get(racer_id, 0))
+		_notify_recovery_visual(racer, kind)
 		if racer.is_player:
 			_record_recovery_highlight(racer, kind, duration, zone)
 	super(racer)
+
+func _notify_recovery_visual(racer: WildDashCharacterController, kind: StringName) -> void:
+	if racer == null:
+		return
+	var feedback := racer.get_node_or_null("RacerFeedback")
+	if feedback == null or not feedback.has_method("notify_recovery"):
+		return
+	var visual_kind: StringName = &"root"
+	if kind == &"vine_rescue" or kind == &"vine":
+		visual_kind = &"vine"
+	elif kind == &"ladder" or kind == &"ladder_climb":
+		visual_kind = &"ladder"
+	feedback.call("notify_recovery", visual_kind)
 
 func _record_recovery_highlight(
 	racer: WildDashCharacterController,
