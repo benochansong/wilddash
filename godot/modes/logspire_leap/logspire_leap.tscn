@@ -1,6 +1,8 @@
 [gd_scene load_steps=15 format=3]
 
 # P0 CAMPAIGN-SAFE ROUND 3
+# Phase B mode inherits res://modes/logspire_leap/logspire_leap_v3_recovery_camera.gd
+# Phase B combat inherits res://modes/logspire_leap/logspire_combat_safety_v2_recovery_protection.gd
 # Keep Phase A/B gameplay and the last stable recovery/collision layers load-critical.
 # Graphics Phase 2/3 and the Wild Moments water adapter remain in the repository,
 # but are intentionally not required to enter Round 3 until manual Godot validation.
