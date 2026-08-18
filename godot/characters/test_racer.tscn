@@ -1,10 +1,7 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://characters/character_controller.gd" id="1_controller"]
 [ext_resource type="Script" path="res://characters/premium_character_art.gd" id="2_premium_art"]
-[ext_resource type="Script" path="res://effects/racer_feedback_controller.gd" id="3_feedback"]
-[ext_resource type="Script" path="res://characters/character_motion_polish.gd" id="4_motion"]
-[ext_resource type="Script" path="res://camera/player_camera_cue.gd" id="5_camera_cue"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape_player"]
 radius = 0.62
@@ -22,12 +19,3 @@ shape = SubResource("CapsuleShape_player")
 
 [node name="PremiumCharacterArt" type="Node3D" parent="."]
 script = ExtResource("2_premium_art")
-
-[node name="RacerFeedback" type="Node3D" parent="."]
-script = ExtResource("3_feedback")
-
-[node name="CharacterMotionPolish" type="Node" parent="."]
-script = ExtResource("4_motion")
-
-[node name="PlayerCameraCue" type="Node" parent="."]
-script = ExtResource("5_camera_cue")
