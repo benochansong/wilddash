@@ -1,12 +1,10 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=5 format=3]
 
 # Wild Moments V18 inherits res://modes/fruit_collection/fruit_frenzy_v17_fart_dizzy.gd
 [ext_resource type="Script" path="res://modes/fruit_collection/fruit_frenzy_v18_wild_moments.gd" id="1_mode"]
 [ext_resource type="Script" path="res://modes/fruit_collection/fruit_frenzy_ci_bridge.gd" id="2_ci"]
 [ext_resource type="Script" path="res://modes/fruit_collection/fruit_frenzy_fx.gd" id="3_fx"]
 [ext_resource type="Script" path="res://modes/fruit_collection/fruit_frenzy_v2_visibility_guard.gd" id="4_visibility"]
-[ext_resource type="Script" path="res://tracks/graphics_phase2_world_art.gd" id="5_graphics_phase2"]
-[ext_resource type="Script" path="res://effects/round_vfx_safe_loader.gd" id="6_round_vfx"]
 
 [node name="FruitCollection" type="Node3D"]
 script = ExtResource("1_mode")
@@ -19,11 +17,3 @@ script = ExtResource("3_fx")
 
 [node name="FruitFrenzyVisibilityGuard" type="Node" parent="."]
 script = ExtResource("4_visibility")
-
-[node name="GraphicsPhase2WorldArt" type="Node3D" parent="."]
-script = ExtResource("5_graphics_phase2")
-round_profile = "fruit_frenzy"
-
-[node name="GraphicsPhase3RoundVFX" type="Node3D" parent="."]
-script = ExtResource("6_round_vfx")
-round_profile = "fruit_frenzy"
