@@ -72,14 +72,17 @@ test('HUD is styled and reuses nodes while rank and item feedback animate', () =
   assert.doesNotMatch(processBody, /\.new\(\)/, 'HUD process must not allocate UI nodes every frame');
 });
 
-test('all five production rounds keep Phase 2 and safe-load the correct Phase 3 profile', () => {
+test('Phase 3 safe loader remains on production rounds except campaign-safe Logspire', () => {
   for (const [profile, scene] of Object.entries(roundScenes)) {
+    if (profile === 'logspire') continue;
     assert.match(scene, /GraphicsPhase2WorldArt/);
     assert.match(scene, /GraphicsPhase3RoundVFX/);
     assert.match(scene, /round_vfx_safe_loader\.gd/);
     assert.doesNotMatch(scene, /ext_resource[^\n]*round_vfx_director\.gd/);
     assert.ok(scene.includes(`round_profile = "${profile}"`), `${profile} profile missing`);
   }
+  assert.doesNotMatch(roundScenes.logspire, /GraphicsPhase3RoundVFX/);
+  assert.match(roundScenes.logspire, /P0 CAMPAIGN-SAFE ROUND 3/);
   assert.match(roundVfxSafeLoader, /call_deferred\("_attach_optional_director"\)/);
   assert.match(roundVfxSafeLoader, /ResourceLoader\.load\(DIRECTOR_PATH/);
   assert.match(roundVfxSafeLoader, /gameplay_continues=true/);
