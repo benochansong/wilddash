@@ -1,51 +1,11 @@
 extends "res://scenes/result.gd"
 
 ## RC9 result rules aligned with the active campaign contracts.
-## Round 2 uses an explicit 8-point bank target and performance grades.
-## Round 4 Titan Crown reports placement/finalist/champion instead of the retired
-## `rivals_remaining` Push Out summary. Round 5 TIDAL CLASH uses race placement.
+## Round Recap and Final Result now share ResultManager's campaign scoring so
+## the running total shown between rounds exactly matches the final scoreboard.
 
 func _calculate_campaign_score() -> int:
-	var total: int = 0
-	for entry: Dictionary in ResultManager.round_results:
-		var success: bool = bool(entry.get("success", false))
-		if success:
-			total += 1000
-		var mode_id: StringName = StringName(entry.get("mode_id", &"unknown"))
-		var raw_score: int = int(entry.get("score", 0))
-		var details_value: Variant = entry.get("details", {})
-		var details: Dictionary = details_value as Dictionary if typeof(details_value) == TYPE_DICTIONARY else {}
-		match mode_id:
-			&"grand_prix", &"neon_harbor_race", &"snowpeak_winter_rally", &"tidal_clash":
-				var rank: int = int(details.get("rank", raw_score))
-				var racers: int = maxi(1, int(details.get("racers", GameManager.ai_count + 1)))
-				if rank > 0 and rank <= racers:
-					total += int(round((float(racers - rank + 1) / float(racers)) * 1000.0))
-			&"fruit_collection":
-				var target: int = maxi(1, int(details.get("target", 8)))
-				if raw_score < target:
-					total += int(round(clampf(float(raw_score) / float(target), 0.0, 1.0) * 700.0))
-				elif raw_score < 12:
-					total += 800 + clampi(raw_score - target, 0, 3) * 25
-				elif raw_score < 16:
-					total += 900 + clampi(raw_score - 12, 0, 3) * 25
-				else:
-					total += 1000
-			&"push_out":
-				var racers: int = maxi(1, int(details.get("racers", GameManager.ai_count + 1)))
-				var placement: int = clampi(int(details.get("placement", racers)), 1, racers)
-				if placement == 1:
-					total += 1100
-				elif placement == 2:
-					total += 850
-				elif placement == 3:
-					total += 700
-				else:
-					var placement_ratio: float = float(racers - placement + 1) / float(racers)
-					total += int(round(placement_ratio * 600.0))
-			_:
-				total += clampi(raw_score, 0, 1000)
-	return total
+	return ResultManager.get_campaign_total_score()
 
 func _format_round_result(entry: Dictionary) -> String:
 	var mode_id: StringName = StringName(entry.get("mode_id", &"unknown"))
