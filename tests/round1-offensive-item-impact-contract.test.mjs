@@ -25,7 +25,7 @@ test("Round 1 impact pass remains an adapter over the existing ItemSystem archit
   assert.match(round1Items, /extends "res:\/\/systems\/item_system_rc9_party_turbo\.gd"/);
   assert.match(rc9Items, /extends "res:\/\/systems\/item_system\.gd"/);
   assert.match(baseItems, /const ITEM_IDS: Array\[StringName\] = \[/);
-  assert.match(round1Items, /return RaceManager\.active and GameManager\.get_current_round_id\(\) == &"grand_prix"/);
+  assert.match(round1Items, /return GameManager\.round_active and RaceManager\.active and GameManager\.get_current_round_id\(\) == &"grand_prix"/);
   assert.match(round1Items, /return super\.apply_attack\(target, source, effect_id, duration, slow_multiplier, knockback_strength\)/);
 });
 
