@@ -4,7 +4,7 @@ extends "res://modes/logspire_leap/logspire_jump_rebalance.gd"
 ## Landing magnet and ledge catch are bounded assists, never teleports. Both now
 ## query the CharacterBody motion before moving, and moving-platform targets use
 ## the PlatformGameplay predicted landing position instead of stale world data.
-## WATER recovery owns the player transform before the base landing assist runs.
+## WATER/RECOVERY/SAFE_EXIT own the player transform before base assists run.
 
 const LEDGE_CATCH_WINDOW_SECONDS: float = 0.42
 const LEDGE_CATCH_EXTRA_RANGE: float = 0.85
@@ -23,7 +23,7 @@ var _water_recovery: Node
 func _ready() -> void:
 	super()
 	_water_recovery = get_parent().get_node_or_null("WaterRecovery")
-	print("LOGSPIRE PHASE B PLAYER ASSIST READY landing_assist=%.2fm ledge_catch=%.2fs extra_range=%.2fm teleport=false physics_query=true moving_prediction=true" % [
+	print("LOGSPIRE PHASE B PLAYER ASSIST READY landing_assist=%.2fm ledge_catch=%.2fs extra_range=%.2fm teleport=false physics_query=true moving_prediction=true authority_guard=true" % [
 		LANDING_ASSIST_MAX_METERS, LEDGE_CATCH_WINDOW_SECONDS, LEDGE_CATCH_EXTRA_RANGE,
 	])
 
@@ -35,10 +35,10 @@ func _physics_process(delta: float) -> void:
 		_cancel_ledge_catch()
 		return
 
-	# Do this before super(delta): the base JumpRebalance owns landing magnet,
-	# forward assist, coyote time and jump buffer. None of those may move a racer
-	# while WaterRecovery owns the transform.
-	if _is_player_water_recovering(player):
+	# SAFE_EXIT is deliberately one protected frame after a recovery transform.
+	# This prevents landing magnet or ledge catch from becoming a second transform
+	# writer before normal/airborne movement authority is restored.
+	if not _authority_allows_jump_assist(player):
 		_cancel_ledge_catch()
 		_coyote_remaining = 0.0
 		_jump_buffer_remaining = 0.0
@@ -47,6 +47,19 @@ func _physics_process(delta: float) -> void:
 		_player_was_on_floor = false
 		return
 
+	# Do this before super(delta): should_handle_racer catches a newly submerged
+	# racer even before WaterRecovery's node gets its own physics callback.
+	if _is_player_water_recovering(player):
+		_qa_set_motion_state(player, &"WATER", "jump_pre_capture_guard")
+		_cancel_ledge_catch()
+		_coyote_remaining = 0.0
+		_jump_buffer_remaining = 0.0
+		_landing_correction_used = 0.0
+		_landing_assist_logged = false
+		_player_was_on_floor = false
+		return
+
+	_qa_set_motion_state(player, &"NORMAL" if player.is_on_floor() else &"AIRBORNE", "jump_assist")
 	super(delta)
 	if player.is_on_floor():
 		_cancel_ledge_catch()
@@ -131,6 +144,7 @@ func _try_begin_ledge_catch(player: WildDashCharacterController) -> void:
 	_ledge_catch_target_id = target_id
 	_ledge_catch_logged = false
 	player.velocity.y = maxf(player.velocity.y, 0.25)
+	_qa_record_metric(&"ledge_catch", player, target_id)
 	print("LOGSPIRE LEDGE CATCH racer=%s target=%s window=%.2fs miss=%.2fm safe_route=true teleport=false physics_query=true" % [
 		RaceManager.get_racer_label(player), String(target_id), LEDGE_CATCH_WINDOW_SECONDS, maxf(0.0, distance - radius),
 	])
@@ -196,8 +210,30 @@ func _cancel_ledge_catch() -> void:
 	_ledge_catch_logged = false
 
 func _is_player_water_recovering(player: WildDashCharacterController) -> bool:
+	if player == null:
+		return false
 	if _water_recovery == null or not is_instance_valid(_water_recovery):
 		_water_recovery = get_parent().get_node_or_null("WaterRecovery")
-	if _water_recovery == null or not _water_recovery.has_method("is_water_recovering"):
+	if _water_recovery == null:
 		return false
-	return bool(_water_recovery.call("is_water_recovering", player))
+	if _water_recovery.has_method("is_water_recovering") and bool(_water_recovery.call("is_water_recovering", player)):
+		return true
+	if _water_recovery.has_method("should_handle_racer"):
+		return bool(_water_recovery.call("should_handle_racer", player))
+	return false
+
+func _authority_allows_jump_assist(player: WildDashCharacterController) -> bool:
+	var mode := get_parent()
+	if mode != null and mode.has_method("reliability_jump_assist_allowed"):
+		return bool(mode.call("reliability_jump_assist_allowed", player))
+	return true
+
+func _qa_set_motion_state(player: WildDashCharacterController, state: StringName, source: String) -> void:
+	var mode := get_parent()
+	if mode != null and mode.has_method("reliability_set_motion_state"):
+		mode.call("reliability_set_motion_state", player, state, source)
+
+func _qa_record_metric(metric: StringName, player: WildDashCharacterController, platform_id: StringName) -> void:
+	var mode := get_parent()
+	if mode != null and mode.has_method("reliability_record_metric"):
+		mode.call("reliability_record_metric", metric, player, platform_id)
