@@ -186,6 +186,7 @@ func _audit_safe_jump_pairs() -> Dictionary:
 			if not head_name.is_empty():
 				pair_head_blocked = true
 				head_blocks += 1
+				_qa_record_metric(&"head_collision", from_id)
 				print("LOGSPIRE HEAD BLOCK from=%s to=%s sample=%d collider=%s feet_y=%.2f" % [
 					String(from_id), String(to_id), sample, head_name, feet.y,
 				])
@@ -193,6 +194,7 @@ func _audit_safe_jump_pairs() -> Dictionary:
 
 		if not blocked_by.is_empty():
 			blocked_pairs += 1
+			_qa_record_metric(&"jump_block", from_id)
 			print("LOGSPIRE COLLISION OVERLAP from=%s to=%s type=jump_arc collider=%s action=runtime_audit" % [
 				String(from_id), String(to_id), blocked_by,
 			])
@@ -283,6 +285,11 @@ func _resolve_player() -> WildDashCharacterController:
 		if racer != null and racer.is_player:
 			return racer
 	return null
+
+func _qa_record_metric(metric: StringName, platform_id: StringName) -> void:
+	var mode := get_parent()
+	if mode != null and mode.has_method("reliability_record_metric"):
+		mode.call("reliability_record_metric", metric, _resolve_player(), platform_id)
 
 func _copy_string_name_array(value: Variant) -> Array[StringName]:
 	var result: Array[StringName] = []
