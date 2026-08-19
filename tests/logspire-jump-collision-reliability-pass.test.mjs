@@ -10,13 +10,15 @@ const gap = read('godot/modes/logspire_leap/logspire_jump_gap_guard.gd');
 const phase3 = read('godot/modes/logspire_leap/logspire_phase3_director_v4_major_collision.gd');
 const audit = read('godot/modes/logspire_leap/logspire_jump_collision_reliability.gd');
 const gameplay = read('godot/modes/logspire_leap/logspire_platform_gameplay.gd');
+const water = read('godot/modes/logspire_leap/logspire_water_recovery_v13_integrated_qa.gd');
 
 test('Round 3 wires the final collision audit after existing jump and Phase3 layers', () => {
   assert.match(scene, /logspire_jump_rebalance_v2_phase_b\.gd/);
   assert.match(scene, /logspire_jump_gap_guard\.gd/);
   assert.match(scene, /logspire_phase3_director_v4_major_collision\.gd/);
   assert.match(scene, /logspire_jump_collision_reliability\.gd/);
-  assert.match(scene, /logspire_water_recovery_v12_reliability_authority\.gd/);
+  assert.match(scene, /logspire_water_recovery_v13_integrated_qa\.gd/);
+  assert.match(water, /logspire_water_recovery_v12_reliability_authority\.gd/);
   const phase3Node = scene.indexOf('[node name="Phase3Director"');
   const auditNode = scene.indexOf('[node name="JumpCollisionAudit"');
   assert.ok(phase3Node >= 0 && auditNode > phase3Node);
@@ -41,6 +43,8 @@ test('Jump arc and head clearance use real Physics queries with the racer capsul
   assert.match(audit, /PhysicsRayQueryParameters3D\.create/);
   assert.match(audit, /LOGSPIRE JUMP CLEARANCE/);
   assert.match(audit, /LOGSPIRE HEAD BLOCK/);
+  assert.match(audit, /&"jump_block"/);
+  assert.match(audit, /&"head_collision"/);
 });
 
 test('Titan and Giant Root collision are gameplay-only and audited against Safe Route', () => {
@@ -66,6 +70,7 @@ test('Landing Magnet and Ledge Catch never move before test_move approves the mo
   assert.match(ledgeUpdate, /player\.move_and_collide\(motion\)/);
   assert.ok(ledgeUpdate.indexOf('test_move') < ledgeUpdate.indexOf('move_and_collide'));
   assert.match(jump, /LOGSPIRE LANDING BLOCKED/);
+  assert.match(jump, /&"ledge_catch"/);
 });
 
 test('Moving-platform landing assists use runtime prediction instead of stale static coordinates', () => {
@@ -85,6 +90,7 @@ test('Reliability pass preserves current jump power, Wild Route and water author
   assert.match(audit, /wild_route_unchanged=true/);
   assert.match(audit, /water_recovery_unchanged=true/);
   assert.match(gap, /wild_exclusive_preserved=true/);
+  assert.match(jump, /should_handle_racer/);
 });
 
 test('Required collision reliability telemetry remains available', () => {
