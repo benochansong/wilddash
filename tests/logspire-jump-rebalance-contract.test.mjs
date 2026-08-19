@@ -5,6 +5,7 @@ import test from "node:test";
 const scene = readFileSync("godot/modes/logspire_leap/logspire_leap.tscn", "utf8");
 const rebalance = readFileSync("godot/modes/logspire_leap/logspire_jump_rebalance.gd", "utf8");
 const phaseBRebalance = readFileSync("godot/modes/logspire_leap/logspire_jump_rebalance_v2_phase_b.gd", "utf8");
+const titanTreeRebalance = readFileSync("godot/modes/logspire_leap/logspire_jump_rebalance_v3_titan_tree_accessibility.gd", "utf8");
 const mobility = readFileSync("godot/modes/logspire_leap/logspire_mobility_assist.gd", "utf8");
 const gameManager = readFileSync("godot/scripts/game_manager.gd", "utf8");
 
@@ -14,8 +15,9 @@ function extractRoundIds() {
   return [...block[1].matchAll(/&"([^"]+)"/g)].map((match) => match[1]);
 }
 
-test("Logspire scene wires Phase B jump accessibility before the graph/controller setup", () => {
-  assert.match(scene, /logspire_jump_rebalance_v2_phase_b\.gd/);
+test("Logspire scene wires Titan Tree V3 over Phase B jump accessibility before graph setup", () => {
+  assert.match(scene, /logspire_jump_rebalance_v3_titan_tree_accessibility\.gd/);
+  assert.match(titanTreeRebalance, /extends "res:\/\/modes\/logspire_leap\/logspire_jump_rebalance_v2_phase_b\.gd"/);
   assert.match(phaseBRebalance, /extends "res:\/\/modes\/logspire_leap\/logspire_jump_rebalance\.gd"/);
   assert.match(scene, /JumpRebalance/);
   assert.ok(scene.indexOf("JumpRebalance") < scene.indexOf("PlatformGraph"));
