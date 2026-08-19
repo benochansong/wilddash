@@ -1,6 +1,6 @@
 extends "res://modes/grand_prix/grand_prix_v2_mode.gd"
 
-## Round 1 Item Distribution V3.2.
+## Round 1 Item Distribution V4.0.
 ##
 ## P0 PICKUP SAFETY:
 ## - ItemBox owns the normal body/swept/proximity pickup path.
@@ -9,19 +9,33 @@ extends "res://modes/grand_prix/grand_prix_v2_mode.gd"
 ## - On contact the watchdog first asks the box to force pickup. If that fails,
 ##   Round 1 grants the item directly, then consumes the box.
 ##
+## DENSITY PASS:
+## - 14 progress-sampled stations replace the previous 11-station layout.
+## - Start, Rally Straight and Final Straight are high-density battle stations.
+## - Battle stations scale to 6 / 7 / 8 boxes for 10 / 15 / 18 racer fields.
+## - Long Downhill + River Approach and Tunnel stay clear of new item stations.
+## - Normal stations preserve three readable Left / Center / Right choices.
+##
 ## IMPORTANT PARSER SAFETY:
 ## - Do not redeclare ITEM_BOX_LANE_OFFSETS / ITEM_BOX_WIDE_LANE_OFFSETS because
 ##   those constants already exist in grand_prix_mode.gd, an ancestor class.
 ## - Avoid Dictionary -> Variant -> Vector3 casts in the station sampler.
 
 const ITEM_STATION_PROGRESS: Array[float] = [
-	0.10, 0.19, 0.29, 0.39, 0.49, 0.59, 0.69, 0.79, 0.87, 0.94, 0.985,
+	0.055, 0.115, 0.165, 0.225, 0.285, 0.345, 0.395,
+	0.520, 0.585, 0.650, 0.710, 0.800, 0.910, 0.975,
 ]
-const WIDE_STATION_PROGRESS: Array[float] = [0.49, 0.79, 0.94]
+const WIDE_STATION_PROGRESS: Array[float] = [0.055, 0.345, 0.975]
 const DISTANCE_ITEM_BOX_LANE_OFFSETS: Array[float] = [-3.2, 0.0, 3.2]
-const DISTANCE_ITEM_BOX_WIDE_LANE_OFFSETS: Array[float] = [-4.2, -1.4, 1.4, 4.2]
-const MIN_EXPECTED_PROGRESS_GAP: float = 0.075
-const MAX_ALLOWED_PROGRESS_GAP: float = 0.14
+const DENSITY_ITEM_BOX_LANES_LOW: Array[float] = [-4.4, -2.2, 0.0, 2.2, 4.4]
+const DENSITY_ITEM_BOX_LANES_10: Array[float] = [-5.0, -3.0, -1.0, 1.0, 3.0, 5.0]
+const DENSITY_ITEM_BOX_LANES_15: Array[float] = [-5.4, -3.6, -1.8, 0.0, 1.8, 3.6, 5.4]
+const DENSITY_ITEM_BOX_LANES_18: Array[float] = [-5.6, -4.0, -2.4, -0.8, 0.8, 2.4, 4.0, 5.6]
+const DANGER_PROGRESS_WINDOWS: Array[Vector2] = [Vector2(0.400, 0.475), Vector2(0.862, 0.899)]
+const BASELINE_ITEM_BOX_COUNT: int = 36
+const MIN_EXPECTED_PROGRESS_GAP: float = 0.045
+const MAX_ALLOWED_PROGRESS_GAP: float = 0.13
+const START_STAGGER_METERS: float = 1.35
 const PLAYER_ITEM_WATCHDOG_RADIUS: float = 3.60
 const PLAYER_ITEM_WATCHDOG_VERTICAL: float = 4.20
 
@@ -145,7 +159,7 @@ func _spawn_item_boxes() -> void:
 		respawn = 4.1
 
 	if _route_points.size() < 3:
-		push_warning("ITEM DISTRIBUTION V3.2 route unavailable")
+		push_warning("ITEM DISTRIBUTION V4.0 route unavailable")
 		return
 
 	var cumulative: PackedFloat32Array = _build_route_cumulative_distance()
@@ -155,7 +169,12 @@ func _spawn_item_boxes() -> void:
 	if total_distance <= 0.01:
 		return
 
+	var racer_count: int = RaceManager.racers.size()
+	var danger_station_count: int = 0
 	for station_progress: float in ITEM_STATION_PROGRESS:
+		if _is_danger_progress(station_progress):
+			danger_station_count += 1
+			push_warning("ITEM DISTRIBUTION V4.0 station inside protected danger window progress=%.3f" % station_progress)
 		var target_distance: float = clampf(station_progress, 0.0, 1.0) * total_distance
 		var segment_index: int = _segment_index_for_distance(target_distance, cumulative)
 		if segment_index < 0 or segment_index + 1 >= _route_points.size():
@@ -176,11 +195,9 @@ func _spawn_item_boxes() -> void:
 			tangent = tangent.normalized()
 		var right: Vector3 = Vector3(-tangent.z, 0.0, tangent.x)
 
-		var lane_offsets: Array[float] = DISTANCE_ITEM_BOX_LANE_OFFSETS
-		if _is_wide_station(station_progress):
-			lane_offsets = DISTANCE_ITEM_BOX_WIDE_LANE_OFFSETS
-
-		for lane_offset: float in lane_offsets:
+		var lane_offsets: Array[float] = _lane_offsets_for_station(station_progress, racer_count)
+		for lane_index: int in range(lane_offsets.size()):
+			var lane_offset: float = lane_offsets[lane_index]
 			var box: WildDashItemBox = ITEM_BOX_SCENE.instantiate() as WildDashItemBox
 			if box == null:
 				continue
@@ -188,7 +205,8 @@ func _spawn_item_boxes() -> void:
 				roundi(station_progress * 1000.0),
 				str(lane_offset).replace("-", "N").replace(".", "_"),
 			]
-			box.position = point + right * lane_offset + Vector3.UP * 1.35
+			var longitudinal_stagger: float = _station_longitudinal_stagger(station_progress, lane_index)
+			box.position = point + right * lane_offset + tangent * longitudinal_stagger + Vector3.UP * 1.35
 			box.respawn_seconds = respawn
 			add_child(box)
 			_item_boxes.append(box)
@@ -201,16 +219,18 @@ func _spawn_item_boxes() -> void:
 			first_twenty += 1
 		if progress >= 0.20 and progress <= 0.90:
 			middle_stations += 1
-	print("ITEM DISTRIBUTION V3.2 stations=%d boxes=%d progresses=%s max_gap=%.3f first_20_percent=%d middle_stations=%d wide=%d respawn=%.1fs distance_sampled=true pickup_watchdog=true" % [
-		ITEM_STATION_PROGRESS.size(), _item_boxes.size(), str(ITEM_STATION_PROGRESS), max_gap,
-		first_twenty, middle_stations, WIDE_STATION_PROGRESS.size(), respawn,
+	var battle_lanes: int = _lane_offsets_for_station(WIDE_STATION_PROGRESS[0], racer_count).size()
+	var density_gain: float = (float(_item_boxes.size()) / float(BASELINE_ITEM_BOX_COUNT) - 1.0) * 100.0
+	print("ITEM DISTRIBUTION V4.0 stations=%d boxes=%d racers=%d progresses=%s max_gap=%.3f first_20_percent=%d middle_stations=%d battle_zones=%d battle_lanes=%d respawn=%.1fs density_gain=%.1f%% danger_stations=%d distance_sampled=true pickup_watchdog=true" % [
+		ITEM_STATION_PROGRESS.size(), _item_boxes.size(), racer_count, str(ITEM_STATION_PROGRESS), max_gap,
+		first_twenty, middle_stations, WIDE_STATION_PROGRESS.size(), battle_lanes, respawn, density_gain, danger_station_count,
 	])
 	if max_gap > MAX_ALLOWED_PROGRESS_GAP:
-		push_warning("ITEM DISTRIBUTION V3.2 gap too large: %.3f" % max_gap)
+		push_warning("ITEM DISTRIBUTION V4.0 gap too large: %.3f" % max_gap)
 	for i: int in range(1, ITEM_STATION_PROGRESS.size()):
 		var gap: float = ITEM_STATION_PROGRESS[i] - ITEM_STATION_PROGRESS[i - 1]
 		if gap < MIN_EXPECTED_PROGRESS_GAP:
-			push_warning("ITEM DISTRIBUTION V3.2 stations too close at %d gap=%.3f" % [i, gap])
+			push_warning("ITEM DISTRIBUTION V4.0 stations too close at %d gap=%.3f" % [i, gap])
 
 func get_item_station_progresses() -> Array[float]:
 	var result: Array[float] = []
@@ -242,6 +262,28 @@ func _segment_index_for_distance(target_distance: float, cumulative: PackedFloat
 		if float(cumulative[i]) >= target_distance:
 			return i - 1
 	return _route_points.size() - 2
+
+func _lane_offsets_for_station(progress: float, racer_count: int) -> Array[float]:
+	if not _is_wide_station(progress):
+		return DISTANCE_ITEM_BOX_LANE_OFFSETS
+	if racer_count >= 18:
+		return DENSITY_ITEM_BOX_LANES_18
+	if racer_count >= 15:
+		return DENSITY_ITEM_BOX_LANES_15
+	if racer_count >= 10:
+		return DENSITY_ITEM_BOX_LANES_10
+	return DENSITY_ITEM_BOX_LANES_LOW
+
+func _station_longitudinal_stagger(progress: float, lane_index: int) -> float:
+	if absf(progress - ITEM_STATION_PROGRESS[0]) > 0.001:
+		return 0.0
+	return -START_STAGGER_METERS if lane_index % 2 == 0 else START_STAGGER_METERS
+
+func _is_danger_progress(progress: float) -> bool:
+	for window: Vector2 in DANGER_PROGRESS_WINDOWS:
+		if progress >= window.x and progress <= window.y:
+			return true
+	return false
 
 func _is_wide_station(progress: float) -> bool:
 	for wide_progress: float in WIDE_STATION_PROGRESS:
