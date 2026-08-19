@@ -49,8 +49,8 @@ test('Root and Ladder traversal require clearance and blocked targets cannot loo
 });
 
 test('jump and landing assists yield before base processing while WaterRecovery owns the player', () => {
-  const waterGuard = jump.indexOf('if _is_player_water_recovering(player):');
-  const superCall = jump.indexOf('super(delta)');
+  const waterGuard = jump.indexOf('\n\tif _is_player_water_recovering(player):');
+  const superCall = jump.indexOf('\n\tsuper(delta)');
   assert.ok(waterGuard >= 0 && superCall >= 0 && waterGuard < superCall);
   assert.match(jump, /_landing_correction_used = 0\.0/);
   assert.match(jump, /_jump_buffer_remaining = 0\.0/);
