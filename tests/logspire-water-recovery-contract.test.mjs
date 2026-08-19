@@ -16,6 +16,7 @@ const waterV8 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_
 const waterV9 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v9_priority_camera.gd", "utf8");
 const waterV10 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v10_surface_collision_guard.gd", "utf8");
 const waterV12 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v12_reliability_authority.gd", "utf8");
+const waterV13 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v13_integrated_qa.gd", "utf8");
 const swim = readFileSync("godot/modes/logspire_leap/logspire_swim_controller.gd", "utf8");
 const ladder = readFileSync("godot/modes/logspire_leap/logspire_ladder_system.gd", "utf8");
 const ladderV4 = readFileSync("godot/modes/logspire_leap/logspire_ladder_system_v4_safe_exit.gd", "utf8");
@@ -27,9 +28,10 @@ const recoveryV2 = readFileSync("godot/modes/logspire_leap/logspire_recovery_sys
 const graph = readFileSync("godot/modes/logspire_leap/logspire_platform_graph.gd", "utf8");
 const character = readFileSync("godot/characters/character_controller.gd", "utf8");
 
-test("Logspire scene wires V12 reliability over V10 surface recovery and scoped camera", () => {
+test("Logspire scene wires V13 over V12/V10 surface recovery and scoped camera", () => {
   assert.match(scene, /logspire_leap_v3_recovery_camera\.gd/);
-  assert.match(scene, /logspire_water_recovery_v12_reliability_authority\.gd/);
+  assert.match(scene, /logspire_water_recovery_v13_integrated_qa\.gd/);
+  assert.match(waterV13, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v12_reliability_authority\.gd"/);
   assert.match(scene, /logspire_phase3_director_v4_major_collision\.gd/);
   assert.match(scene, /logspire_ladder_system_v5_traversal_paths\.gd/);
   assert.match(scene, /logspire_water_depth_guard\.gd/);
@@ -67,6 +69,7 @@ test("WaterRecovery exclusively hard-locks swimmers to visible surface instead o
   assert.match(waterV12, /_find_safe_surface_position/);
   assert.match(waterV12, /LOGSPIRE SURFACE BLOCKED/);
   assert.match(waterV12, /LOGSPIRE SURFACE REACQUIRE/);
+  assert.match(waterV13, /DEEP_WATER_FAIL_SECONDS: float = 0\.75/);
   assert.doesNotMatch(swim, /SURFACE_BODY_OFFSET|SURFACE_LOCK_TOLERANCE/);
   assert.doesNotMatch(swim, /move_and_collide\(Vector3\.UP/);
   assert.match(swim, /WaterRecovery is the single Y-axis authority/);
@@ -185,6 +188,7 @@ test("Deep water and no-restart protections remain intact", () => {
   assert.match(waterV5, /LOGSPIRE WATER NO RESTART/);
   assert.match(recovery, /LOGSPIRE RECOVERY TIMER CANCELLED BY WATER/);
   assert.match(waterV12, /DEEP_WATER_GUARD_DEPTH/);
+  assert.match(waterV13, /deep_water_fail/);
 });
 
 test("Start grid and safe exits retain earlier regression guards", () => {
@@ -195,6 +199,7 @@ test("Start grid and safe exits retain earlier regression guards", () => {
   assert.match(waterV7, /RECOVERY_PROTECTION_SECONDS: float = 0\.75/);
   assert.match(combatV2, /logspire_recovery_protection_until/);
   assert.match(waterV12, /func _exit_position_clear/);
+  assert.match(waterV13, /_qa_begin_safe_exit/);
 });
 
 test("PlatformGraph API and global CharacterController remain isolated", () => {
