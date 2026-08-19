@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3]
+[gd_scene load_steps=16 format=3]
 
 # P0 CAMPAIGN-SAFE ROUND 3
 # Phase B mode inherits res://modes/logspire_leap/logspire_leap_v3_recovery_camera.gd
@@ -6,6 +6,7 @@
 # Keep Phase A/B gameplay and stable recovery/collision layers load-critical.
 # Graphics Phase 2/3 and the Wild Moments water adapter remain source-only.
 # Water reliability authority inherits the proven V10 recovery state machine.
+# JumpCollisionAudit runs only after the final geometry/collision layers exist.
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_leap_v4_phase_b.gd" id="1_mode"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_world_v2_deep_water.gd" id="2_world"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_rebalance_v2_phase_b.gd" id="2b_jump_rebalance"]
@@ -20,6 +21,7 @@
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_phase3_director_v4_major_collision.gd" id="9_phase3"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_ladder_system_v5_traversal_paths.gd" id="10_ladder"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_recovery_v12_reliability_authority.gd" id="11_water"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_collision_reliability.gd" id="12_jump_collision_audit"]
 
 [node name="LogspireLeap" type="Node3D"]
 script = ExtResource("1_mode")
@@ -62,3 +64,6 @@ script = ExtResource("8_mushroom")
 
 [node name="Phase3Director" type="Node" parent="."]
 script = ExtResource("9_phase3")
+
+[node name="JumpCollisionAudit" type="Node" parent="."]
+script = ExtResource("12_jump_collision_audit")
