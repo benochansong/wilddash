@@ -205,8 +205,15 @@ func _update_wild_turbo(delta: float) -> void:
 	for id_value: Variant in _wild_turbo_effects.keys():
 		var id := int(id_value)
 		var data: Dictionary = _wild_turbo_effects.get(id, {})
-		var racer := data.get("character") as WildDashCharacterController
-		if racer == null or not is_instance_valid(racer) or float(data.get("expires", 0.0)) <= now:
+		var racer_value: Variant = data.get("character", null)
+		if racer_value == null or not is_instance_valid(racer_value):
+			_wild_turbo_effects.erase(id)
+			continue
+		var racer := racer_value as WildDashCharacterController
+		if racer == null:
+			_wild_turbo_effects.erase(id)
+			continue
+		if float(data.get("expires", 0.0)) <= now:
 			_cleanup_wild_turbo(id)
 			continue
 		var canonical := _canonical_max(racer)
@@ -216,16 +223,23 @@ func _update_wild_turbo(delta: float) -> void:
 func _cleanup_wild_turbo(id: int) -> void:
 	var data: Dictionary = _wild_turbo_effects.get(id, {})
 	if data.is_empty(): return
-	var racer := data.get("character") as WildDashCharacterController
-	if racer != null and is_instance_valid(racer):
-		if absf(racer.turn_speed - float(data.get("turbo_turn", racer.turn_speed))) <= 0.03:
-			racer.turn_speed = float(data.get("base_turn", racer.turn_speed))
-		racer.remove_meta(&"wild_turbo_active")
-	var camera := data.get("camera") as Camera3D
-	if camera != null and is_instance_valid(camera) and absf(camera.fov - float(data.get("turbo_fov", camera.fov))) <= 0.2:
-		camera.fov = float(data.get("base_fov", camera.fov))
-	var vfx := data.get("vfx") as Node
-	if vfx != null and is_instance_valid(vfx): vfx.queue_free()
+	var racer_value: Variant = data.get("character", null)
+	if racer_value != null and is_instance_valid(racer_value):
+		var racer := racer_value as WildDashCharacterController
+		if racer != null:
+			if absf(racer.turn_speed - float(data.get("turbo_turn", racer.turn_speed))) <= 0.03:
+				racer.turn_speed = float(data.get("base_turn", racer.turn_speed))
+			racer.remove_meta(&"wild_turbo_active")
+	var camera_value: Variant = data.get("camera", null)
+	if camera_value != null and is_instance_valid(camera_value):
+		var camera := camera_value as Camera3D
+		if camera != null and absf(camera.fov - float(data.get("turbo_fov", camera.fov))) <= 0.2:
+			camera.fov = float(data.get("base_fov", camera.fov))
+	var vfx_value: Variant = data.get("vfx", null)
+	if vfx_value != null and is_instance_valid(vfx_value):
+		var vfx := vfx_value as Node
+		if vfx != null:
+			vfx.queue_free()
 	_wild_turbo_effects.erase(id)
 
 func _canonical_max(racer: WildDashCharacterController) -> float:
