@@ -5,6 +5,7 @@ import test from "node:test";
 const grandPrixScene = readFileSync("godot/modes/grand_prix/grand_prix.tscn", "utf8");
 const fairItems = readFileSync("godot/modes/grand_prix/grand_prix_v6_item_fairness.gd", "utf8");
 const fruitScene = readFileSync("godot/modes/fruit_collection/fruit_collection.tscn", "utf8");
+const economyCombat = readFileSync("godot/modes/fruit_collection/fruit_frenzy_v20_economy_combat_ai.gd", "utf8");
 const speciesInteraction = readFileSync("godot/modes/fruit_collection/fruit_frenzy_v19_species_interaction.gd", "utf8");
 const wildMoments = readFileSync("godot/modes/fruit_collection/fruit_frenzy_v18_wild_moments.gd", "utf8");
 const fartDizzy = readFileSync("godot/modes/fruit_collection/fruit_frenzy_v17_fart_dizzy.gd", "utf8");
@@ -27,7 +28,8 @@ test("Round 1 item boxes respawn faster for 5, 15 and 18 racer fields", () => {
 });
 
 test("Round 2 activates the fart dizzy layer through the production inheritance chain", () => {
-  assert.match(fruitScene, /fruit_frenzy_v19_species_interaction\.gd/);
+  assert.match(fruitScene, /fruit_frenzy_v20_economy_combat_ai\.gd/);
+  assert.match(economyCombat, /extends "res:\/\/modes\/fruit_collection\/fruit_frenzy_v19_species_interaction\.gd"/);
   assert.match(speciesInteraction, /extends "res:\/\/modes\/fruit_collection\/fruit_frenzy_v18_wild_moments\.gd"/);
   assert.match(wildMoments, /extends "res:\/\/modes\/fruit_collection\/fruit_frenzy_v17_fart_dizzy\.gd"/);
   assert.match(fartDizzy, /FART_DIZZY_SECONDS: float = 1\.0/);
