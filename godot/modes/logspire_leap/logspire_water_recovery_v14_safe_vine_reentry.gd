@@ -18,7 +18,10 @@ func _vine_rescue_target(racer: WildDashCharacterController) -> Vector3:
 
 	var route_ids: Array[StringName] = _safe_route_ids_for_vine()
 	if route_ids.is_empty():
-		return _validated_parent_vine_target(racer)
+		var parent_target: Vector3 = super(racer)
+		if parent_target != Vector3.INF and _vine_reentry_position_clear(racer, parent_target, Vector3.ZERO, 0.0):
+			return parent_target
+		return Vector3.INF
 
 	var zone: int = int(_zone_by_id.get(racer.get_instance_id(), 0))
 	var nearest_index: int = 0
@@ -70,7 +73,10 @@ func _vine_rescue_target(racer: WildDashCharacterController) -> Vector3:
 		print("LOGSPIRE VINE REENTRY racer=%s source=checkpoint_fallback safe=true" % RaceManager.get_racer_label(racer))
 		return checkpoint_target
 
-	return _validated_parent_vine_target(racer)
+	var parent_target: Vector3 = super(racer)
+	if parent_target != Vector3.INF and _vine_reentry_position_clear(racer, parent_target, Vector3.ZERO, 0.0):
+		return parent_target
+	return Vector3.INF
 
 func _finish_assisted_recovery(racer: WildDashCharacterController, exit_position: Vector3, message: String) -> void:
 	if racer != null and is_instance_valid(racer):
@@ -170,12 +176,6 @@ func _checkpoint_reentry_target(racer: WildDashCharacterController) -> Vector3:
 	if platform_id == &"":
 		return Vector3.INF
 	return _safe_platform_reentry(racer, platform_id)
-
-func _validated_parent_vine_target(racer: WildDashCharacterController) -> Vector3:
-	var target: Vector3 = super(racer)
-	if target == Vector3.INF:
-		return Vector3.INF
-	return target if _vine_reentry_position_clear(racer, target, Vector3.ZERO, 0.0) else Vector3.INF
 
 func _log_safe_vine_target(racer: WildDashCharacterController, platform_id: StringName, target: Vector3, source: String) -> void:
 	print("LOGSPIRE VINE REENTRY racer=%s platform=%s source=%s safe=true x=%.2f y=%.2f z=%.2f" % [
