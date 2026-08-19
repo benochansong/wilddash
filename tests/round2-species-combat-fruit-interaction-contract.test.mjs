@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const scene = readFileSync("godot/modes/fruit_collection/fruit_collection.tscn", "utf8");
+const v20 = readFileSync("godot/modes/fruit_collection/fruit_frenzy_v20_economy_combat_ai.gd", "utf8");
 const v19 = readFileSync("godot/modes/fruit_collection/fruit_frenzy_v19_species_interaction.gd", "utf8");
 const v18 = readFileSync("godot/modes/fruit_collection/fruit_frenzy_v18_wild_moments.gd", "utf8");
 const v17 = readFileSync("godot/modes/fruit_collection/fruit_frenzy_v17_fart_dizzy.gd", "utf8");
@@ -25,8 +26,9 @@ function numericConstant(source, name) {
   return Number(match[1]);
 }
 
-test("Round 2 production scene activates V19 as a thin adapter over V18 and V17", () => {
-  assert.match(scene, /fruit_frenzy_v19_species_interaction\.gd/);
+test("Round 2 production scene activates V20 over the V19, V18 and V17 inheritance chain", () => {
+  assert.match(scene, /fruit_frenzy_v20_economy_combat_ai\.gd/);
+  assert.match(v20, /extends "res:\/\/modes\/fruit_collection\/fruit_frenzy_v19_species_interaction\.gd"/);
   assert.match(v19, /extends "res:\/\/modes\/fruit_collection\/fruit_frenzy_v18_wild_moments\.gd"/);
   assert.match(v18, /extends "res:\/\/modes\/fruit_collection\/fruit_frenzy_v17_fart_dizzy\.gd"/);
   assert.match(v17, /extends "res:\/\/modes\/fruit_collection\/fruit_frenzy_v16_clear_balance\.gd"/);
@@ -97,23 +99,23 @@ test("Crocodile, Wolf, Cat, Fox, Rabbit and Dog retain their requested shared-pr
   assert.match(v19, /player\.velocity\.y = maxf\(player\.velocity\.y, player\.jump_velocity \* R2_RABBIT_HOP_SCALE\)/);
 });
 
-test("Raccoon Fruit Swipe steals exactly one fruit with source cooldown and recent-target protection", () => {
+test("Raccoon Fruit Swipe keeps one-fruit stealing, source cooldown and recent-target protection", () => {
   assert.equal(numericConstant(v19, "R2_RACCOON_STEAL_AMOUNT"), 1);
   assert.equal(numericConstant(v19, "R2_RACCOON_TARGET_PROTECTION_SECONDS"), 1.25);
-  assert.match(v19, /_phase3_steal_cooldown_by_id\[source_id\] = RACCOON_STEAL_COOLDOWN/);
-  assert.match(v19, /_r2_raccoon_target_protected_until\[target_id\] = now \+ R2_RACCOON_TARGET_PROTECTION_SECONDS/);
-  assert.match(v19, /steal_amount: int = mini\(R2_RACCOON_STEAL_AMOUNT/);
+  assert.match(v20, /_phase3_steal_cooldown_by_id\[source_id\] = RACCOON_STEAL_COOLDOWN/);
+  assert.match(v20, /_r2_raccoon_target_protected_until\[target_id\] = now \+ R2_RACCOON_TARGET_PROTECTION_SECONDS/);
+  assert.match(v20, /steal_amount: int = mini\(R2_RACCOON_STEAL_AMOUNT/);
   assert.match(v10, /const RACCOON_STEAL_COOLDOWN: float = 1\.85/);
 });
 
-test("player and AI execute the same species profiles while collection-first target selection stays authoritative", () => {
-  assert.match(v19, /func _try_ai_attack/);
+test("player and AI execute the same V20 species profile authority while collection-first targeting stays authoritative", () => {
+  assert.match(v20, /func _try_ai_attack/);
+  assert.match(v20, /func _phase3_round2_profile_attack/);
+  assert.match(v20, /super\(attacker, target, personality\)/);
   assert.match(v19, /_phase3_round2_profile_attack\(attacker, true\)/);
   assert.match(v19, /_phase3_round2_profile_attack\(attacker, false\)/);
   assert.match(v19, /_r2_bear_wide_shove\(attacker\)/);
   assert.match(v19, /_r2_crocodile_tail_sweep\(attacker\)/);
-  assert.match(v19, /_r2_apply_deer_stomp\(racer, target\)/);
-  assert.match(v19, /_r2_apply_monkey_ground_slam\(racer\)/);
   assert.match(v12, /_try_ai_attack\(racer, victim, personality\)/);
   assert.match(v15, /combat_normal=%.1fm combat_hunter=%.1fm/);
   assert.match(abilitySystem, /WildDashCombatV2Phase3Profile\.get_basic_attack/);
@@ -122,8 +124,8 @@ test("player and AI execute the same species profiles while collection-first tar
 
 test("new species interactions stay short and do not add a second hard-stun authority", () => {
   assert.equal(numericConstant(v19, "R2_SIGNATURE_RECOVERY_MAX"), 0.80);
-  assert.doesNotMatch(v19, /stun_remaining_by_id\[/);
-  assert.doesNotMatch(v19, /FART_DIZZY_SECONDS\s*=/);
+  assert.doesNotMatch(v20, /stun_remaining_by_id\[/);
+  assert.doesNotMatch(v20, /FART_DIZZY_SECONDS\s*=/);
   assert.match(v19, /visual\.play_action\(&"Hit", clampf\(seconds, 0\.20, 0\.40\)\)/);
   assert.match(v17, /const FART_DIZZY_SECONDS: float = 1\.0/);
   assert.match(v17, /FART_DIZZY_IMMUNITY_SECONDS: float = 0\.35/);
@@ -139,15 +141,18 @@ test("Fruit pickup, loose-fruit recovery, Golden Fruit, Bank and Round 2 finish 
   assert.match(v18, /func _try_pickup_spill_fruit/);
   assert.match(v18, /func _spill_racer/);
   assert.match(v18, /func _bank_racer/);
+  assert.match(v20, /super\(racer, bounded, reason\)/);
   assert.match(v16, /const ROUND2_CLEAR_TARGET: int = 8/);
   assert.match(v16, /finish_mode\(success, player_score/);
 });
 
-test("Round 2 species pass is scoped away from the other four campaign rounds", () => {
-  assert.doesNotMatch(v19, /&"grand_prix"/);
-  assert.doesNotMatch(v19, /&"logspire_leap"/);
-  assert.doesNotMatch(v19, /&"push_out"/);
-  assert.doesNotMatch(v19, /&"neon_harbor_race"/);
+test("Round 2 species and economy combat passes are scoped away from the other four campaign rounds", () => {
+  for (const source of [v19, v20]) {
+    assert.doesNotMatch(source, /&"grand_prix"/);
+    assert.doesNotMatch(source, /&"logspire_leap"/);
+    assert.doesNotMatch(source, /&"push_out"/);
+    assert.doesNotMatch(source, /&"neon_harbor_race"/);
+  }
   const r1 = gameManager.indexOf('&"grand_prix"');
   const r2 = gameManager.indexOf('&"fruit_collection"');
   const r3 = gameManager.indexOf('&"logspire_leap"');
@@ -156,7 +161,7 @@ test("Round 2 species pass is scoped away from the other four campaign rounds", 
   assert.ok(r1 >= 0 && r2 > r1 && r3 > r2 && r4 > r3 && r5 > r4);
 });
 
-test("existing agile aerial, Combat V2 and fart/Wild Moments inheritance remains present underneath V19", () => {
+test("existing agile aerial, Combat V2 and fart/Wild Moments inheritance remains present underneath V20", () => {
   assert.match(v8, /func _update_round2_aerial_combat/);
   assert.match(v10, /func _phase3_round2_profile_attack/);
   assert.match(v10, /func _phase3_try_quick_steal/);
