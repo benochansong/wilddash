@@ -8,6 +8,7 @@ const round2 = read('godot/modes/fruit_collection/fruit_frenzy_v16_clear_balance
 const recapScene = read('godot/scenes/round_recap.tscn');
 const recap = read('godot/scenes/round_recap.gd');
 const round3Scene = read('godot/modes/logspire_leap/logspire_leap.tscn');
+const waterAuthority = read('godot/modes/logspire_leap/logspire_water_recovery_v12_reliability_authority.gd');
 
 test('Round 2 completion still hands its result to the campaign manager', () => {
   assert.match(round2, /finish_mode\(success, player_score/);
@@ -29,10 +30,11 @@ test('campaign order advances Round 2 recap directly to Logspire Round 3', () =>
   assert.match(gameManager, /call_deferred\("_load_current_round"\)/);
 });
 
-test('Round 3 campaign scene uses stable gameplay and recovery dependencies only', () => {
+test('Round 3 campaign scene uses stable gameplay plus the V12 reliability authority', () => {
   assert.match(round3Scene, /P0 CAMPAIGN-SAFE ROUND 3/);
   assert.match(round3Scene, /logspire_leap_v4_phase_b\.gd/);
-  assert.match(round3Scene, /logspire_water_recovery_v10_surface_collision_guard\.gd/);
+  assert.match(round3Scene, /logspire_water_recovery_v12_reliability_authority\.gd/);
+  assert.match(waterAuthority, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v10_surface_collision_guard\.gd"/);
   assert.match(round3Scene, /logspire_phase3_director_v4_major_collision\.gd/);
   assert.doesNotMatch(round3Scene, /graphics_phase2_world_art\.gd/);
   assert.doesNotMatch(round3Scene, /round_vfx_safe_loader\.gd/);
