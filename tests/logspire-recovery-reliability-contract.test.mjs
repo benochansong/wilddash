@@ -3,18 +3,28 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const scene = readFileSync("godot/modes/logspire_leap/logspire_leap.tscn", "utf8");
+const vineOnly = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v15_vine_only.gd", "utf8");
+const safeVine = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v14_safe_vine_reentry.gd", "utf8");
 const integrated = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v13_integrated_qa.gd", "utf8");
 const authority = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v12_reliability_authority.gd", "utf8");
 const water = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v10_surface_collision_guard.gd", "utf8");
 const ladder = readFileSync("godot/modes/logspire_leap/logspire_ladder_system_v5_traversal_paths.gd", "utf8");
+const ladderCleanup = readFileSync("godot/modes/logspire_leap/logspire_ladder_system_v6_vine_only_cleanup.gd", "utf8");
 const swim = readFileSync("godot/modes/logspire_leap/logspire_swim_controller.gd", "utf8");
 const recovery = readFileSync("godot/modes/logspire_leap/logspire_recovery_system.gd", "utf8");
 
-test("Round 3 keeps stable V10/V12 recovery under the V13 QA guard and V5 ladder wiring", () => {
-  assert.match(scene, /logspire_water_recovery_v13_integrated_qa\.gd/);
+test("Round 3 production uses Vine-only V15 over the proven recovery stack and retires traversal props", () => {
+  assert.match(scene, /logspire_water_recovery_v15_vine_only\.gd/);
+  assert.match(vineOnly, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v14_safe_vine_reentry\.gd"/);
+  assert.match(safeVine, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v13_integrated_qa\.gd"/);
   assert.match(integrated, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v12_reliability_authority\.gd"/);
   assert.match(authority, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v10_surface_collision_guard\.gd"/);
-  assert.match(scene, /logspire_ladder_system_v5_traversal_paths\.gd/);
+  assert.match(scene, /logspire_ladder_system_v6_vine_only_cleanup\.gd/);
+  assert.match(ladderCleanup, /extends "res:\/\/modes\/logspire_leap\/logspire_ladder_system_v5_traversal_paths\.gd"/);
+  assert.match(vineOnly, /VINE_ONLY_CAPTURE_DELAY_SECONDS: float = 0\.22/);
+  assert.match(vineOnly, /ladder=false stairs=false/);
+  assert.match(ladderCleanup, /_ladders\.clear\(\)/);
+  assert.match(ladderCleanup, /_root_ramps\.clear\(\)/);
   assert.match(water, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v9_priority_camera\.gd"/);
   assert.match(ladder, /extends "res:\/\/modes\/logspire_leap\/logspire_ladder_system_v4_safe_exit\.gd"/);
 });
@@ -32,7 +42,7 @@ test("Submerged racers rise to the visible surface without vertical player input
   assert.match(integrated, /deep_water_fail/);
 });
 
-test("Recovery guidance is Root first, Ladder second", () => {
+test("Legacy Root and Ladder guidance source remains preserved for rollback", () => {
   const rootIndex = water.indexOf("var best_root: Dictionary");
   const ladderIndex = water.indexOf("var same_zone_ladders: Array");
   assert.ok(rootIndex >= 0, "missing Root selection");
@@ -42,7 +52,7 @@ test("Recovery guidance is Root first, Ladder second", () => {
   assert.match(water, /priority=ROOT/);
 });
 
-test("Ladder capture is generous, automatic, and does not require Jump", () => {
+test("Legacy Ladder capture source remains preserved without being production authority", () => {
   assert.match(water, /LADDER_CAPTURE_HALF_WIDTH: float = 1\.50/);
   assert.match(water, /LADDER_CAPTURE_FRONT_METERS: float = 2\.50/);
   assert.match(water, /LADDER_CAPTURE_RADIAL_FALLBACK: float = 2\.20/);
@@ -53,7 +63,7 @@ test("Ladder capture is generous, automatic, and does not require Jump", () => {
   assert.match(water, /LADDER_CLIMB_RELIABLE_MAX_SECONDS: float = 3\.00/);
 });
 
-test("Every major water basin has a broad Root recovery before Ladder fallback", () => {
+test("Legacy broad Root recovery construction remains preserved for rollback", () => {
   assert.match(ladder, /func _ensure_broad_root_ramp_per_basin\(\)/);
   assert.match(ladder, /Z3_05/);
   assert.match(ladder, /Z4_SAFE_03/);
@@ -63,7 +73,7 @@ test("Every major water basin has a broad Root recovery before Ladder fallback",
   assert.match(ladder, /STAIR_WIDTH: float = 5\.6/);
 });
 
-test("Recovery reselects after one second without progress", () => {
+test("Recovery reselects after one second without progress in the inherited fallback stack", () => {
   assert.match(water, /RECOVERY_STUCK_SECONDS: float = 1\.00/);
   assert.match(water, /RECOVERY_PROGRESS_METERS: float = 0\.18/);
   assert.match(water, /func _handle_recovery_stuck\(/);
@@ -75,7 +85,7 @@ test("Recovery reselects after one second without progress", () => {
   assert.match(integrated, /recovery_stuck/);
 });
 
-test("Emergency Vine Rescue is bounded and remains a visible pull fail-safe", () => {
+test("Vine Rescue remains bounded and visible while V15 promotes it to primary recovery", () => {
   assert.match(water, /VINE_RESCUE_TRIGGER_SECONDS: float = 4\.80/);
   assert.match(water, /VINE_RESCUE_DURATION: float = 1\.00/);
   assert.match(water, /RECOVERY_HARD_LIMIT_SECONDS: float = 7\.00/);
@@ -84,6 +94,7 @@ test("Emergency Vine Rescue is bounded and remains a visible pull fail-safe", ()
   assert.match(water, /EmergencyVine_/);
   assert.match(water, /LOGSPIRE VINE RESCUE/);
   assert.match(water, /teleport=false/);
+  assert.match(vineOnly, /_begin_vine_rescue\(racer\)/);
 });
 
 test("Water and checkpoint recovery both expose bounded SAFE_EXIT authority", () => {
