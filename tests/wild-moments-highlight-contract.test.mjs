@@ -11,6 +11,7 @@ const rumbleScene = readFileSync("godot/modes/push_out/push_out.tscn", "utf8");
 const r1 = readFileSync("godot/modes/grand_prix/grand_prix_v7_wild_moments.gd", "utf8");
 const r2 = readFileSync("godot/modes/fruit_collection/fruit_frenzy_v18_wild_moments.gd", "utf8");
 const r3 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v11_wild_moments.gd", "utf8");
+const r3Authority = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v12_reliability_authority.gd", "utf8");
 const r4 = readFileSync("godot/modes/push_out/wild_rumble_round4_wild_moments.gd", "utf8");
 
 test("shared Wild Moments schema has four importance tiers and normalized event fields", () => {
@@ -37,16 +38,17 @@ test("Replay Lite keeps only recent transforms at 10Hz for player plus four near
   assert.doesNotMatch(resultManager, /get_viewport\(\)\.get_texture|Image\.save|capture.*frame/i);
 });
 
-test("production highlights remain wired except optional Round 3 adapter during P0 transition recovery", () => {
+test("production highlights remain wired while Round 3 prioritizes the reliability authority", () => {
   assert.match(grandScene, /grand_prix_v7_wild_moments\.gd/);
   assert.match(fruitScene, /fruit_frenzy_v18_wild_moments\.gd/);
   assert.match(rumbleScene, /wild_rumble_round4_wild_moments\.gd/);
-  assert.match(logspireScene, /logspire_water_recovery_v10_surface_collision_guard\.gd/);
+  assert.match(logspireScene, /logspire_water_recovery_v12_reliability_authority\.gd/);
   assert.doesNotMatch(logspireScene, /logspire_water_recovery_v11_wild_moments\.gd/);
   assert.match(logspireScene, /P0 CAMPAIGN-SAFE ROUND 3/);
   assert.match(r1, /extends "res:\/\/modes\/grand_prix\/grand_prix_v6_item_fairness\.gd"/);
   assert.match(r2, /extends "res:\/\/modes\/fruit_collection\/fruit_frenzy_v17_fart_dizzy\.gd"/);
   assert.match(r3, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v10_surface_collision_guard\.gd"/);
+  assert.match(r3Authority, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v10_surface_collision_guard\.gd"/);
   assert.match(r4, /extends "res:\/\/modes\/push_out\/wild_rumble_round4_result_balance\.gd"/);
 });
 
@@ -67,11 +69,12 @@ test("Round 2 records Golden Fruit, spill, steal and late bank moments", () => {
   assert.match(r2, /time_remaining <= 7\.0/);
 });
 
-test("Round 3 highlight adapter source remains ready without replacing V10 physics", () => {
+test("Round 3 highlight adapter source remains ready without replacing recovery physics", () => {
   assert.match(r3, /func _finish_assisted_recovery/);
   assert.match(r3, /func _finish_water_recovery/);
   assert.match(r3, /&"water_recovery"/);
   assert.match(r3, /BACK IN %.1f SEC/);
+  assert.match(r3Authority, /LOGSPIRE RECOVERY EXIT CLEAR/);
 });
 
 test("Round 4 records ring-out, final-three and Titan Champion moments", () => {
