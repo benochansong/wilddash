@@ -33,7 +33,11 @@ test('Round 1 failure probes critical dependencies and reports the first failing
   assert.match(active, /func _probe_round1_dependencies\(\) -> String:/);
   assert.match(active, /DEPENDENCY MISSING/);
   assert.match(active, /DEPENDENCY FAILED/);
-  assert.match(active, /R1 dependency failed:/);
+  assert.match(active, /SCRIPT PARSE FAILED/);
+  assert.match(active, /PACKED SCENE INVALID/);
+  assert.match(active, /can_instantiate\(\)/);
+  assert.match(active, /R1 parser failed:/);
+  assert.match(active, /R1 scene invalid:/);
   assert.match(active, /grand_prix_v7_wild_moments\.gd/);
   assert.match(active, /grand_prix_track\.tscn/);
   assert.match(active, /test_racer\.tscn/);
