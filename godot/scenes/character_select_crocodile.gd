@@ -140,7 +140,7 @@ func _force_checked_round1_load() -> void:
 		_set_start_status("ROUND 1 load failed · checking production dependencies...")
 		var dependency_failure: String = _probe_round1_dependencies()
 		if dependency_failure.is_empty():
-			_start_failed("Round 1 fresh load failed; dependencies individually load. Check first red parser error in Output")
+			_start_failed("Round 1 fresh load failed; dependencies compile individually. Check first red scene error in Output")
 		else:
 			_start_failed(dependency_failure)
 		return
@@ -154,7 +154,7 @@ func _force_checked_round1_load() -> void:
 	_start_failed("Production Round 1 scene change failed: %s" % error_string(error))
 
 func _probe_round1_dependencies() -> String:
-	print("CHARACTER SELECT P0 START stage=dependency_probe count=%d" % ROUND1_CRITICAL_DEPENDENCIES.size())
+	print("CHARACTER SELECT P0 START stage=dependency_probe count=%d compile_check=true" % ROUND1_CRITICAL_DEPENDENCIES.size())
 	for dependency_path: String in ROUND1_CRITICAL_DEPENDENCIES:
 		if not ResourceLoader.exists(dependency_path):
 			push_error("CHARACTER SELECT P0 DEPENDENCY MISSING path=%s" % dependency_path)
@@ -168,8 +168,18 @@ func _probe_round1_dependencies() -> String:
 		if dependency == null:
 			push_error("CHARACTER SELECT P0 DEPENDENCY FAILED path=%s type=%s" % [dependency_path, type_hint])
 			return "R1 dependency failed: %s" % dependency_path
-		print("CHARACTER SELECT P0 DEPENDENCY OK path=%s" % dependency_path)
-	print("CHARACTER SELECT P0 START stage=dependency_probe status=all_critical_dependencies_load")
+		if dependency is Script:
+			var script := dependency as Script
+			if script == null or not script.can_instantiate():
+				push_error("CHARACTER SELECT P0 SCRIPT PARSE FAILED path=%s can_instantiate=false" % dependency_path)
+				return "R1 parser failed: %s" % dependency_path
+		elif dependency is PackedScene:
+			var scene := dependency as PackedScene
+			if scene == null or not scene.can_instantiate():
+				push_error("CHARACTER SELECT P0 PACKED SCENE INVALID path=%s can_instantiate=false" % dependency_path)
+				return "R1 scene invalid: %s" % dependency_path
+		print("CHARACTER SELECT P0 DEPENDENCY OK path=%s compile=true" % dependency_path)
+	print("CHARACTER SELECT P0 START stage=dependency_probe status=all_critical_dependencies_compile")
 	return ""
 
 func _start_failed(message: String) -> void:
