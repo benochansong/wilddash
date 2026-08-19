@@ -51,6 +51,8 @@ test('all requested per-zone reliability counters are present', () => {
     assert.ok(mode.includes(`&"${metric}"`), `missing QA metric key: ${metric}`);
     assert.ok(mode.includes(`${metric}=%d`), `missing QA zone report field: ${metric}`);
   }
+  assert.match(waterV13, /_qa_record_metric\(&"water_enter", racer, zone\)/);
+  assert.match(waterV13, /_qa_record_metric\(&"player_fall" if racer\.is_player else &"ai_fall", racer, zone\)/);
 });
 
 test('motion authority is explicit and the registry never writes racer transforms', () => {
@@ -68,7 +70,7 @@ test('motion authority is explicit and the registry never writes racer transform
 test('jump and mobility helpers yield before base assist processing during protected authority', () => {
   const authorityGuard = jump.indexOf('if not _authority_allows_jump_assist(player):');
   const waterGuard = jump.indexOf('if _is_player_water_recovering(player):');
-  const superCall = jump.indexOf('super(delta)');
+  const superCall = jump.indexOf('\n\tsuper(delta)');
   assert.ok(authorityGuard >= 0 && waterGuard > authorityGuard && superCall > waterGuard);
   assert.match(jump, /should_handle_racer/);
   assert.match(jump, /reliability_jump_assist_allowed/);
