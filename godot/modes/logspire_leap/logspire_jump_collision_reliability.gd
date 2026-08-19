@@ -209,8 +209,14 @@ func _audit_safe_jump_pairs() -> Dictionary:
 		])
 	return {"blocked_pairs": blocked_pairs, "head_blocks": head_blocks}
 
+func _physics_world() -> World3D:
+	if _world == null or not is_instance_valid(_world) or not _world.is_inside_tree():
+		return null
+	return _world.get_world_3d()
+
 func _capsule_blocker_name(feet: Vector3, from_id: StringName, to_id: StringName) -> String:
-	if get_world_3d() == null:
+	var physics_world: World3D = _physics_world()
+	if physics_world == null:
 		return ""
 	var shape := CapsuleShape3D.new()
 	shape.radius = CAPSULE_RADIUS
@@ -224,7 +230,7 @@ func _capsule_blocker_name(feet: Vector3, from_id: StringName, to_id: StringName
 	var player := _resolve_player()
 	if player != null:
 		query.exclude = [player.get_rid()]
-	var hits: Array[Dictionary] = get_world_3d().direct_space_state.intersect_shape(query, 12)
+	var hits: Array[Dictionary] = physics_world.direct_space_state.intersect_shape(query, 12)
 	for hit: Dictionary in hits:
 		var collider_value: Variant = hit.get("collider", null)
 		var collider := collider_value as Node
@@ -234,7 +240,8 @@ func _capsule_blocker_name(feet: Vector3, from_id: StringName, to_id: StringName
 	return ""
 
 func _head_blocker_name(feet: Vector3, from_id: StringName, to_id: StringName) -> String:
-	if get_world_3d() == null:
+	var physics_world: World3D = _physics_world()
+	if physics_world == null:
 		return ""
 	var ray := PhysicsRayQueryParameters3D.create(
 		feet + Vector3.UP * HEAD_PROBE_START_Y,
@@ -244,7 +251,7 @@ func _head_blocker_name(feet: Vector3, from_id: StringName, to_id: StringName) -
 	var player := _resolve_player()
 	if player != null:
 		ray.exclude = [player.get_rid()]
-	var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(ray)
+	var hit: Dictionary = physics_world.direct_space_state.intersect_ray(ray)
 	if hit.is_empty():
 		return ""
 	var collider_value: Variant = hit.get("collider", null)
@@ -281,6 +288,8 @@ func _normal_jump_peak() -> float:
 
 func _resolve_player() -> WildDashCharacterController:
 	for racer_value: Variant in RaceManager.racers:
+		if racer_value == null or not is_instance_valid(racer_value):
+			continue
 		var racer := racer_value as WildDashCharacterController
 		if racer != null and racer.is_player:
 			return racer
