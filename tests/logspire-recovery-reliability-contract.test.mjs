@@ -3,13 +3,16 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const scene = readFileSync("godot/modes/logspire_leap/logspire_leap.tscn", "utf8");
+const integrated = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v13_integrated_qa.gd", "utf8");
 const authority = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v12_reliability_authority.gd", "utf8");
 const water = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v10_surface_collision_guard.gd", "utf8");
 const ladder = readFileSync("godot/modes/logspire_leap/logspire_ladder_system_v5_traversal_paths.gd", "utf8");
 const swim = readFileSync("godot/modes/logspire_leap/logspire_swim_controller.gd", "utf8");
+const recovery = readFileSync("godot/modes/logspire_leap/logspire_recovery_system.gd", "utf8");
 
-test("Round 3 keeps stable V10 recovery under the V12 reliability authority and V5 ladder wiring", () => {
-  assert.match(scene, /logspire_water_recovery_v12_reliability_authority\.gd/);
+test("Round 3 keeps stable V10/V12 recovery under the V13 QA guard and V5 ladder wiring", () => {
+  assert.match(scene, /logspire_water_recovery_v13_integrated_qa\.gd/);
+  assert.match(integrated, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v12_reliability_authority\.gd"/);
   assert.match(authority, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v10_surface_collision_guard\.gd"/);
   assert.match(scene, /logspire_ladder_system_v5_traversal_paths\.gd/);
   assert.match(water, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v9_priority_camera\.gd"/);
@@ -25,6 +28,8 @@ test("Submerged racers rise to the visible surface without vertical player input
   assert.match(authority, /LOGSPIRE SURFACE REACQUIRE/);
   assert.match(authority, /LOGSPIRE SURFACE BLOCKED/);
   assert.match(swim, /CROCODILE_SWIM_SPEED_RATIO: float = 1\.00/);
+  assert.match(integrated, /surface_reacquire/);
+  assert.match(integrated, /deep_water_fail/);
 });
 
 test("Recovery guidance is Root first, Ladder second", () => {
@@ -67,9 +72,10 @@ test("Recovery reselects after one second without progress", () => {
   assert.match(water, /stuck_watchdog/);
   assert.match(authority, /_blocked_targets_by_id/);
   assert.match(authority, /LOGSPIRE RECOVERY RETARGET/);
+  assert.match(integrated, /recovery_stuck/);
 });
 
-test("Emergency Vine Rescue is a visible pull fail-safe, not normal teleport recovery", () => {
+test("Emergency Vine Rescue is bounded and remains a visible pull fail-safe", () => {
   assert.match(water, /VINE_RESCUE_TRIGGER_SECONDS: float = 4\.80/);
   assert.match(water, /VINE_RESCUE_DURATION: float = 1\.00/);
   assert.match(water, /RECOVERY_HARD_LIMIT_SECONDS: float = 7\.00/);
@@ -78,6 +84,16 @@ test("Emergency Vine Rescue is a visible pull fail-safe, not normal teleport rec
   assert.match(water, /EmergencyVine_/);
   assert.match(water, /LOGSPIRE VINE RESCUE/);
   assert.match(water, /teleport=false/);
+});
+
+test("Water and checkpoint recovery both expose bounded SAFE_EXIT authority", () => {
+  assert.match(integrated, /&"SAFE_EXIT"/);
+  assert.match(integrated, /await get_tree\(\)\.physics_frame/);
+  assert.match(recovery, /checkpoint_recovery_pending/);
+  assert.match(recovery, /&"RECOVERY"/);
+  assert.match(recovery, /&"SAFE_EXIT"/);
+  assert.match(recovery, /checkpoint_safe_exit_complete/);
+  assert.match(recovery, /await get_tree\(\)\.physics_frame/);
 });
 
 test("Required reliability telemetry remains available for manual playtest", () => {
@@ -101,5 +117,15 @@ test("Required reliability telemetry remains available for manual playtest", () 
     "LOGSPIRE RECOVERY RETARGET",
   ]) {
     assert.ok(authority.includes(marker), `missing V12 telemetry: ${marker}`);
+  }
+  for (const metric of [
+    "water_enter",
+    "surface_reacquire",
+    "deep_water_fail",
+    "root_success",
+    "ladder_success",
+    "recovery_stuck",
+  ]) {
+    assert.ok(integrated.includes(metric), `missing V13 metric: ${metric}`);
   }
 });
