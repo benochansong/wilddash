@@ -1,7 +1,7 @@
 [gd_scene load_steps=5 format=3]
 
-# Species Interaction V19 inherits V18 Wild Moments -> V17 Fart Dizzy -> existing Fruit Frenzy stack.
-[ext_resource type="Script" path="res://modes/fruit_collection/fruit_frenzy_v19_species_interaction.gd" id="1_mode"]
+# V20 inherits V19 Species Combat -> V18 Wild Moments -> V17 Fart Dizzy -> existing Fruit Frenzy stack.
+[ext_resource type="Script" path="res://modes/fruit_collection/fruit_frenzy_v20_economy_combat_ai.gd" id="1_mode"]
 [ext_resource type="Script" path="res://modes/fruit_collection/fruit_frenzy_ci_bridge.gd" id="2_ci"]
 [ext_resource type="Script" path="res://modes/fruit_collection/fruit_frenzy_fx.gd" id="3_fx"]
 [ext_resource type="Script" path="res://modes/fruit_collection/fruit_frenzy_v2_visibility_guard.gd" id="4_visibility"]
