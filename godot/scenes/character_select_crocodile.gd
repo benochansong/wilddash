@@ -106,11 +106,27 @@ func _start_run() -> void:
 	call_deferred("_verify_start_transition")
 
 func _verify_start_transition() -> void:
-	await get_tree().process_frame
-	await get_tree().process_frame
+	# The canonical GameManager transition is also deferred. If it wins the race,
+	# this Character Select node can already be detached before this verifier runs.
+	# Never dereference get_tree() until we know the node is still attached.
 	if not is_inside_tree():
+		print("CHARACTER SELECT P0 START stage=verify status=detached_before_wait transition_assumed_success=true")
 		return
-	if get_tree().current_scene != self:
+	var tree: SceneTree = get_tree()
+	if tree == null:
+		print("CHARACTER SELECT P0 START stage=verify status=no_tree_before_wait transition_assumed_success=true")
+		return
+
+	await tree.process_frame
+	if not is_inside_tree():
+		print("CHARACTER SELECT P0 START stage=normal_transition status=success detached_after_first_frame=true")
+		return
+
+	await tree.process_frame
+	if not is_inside_tree():
+		print("CHARACTER SELECT P0 START stage=normal_transition status=success detached_after_second_frame=true")
+		return
+	if tree.current_scene != self:
 		print("CHARACTER SELECT P0 START stage=normal_transition status=success")
 		return
 
