@@ -55,6 +55,7 @@ func _enter_water(racer: WildDashCharacterController, zone: int, water_y: float)
 		_deep_water_elapsed_by_id.erase(racer_id)
 		_deep_water_fail_recorded_by_id.erase(racer_id)
 		_qa_record_metric(&"water_enter", racer, zone)
+		_qa_record_metric(&"player_fall" if racer.is_player else &"ai_fall", racer, zone)
 	super(racer, zone, water_y)
 	if racer != null and is_instance_valid(racer) and is_water_recovering(racer):
 		_qa_set_state(racer, &"WATER", "water_enter")
