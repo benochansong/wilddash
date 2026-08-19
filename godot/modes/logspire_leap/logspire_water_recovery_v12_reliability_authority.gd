@@ -4,6 +4,8 @@ extends "res://modes/logspire_leap/logspire_water_recovery_v10_surface_collision
 ## WATER owns vertical motion. Scripted root/ladder traversal temporarily owns the
 ## full transform only after a clearance audit. Blocked targets remain excluded
 ## for the rest of the current water recovery so the racer cannot loop forever.
+## Normal water recovery is strictly Root -> Ladder -> Vine fail-safe; the older
+## V9 Jump-out candidate remains available in source but is not selected here.
 
 const IMMEDIATE_REACQUIRE_DEPTH: float = 0.18
 const DEEP_WATER_GUARD_DEPTH: float = 0.70
@@ -59,6 +61,87 @@ func _enter_water(racer: WildDashCharacterController, zone: int, water_y: float)
 			RaceManager.get_racer_label(racer), zone + 1, water_y,
 		])
 	super(racer, zone, water_y)
+
+func _update_swimming(racer: WildDashCharacterController, delta: float) -> void:
+	if racer == null or not is_instance_valid(racer):
+		return
+	_cancel_stale_checkpoint_recovery(racer)
+	racer.collision_mask = 1
+	var racer_id: int = racer.get_instance_id()
+	var zone: int = int(_zone_by_id.get(racer_id, 0))
+	var water_y: float = float(_water_y_by_id.get(racer_id, racer.global_position.y))
+	var controlled_by_player: bool = racer.is_player and DisplayServer.get_name() != "headless"
+
+	# If the racer physically reaches a ladder, capture it immediately. This does
+	# not change route guidance; it only prevents a touched ladder from being lost.
+	var captured_ladder: Dictionary = _ladder_capture_candidate(racer, zone)
+	if not captured_ladder.is_empty():
+		captured_ladder["recovery_type"] = TARGET_LADDER
+		_preferred_target_by_id[racer_id] = captured_ladder
+		_ladder_by_id[racer_id] = captured_ladder
+		_update_recovery_camera_focus(racer, captured_ladder)
+		_begin_ladder_climb(racer, captured_ladder)
+		return
+
+	# V10 _choose_recovery_target returns a valid Root first, then a Ladder. Do not
+	# delegate this path to V9 because V9 also considers legacy Jump-out targets.
+	var target: Dictionary = _choose_recovery_target(racer, zone)
+	if target.is_empty():
+		_preferred_target_by_id.erase(racer_id)
+		_ladder_by_id.erase(racer_id)
+		_set_ux_state(racer, RecoveryUXState.SWIMMING)
+		_clear_recovery_camera_focus_if_needed(racer)
+		if controlled_by_player:
+			_set_hud_message("RECOVERY ROUTE · FIND A ROOT OR LADDER")
+			_apply_manual_recovery_swim(racer, water_y, delta)
+		else:
+			racer.velocity.y = 0.0
+		return
+
+	var previous_value: Variant = _preferred_target_by_id.get(racer_id, {})
+	var previous: Dictionary = previous_value if previous_value is Dictionary else {}
+	if _target_signature(previous) != _target_signature(target):
+		print("LOGSPIRE RECOVERY TARGET racer=%s from=%s to=%s score=%.2f player_priority=%s strict_priority=ROOT_LADDER_VINE" % [
+			RaceManager.get_racer_label(racer),
+			_target_signature(previous),
+			_target_signature(target),
+			float(target.get("target_score", 0.0)),
+			str(racer.is_player),
+		])
+	_preferred_target_by_id[racer_id] = target
+	_update_recovery_camera_focus(racer, target)
+	var recovery_type := StringName(target.get("recovery_type", &""))
+	var target_distance: float = _distance_to_target(racer, target)
+
+	if recovery_type == TARGET_ROOT:
+		_set_ux_state(racer, RecoveryUXState.ROOT_APPROACH)
+		if target_distance <= STAIR_AUTO_ATTACH_RADIUS:
+			_begin_root_climb(racer, target)
+			return
+		if controlled_by_player:
+			_set_hud_message("RECOVERY ROUTE · SWIM TO THE ROOT · %.0fm" % target_distance)
+			_apply_manual_recovery_swim(racer, water_y, delta)
+		else:
+			_apply_ai_recovery_swim(racer, target, water_y, delta)
+		return
+
+	if recovery_type == TARGET_LADDER:
+		_set_ux_state(racer, RecoveryUXState.LADDER_APPROACH)
+		_ladder_by_id[racer_id] = target
+		if target_distance <= LADDER_AUTO_ATTACH_RADIUS:
+			_begin_ladder_climb(racer, target)
+			return
+		if controlled_by_player:
+			_set_hud_message("RECOVERY ROUTE · SWIM TO THE LADDER · %.0fm" % target_distance)
+			_apply_manual_recovery_swim(racer, water_y, delta)
+		else:
+			var bottom_value: Variant = target.get("bottom", racer.global_position)
+			var bottom: Vector3 = bottom_value if bottom_value is Vector3 else racer.global_position
+			_apply_ai_recovery_swim(racer, {"entry": bottom}, water_y, delta)
+		return
+
+	# Unknown legacy recovery types are not normal paths in the reliability pass.
+	_reject_recovery_target(racer, target, "unsupported_recovery_type")
 
 func _enforce_surface_lock(racer: WildDashCharacterController, water_y: float, delta: float) -> void:
 	if racer == null or not is_instance_valid(racer):
