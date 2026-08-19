@@ -5,6 +5,8 @@ import fs from 'node:fs';
 const read = (path) => fs.readFileSync(path, 'utf8');
 
 const scene = read('godot/modes/logspire_leap/logspire_leap.tscn');
+const vineOnly = read('godot/modes/logspire_leap/logspire_water_recovery_v15_vine_only.gd');
+const safeVine = read('godot/modes/logspire_leap/logspire_water_recovery_v14_safe_vine_reentry.gd');
 const integrated = read('godot/modes/logspire_leap/logspire_water_recovery_v13_integrated_qa.gd');
 const authority = read('godot/modes/logspire_leap/logspire_water_recovery_v12_reliability_authority.gd');
 const v10 = read('godot/modes/logspire_leap/logspire_water_recovery_v10_surface_collision_guard.gd');
@@ -12,12 +14,15 @@ const swim = read('godot/modes/logspire_leap/logspire_swim_controller.gd');
 const jump = read('godot/modes/logspire_leap/logspire_jump_rebalance_v2_phase_b.gd');
 const mobility = read('godot/modes/logspire_leap/logspire_mobility_assist.gd');
 
-test('Round 3 activates the V13 integrated guard over the proven V12/V10 recovery authority', () => {
-  assert.match(scene, /logspire_water_recovery_v13_integrated_qa\.gd/);
+test('Round 3 activates Vine-only V15 over safe V14 and proven V13/V12/V10 authority', () => {
+  assert.match(scene, /logspire_water_recovery_v15_vine_only\.gd/);
+  assert.match(vineOnly, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v14_safe_vine_reentry\.gd"/);
+  assert.match(safeVine, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v13_integrated_qa\.gd"/);
   assert.match(integrated, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v12_reliability_authority\.gd"/);
   assert.match(authority, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v10_surface_collision_guard\.gd"/);
   assert.match(v10, /VINE_RESCUE_TRIGGER_SECONDS/);
-  assert.match(v10, /STAIR_AUTO_ATTACH_RADIUS/);
+  assert.match(vineOnly, /VINE_ONLY_CAPTURE_DELAY_SECONDS: float = 0\.22/);
+  assert.match(vineOnly, /ladder=false stairs=false/);
 });
 
 test('WaterRecovery is the single vertical authority while swimming', () => {
@@ -42,7 +47,14 @@ test('deep water is reacquired before basin-floor walking can become normal move
   assert.match(integrated, /deep_water_fail/);
 });
 
-test('normal recovery priority is Root then Ladder then inherited Vine fail-safe', () => {
+test('Production recovery bypasses legacy Root and Ladder targeting and begins Vine Rescue', () => {
+  assert.match(vineOnly, /func _choose_recovery_target\([\s\S]*?return \{\}/);
+  assert.match(vineOnly, /func _ladder_capture_candidate\([\s\S]*?return \{\}/);
+  assert.match(vineOnly, /func _begin_root_climb\([\s\S]*?_begin_vine_rescue\(racer\)/);
+  assert.match(vineOnly, /func _begin_ladder_climb\([\s\S]*?_begin_vine_rescue\(racer\)/);
+});
+
+test('Legacy Root and Ladder traversal authority remains preserved below the Vine-only adapter', () => {
   const swimStart = authority.indexOf('func _update_swimming');
   const surfaceStart = authority.indexOf('func _enforce_surface_lock');
   const swimBody = authority.slice(swimStart, surfaceStart);
@@ -52,10 +64,9 @@ test('normal recovery priority is Root then Ladder then inherited Vine fail-safe
   assert.doesNotMatch(swimBody, /TARGET_JUMP_OUT/);
   assert.doesNotMatch(swimBody, /super\(racer, delta\)/);
   assert.match(authority, /strict_priority=ROOT_LADDER_VINE/);
-  assert.match(v10, /VINE_RESCUE_TRIGGER_SECONDS: float = 4\.80/);
 });
 
-test('Root and Ladder traversal require clearance and blocked targets cannot loop', () => {
+test('Inherited traversal clearance and blocked-target protections remain available', () => {
   assert.match(authority, /func _recovery_target_clear/);
   assert.match(authority, /func _exit_position_clear/);
   assert.match(authority, /func _head_segment_clear/);
