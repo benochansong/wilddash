@@ -28,6 +28,20 @@ test('active start button loads only production Round 1 and retries with a fresh
   assert.doesNotMatch(active, /ROUND1_FALLBACK|_load_round1_fallback|grand_prix_start_fallback/);
 });
 
+test('start transition verifier never dereferences a null SceneTree after scene replacement', () => {
+  const verifierStart = active.indexOf('func _verify_start_transition() -> void:');
+  const verifierEnd = active.indexOf('func _force_checked_round1_load() -> void:');
+  assert.ok(verifierStart >= 0 && verifierEnd > verifierStart);
+  const verifier = active.slice(verifierStart, verifierEnd);
+  const guardIndex = verifier.indexOf('if not is_inside_tree():');
+  const treeIndex = verifier.indexOf('var tree: SceneTree = get_tree()');
+  const awaitIndex = verifier.indexOf('await tree.process_frame');
+  assert.ok(guardIndex >= 0, 'verifier must guard detached Character Select before get_tree');
+  assert.ok(treeIndex > guardIndex, 'get_tree must happen only after attachment guard');
+  assert.ok(awaitIndex > treeIndex, 'frame await must use the validated SceneTree reference');
+  assert.doesNotMatch(verifier, /await get_tree\(\)\.process_frame/);
+});
+
 test('Round 1 failure probes critical dependencies and reports the first failing path', () => {
   assert.match(active, /ROUND1_CRITICAL_DEPENDENCIES/);
   assert.match(active, /func _probe_round1_dependencies\(\) -> String:/);
