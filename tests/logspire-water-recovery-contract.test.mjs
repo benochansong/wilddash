@@ -17,10 +17,13 @@ const waterV9 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_
 const waterV10 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v10_surface_collision_guard.gd", "utf8");
 const waterV12 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v12_reliability_authority.gd", "utf8");
 const waterV13 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v13_integrated_qa.gd", "utf8");
+const waterV14 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v14_safe_vine_reentry.gd", "utf8");
+const waterV15 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v15_vine_only.gd", "utf8");
 const swim = readFileSync("godot/modes/logspire_leap/logspire_swim_controller.gd", "utf8");
 const ladder = readFileSync("godot/modes/logspire_leap/logspire_ladder_system.gd", "utf8");
 const ladderV4 = readFileSync("godot/modes/logspire_leap/logspire_ladder_system_v4_safe_exit.gd", "utf8");
 const ladderV5 = readFileSync("godot/modes/logspire_leap/logspire_ladder_system_v5_traversal_paths.gd", "utf8");
+const ladderV6 = readFileSync("godot/modes/logspire_leap/logspire_ladder_system_v6_vine_only_cleanup.gd", "utf8");
 const phase3V4 = readFileSync("godot/modes/logspire_leap/logspire_phase3_director_v4_major_collision.gd", "utf8");
 const combatV2 = readFileSync("godot/modes/logspire_leap/logspire_combat_safety_v2_recovery_protection.gd", "utf8");
 const recovery = readFileSync("godot/modes/logspire_leap/logspire_recovery_system.gd", "utf8");
@@ -28,12 +31,15 @@ const recoveryV2 = readFileSync("godot/modes/logspire_leap/logspire_recovery_sys
 const graph = readFileSync("godot/modes/logspire_leap/logspire_platform_graph.gd", "utf8");
 const character = readFileSync("godot/characters/character_controller.gd", "utf8");
 
-test("Logspire scene wires V13 over V12/V10 surface recovery and scoped camera", () => {
+test("Logspire scene wires Vine-only V15 over V14/V13/V12/V10 and retires ladder props", () => {
   assert.match(scene, /logspire_leap_v3_recovery_camera\.gd/);
-  assert.match(scene, /logspire_water_recovery_v13_integrated_qa\.gd/);
+  assert.match(scene, /logspire_water_recovery_v15_vine_only\.gd/);
+  assert.match(waterV15, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v14_safe_vine_reentry\.gd"/);
+  assert.match(waterV14, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v13_integrated_qa\.gd"/);
   assert.match(waterV13, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v12_reliability_authority\.gd"/);
   assert.match(scene, /logspire_phase3_director_v4_major_collision\.gd/);
-  assert.match(scene, /logspire_ladder_system_v5_traversal_paths\.gd/);
+  assert.match(scene, /logspire_ladder_system_v6_vine_only_cleanup\.gd/);
+  assert.match(ladderV6, /extends "res:\/\/modes\/logspire_leap\/logspire_ladder_system_v5_traversal_paths\.gd"/);
   assert.match(scene, /logspire_water_depth_guard\.gd/);
   assert.match(scene, /logspire_recovery_system_v2_ladder_only\.gd/);
   assert.match(scene, /logspire_combat_safety_v2_recovery_protection\.gd/);
@@ -41,6 +47,10 @@ test("Logspire scene wires V13 over V12/V10 surface recovery and scoped camera",
   assert.match(waterV10, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v9_priority_camera\.gd"/);
   assert.match(waterV9, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v8_traversal_ux\.gd"/);
   assert.match(ladderV5, /extends "res:\/\/modes\/logspire_leap\/logspire_ladder_system_v4_safe_exit\.gd"/);
+  assert.match(waterV15, /VINE_ONLY_CAPTURE_DELAY_SECONDS: float = 0\.22/);
+  assert.match(waterV15, /ladder=false stairs=false/);
+  assert.match(ladderV6, /_ladders\.clear\(\)/);
+  assert.match(ladderV6, /_root_ramps\.clear\(\)/);
   assert.match(modeV3, /logspire_recovery_chase_camera\.gd/);
   assert.match(modeV3, /round3_only=true/);
 });
@@ -94,7 +104,7 @@ test("Low ledges use close auto vault instead of wall pushing", () => {
   assert.match(waterV7, /MAX_JUMP_OUT_HEIGHT: float = 1\.70/);
 });
 
-test("Root ramps own the entire recovery climb with authored path points", () => {
+test("Legacy Root ramps retain authored path points for rollback", () => {
   assert.match(ladderV5, /ROOT_PATH_POINT_COUNT: int = 5/);
   assert.match(ladderV5, /path_points/);
   assert.match(waterV8, /ROOT_AUTO_ATTACH_RADIUS: float = 4\.0/);
@@ -107,7 +117,7 @@ test("Root ramps own the entire recovery climb with authored path points", () =>
   assert.match(waterV12, /LOGSPIRE ROOT ATTACH/);
 });
 
-test("Ladders align smoothly and climb much slower than legacy V6", () => {
+test("Legacy Ladder traversal remains preserved below the Vine-only adapter", () => {
   assert.match(waterV6, /LADDER_CLIMB_SPEED_MPS: float = 8\.0/);
   assert.match(waterV8, /LADDER_AUTO_ATTACH_RADIUS: float = 5\.0/);
   assert.match(waterV8, /LADDER_ALIGN_SECONDS: float = 0\.32/);
@@ -136,7 +146,7 @@ test("Major Titan geometry has real gameplay collision and traversal-only query 
   assert.match(waterV10, /phase_through=false/);
 });
 
-test("Recovery targets score distance, type priority, progress, congestion and player yield", () => {
+test("Legacy recovery target scoring remains available below the Vine-only adapter", () => {
   assert.match(waterV9, /TARGET_JUMP_OUT/);
   assert.match(waterV9, /TARGET_ROOT/);
   assert.match(waterV9, /TARGET_LADDER/);
@@ -151,7 +161,7 @@ test("Recovery targets score distance, type priority, progress, congestion and p
   assert.match(waterV12, /_blocked_targets_by_id/);
 });
 
-test("Recovery congestion protects player and separates AI queues", () => {
+test("Recovery congestion protections remain available in the inherited stack", () => {
   assert.match(character, /collision_layer = 2/);
   assert.match(character, /collision_mask = 3/);
   assert.match(waterV8, /racer\.collision_mask = 1/);
@@ -163,7 +173,7 @@ test("Recovery congestion protects player and separates AI queues", () => {
   assert.match(waterV8, /_restore_recovery_collision/);
 });
 
-test("Explicit recovery UX states and traversal action lock cover the full water flow", () => {
+test("Explicit inherited recovery UX states and traversal action lock remain intact", () => {
   for (const state of [
     "RACING", "FALLING", "WATER_ENTRY", "SWIMMING", "JUMP_OUT_APPROACH",
     "AUTO_VAULT", "ROOT_APPROACH", "ROOT_CLIMB", "LADDER_APPROACH",
