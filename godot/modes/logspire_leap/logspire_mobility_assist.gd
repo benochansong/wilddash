@@ -15,6 +15,7 @@ var _logged_drivers: Dictionary = {}
 var _player_coyote_remaining: float = 0.0
 var _player_jump_buffer_remaining: float = 0.0
 var _player_was_on_floor: bool = false
+var _water_recovery: Node
 
 func _physics_process(delta: float) -> void:
 	_configure_racers()
@@ -67,9 +68,10 @@ func _configure_ai_drivers() -> void:
 func _update_player_jump_assist(delta: float) -> void:
 	var player := _resolve_player()
 	if player == null or player.finished or not RaceManager.active:
-		_player_coyote_remaining = 0.0
-		_player_jump_buffer_remaining = 0.0
-		_player_was_on_floor = false
+		_reset_player_jump_assist_state()
+		return
+	if _is_player_water_recovering(player):
+		_reset_player_jump_assist_state()
 		return
 
 	var on_floor: bool = player.is_on_floor()
@@ -98,6 +100,20 @@ func _update_player_jump_assist(delta: float) -> void:
 		print("LOGSPIRE JUMP ASSIST type=buffer racer=%s" % RaceManager.get_racer_label(player))
 
 	_player_was_on_floor = on_floor
+
+func _reset_player_jump_assist_state() -> void:
+	_player_coyote_remaining = 0.0
+	_player_jump_buffer_remaining = 0.0
+	_player_was_on_floor = false
+
+func _is_player_water_recovering(player: WildDashCharacterController) -> bool:
+	if player == null:
+		return false
+	if _water_recovery == null or not is_instance_valid(_water_recovery):
+		_water_recovery = get_parent().get_node_or_null("WaterRecovery")
+	if _water_recovery == null or not _water_recovery.has_method("is_water_recovering"):
+		return false
+	return bool(_water_recovery.call("is_water_recovering", player))
 
 func _apply_animal_platform_identity(racer: WildDashCharacterController) -> void:
 	if racer == null:
