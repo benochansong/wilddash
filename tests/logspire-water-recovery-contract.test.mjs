@@ -15,6 +15,7 @@ const waterV7 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_
 const waterV8 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v8_traversal_ux.gd", "utf8");
 const waterV9 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v9_priority_camera.gd", "utf8");
 const waterV10 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v10_surface_collision_guard.gd", "utf8");
+const waterV12 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v12_reliability_authority.gd", "utf8");
 const swim = readFileSync("godot/modes/logspire_leap/logspire_swim_controller.gd", "utf8");
 const ladder = readFileSync("godot/modes/logspire_leap/logspire_ladder_system.gd", "utf8");
 const ladderV4 = readFileSync("godot/modes/logspire_leap/logspire_ladder_system_v4_safe_exit.gd", "utf8");
@@ -26,14 +27,15 @@ const recoveryV2 = readFileSync("godot/modes/logspire_leap/logspire_recovery_sys
 const graph = readFileSync("godot/modes/logspire_leap/logspire_platform_graph.gd", "utf8");
 const character = readFileSync("godot/characters/character_controller.gd", "utf8");
 
-test("Logspire scene wires final V10 surface/collision recovery and scoped camera", () => {
+test("Logspire scene wires V12 reliability over V10 surface recovery and scoped camera", () => {
   assert.match(scene, /logspire_leap_v3_recovery_camera\.gd/);
-  assert.match(scene, /logspire_water_recovery_v10_surface_collision_guard\.gd/);
+  assert.match(scene, /logspire_water_recovery_v12_reliability_authority\.gd/);
   assert.match(scene, /logspire_phase3_director_v4_major_collision\.gd/);
   assert.match(scene, /logspire_ladder_system_v5_traversal_paths\.gd/);
   assert.match(scene, /logspire_water_depth_guard\.gd/);
   assert.match(scene, /logspire_recovery_system_v2_ladder_only\.gd/);
   assert.match(scene, /logspire_combat_safety_v2_recovery_protection\.gd/);
+  assert.match(waterV12, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v10_surface_collision_guard\.gd"/);
   assert.match(waterV10, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v9_priority_camera\.gd"/);
   assert.match(waterV9, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v8_traversal_ux\.gd"/);
   assert.match(ladderV5, /extends "res:\/\/modes\/logspire_leap\/logspire_ladder_system_v4_safe_exit\.gd"/);
@@ -58,15 +60,17 @@ test("Swimming is camera-relative and recovery camera yaw remains user-controlle
   assert.match(waterV9, /LOGSPIRE WATER INPUT/);
 });
 
-test("Swimming is hard-locked to the visible water surface instead of basin floor walking", () => {
-  assert.match(swim, /SURFACE_BODY_OFFSET: float = 0\.52/);
-  assert.match(swim, /SURFACE_LOCK_TOLERANCE: float = 0\.12/);
-  assert.match(swim, /move_and_collide\(Vector3\.UP \* vertical_delta\)/);
+test("WaterRecovery exclusively hard-locks swimmers to visible surface instead of basin floor walking", () => {
+  assert.match(waterV10, /SURFACE_LOCK_OFFSET: float = 0\.52/);
+  assert.match(waterV10, /SURFACE_ASCEND_SPEED: float = 9\.0/);
+  assert.match(waterV12, /func _enforce_surface_lock/);
+  assert.match(waterV12, /_find_safe_surface_position/);
+  assert.match(waterV12, /LOGSPIRE SURFACE BLOCKED/);
+  assert.match(waterV12, /LOGSPIRE SURFACE REACQUIRE/);
+  assert.doesNotMatch(swim, /SURFACE_BODY_OFFSET|SURFACE_LOCK_TOLERANCE/);
+  assert.doesNotMatch(swim, /move_and_collide\(Vector3\.UP/);
+  assert.match(swim, /WaterRecovery is the single Y-axis authority/);
   assert.match(swim, /racer\.velocity\.y = 0\.0/);
-  assert.match(waterV10, /SUBMERGED_REACQUIRE_DEPTH: float = 0\.35/);
-  assert.match(waterV10, /LOGSPIRE WATER SURFACE REACQUIRE/);
-  assert.match(waterV10, /floor_walk_blocked=true/);
-  assert.match(waterV10, /_enforce_surface_lock/);
 });
 
 test("Crocodile keeps full land-speed swimming while normal racers remain recovery-paced", () => {
@@ -96,6 +100,8 @@ test("Root ramps own the entire recovery climb with authored path points", () =>
   assert.match(waterV8, /_update_root_climb/);
   assert.match(waterV8, /_point_on_path/);
   assert.match(waterV8, /LOGSPIRE ROOT AUTO CLIMB/);
+  assert.match(waterV12, /_recovery_target_clear/);
+  assert.match(waterV12, /LOGSPIRE ROOT ATTACH/);
 });
 
 test("Ladders align smoothly and climb much slower than legacy V6", () => {
@@ -110,6 +116,8 @@ test("Ladders align smoothly and climb much slower than legacy V6", () => {
   assert.match(waterV8, /LOGSPIRE LADDER ALIGN/);
   assert.match(waterV8, /LOGSPIRE LADDER CLIMB/);
   assert.match(waterV8, /&"ladder_exit"/);
+  assert.match(waterV12, /LOGSPIRE LADDER ATTACH/);
+  assert.match(waterV12, /LOGSPIRE RECOVERY EXIT CLEAR/);
 });
 
 test("Major Titan geometry has real gameplay collision and traversal-only query layer", () => {
@@ -137,6 +145,7 @@ test("Recovery targets score distance, type priority, progress, congestion and p
   assert.match(waterV9, /_player_is_near/);
   assert.match(waterV9, /LOGSPIRE RECOVERY TARGET/);
   assert.match(waterV10, /MAJOR_BLOCKED_SCORE_PENALTY: float = 1000\.0/);
+  assert.match(waterV12, /_blocked_targets_by_id/);
 });
 
 test("Recovery congestion protects player and separates AI queues", () => {
@@ -175,6 +184,7 @@ test("Deep water and no-restart protections remain intact", () => {
   assert.match(recoveryV2, /checkpoint_restart=false/);
   assert.match(waterV5, /LOGSPIRE WATER NO RESTART/);
   assert.match(recovery, /LOGSPIRE RECOVERY TIMER CANCELLED BY WATER/);
+  assert.match(waterV12, /DEEP_WATER_GUARD_DEPTH/);
 });
 
 test("Start grid and safe exits retain earlier regression guards", () => {
@@ -184,6 +194,7 @@ test("Start grid and safe exits retain earlier regression guards", () => {
   assert.match(ladderV4, /HIGH_DECK_SIZE := Vector3\(10\.0, 0\.45, 10\.0\)/);
   assert.match(waterV7, /RECOVERY_PROTECTION_SECONDS: float = 0\.75/);
   assert.match(combatV2, /logspire_recovery_protection_until/);
+  assert.match(waterV12, /func _exit_position_clear/);
 });
 
 test("PlatformGraph API and global CharacterController remain isolated", () => {
