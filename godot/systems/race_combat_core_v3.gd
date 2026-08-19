@@ -16,6 +16,14 @@ const CONTROL_META_ACCEL: StringName = &"race_v3_acceleration_multiplier"
 const CONTROL_META_HANDLING: StringName = &"race_v3_handling_multiplier"
 const BODY_META_NEXT: StringName = &"race_v3_body_next"
 
+const ROUND1_ROCKET_KNOCKBACK_MULTIPLIER: float = 1.40
+const ROUND1_BOMB_INNER_IMPACT_MULTIPLIER: float = 1.45
+const ROUND1_BOMB_OUTER_IMPACT_MULTIPLIER: float = 1.20
+const ROUND1_BOMB_KNOCKBACK_MULTIPLIER: float = 1.20
+const ROUND1_TRAP_KNOCKBACK_MULTIPLIER: float = 1.20
+const ROUND1_BANANA_KNOCKBACK_MULTIPLIER: float = 1.25
+const ROUND1_MAX_ITEM_KNOCKBACK: float = 8.40
+
 func _ready() -> void:
 	super._ready()
 	if not ItemSystem.item_used.is_connected(_on_item_used_v3):
@@ -68,16 +76,19 @@ static func apply_race_impact(
 		return false
 	if attacker == victim:
 		return false
+
+	var round1_chain_scale: float = _round1_chain_scale_for(victim, source_id)
+	var effective_profile: WildDashRaceImpactProfile = _round1_tune_item_profile(profile, source_id, round1_chain_scale)
 	var shielded_before: bool = ItemSystem.has_shield(victim)
 	var effective_speed_multiplier: float = minf(
-		profile.slow_multiplier,
-		1.0 - clampf(profile.speed_loss_ratio, 0.0, 0.48)
+		effective_profile.slow_multiplier,
+		1.0 - clampf(effective_profile.speed_loss_ratio, 0.0, 0.48)
 	)
 	var applied: bool = ItemSystem.apply_attack(
 		victim,
 		attacker,
 		source_id,
-		profile.slow_duration,
+		effective_profile.slow_duration,
 		clampf(effective_speed_multiplier, 0.52, 1.0),
 		0.0
 	)
@@ -97,30 +108,102 @@ static func apply_race_impact(
 	if push_direction.length_squared() <= 0.001:
 		push_direction = -victim.global_transform.basis.z
 		push_direction.y = 0.0
-	victim.apply_knockback(push_direction.normalized(), clampf(profile.knockback, 0.0, 7.2))
-	if profile.air_pop > 0.0:
-		victim.velocity.y = maxf(victim.velocity.y, profile.air_pop)
+	var knockback_cap: float = ROUND1_MAX_ITEM_KNOCKBACK if _round1_item_source_active(source_id) else 7.2
+	victim.apply_knockback(push_direction.normalized(), clampf(effective_profile.knockback, 0.0, knockback_cap))
+	if effective_profile.air_pop > 0.0:
+		victim.velocity.y = maxf(victim.velocity.y, effective_profile.air_pop)
 
-	var control_duration: float = maxf(profile.stagger_duration, profile.slow_duration)
+	var control_duration: float = maxf(effective_profile.stagger_duration, effective_profile.slow_duration)
 	if control_duration > 0.0:
 		var until_seconds: float = Time.get_ticks_msec() * 0.001 + minf(control_duration, 1.5)
 		victim.set_meta(CONTROL_META_UNTIL, until_seconds)
-		victim.set_meta(CONTROL_META_YAW, clampf(profile.yaw_instability, 0.0, 0.85))
-		victim.set_meta(CONTROL_META_ACCEL, clampf(profile.acceleration_multiplier, 0.60, 1.0))
-		victim.set_meta(CONTROL_META_HANDLING, clampf(profile.handling_multiplier, 0.72, 1.0))
+		victim.set_meta(CONTROL_META_YAW, clampf(effective_profile.yaw_instability, 0.0, 0.85))
+		victim.set_meta(CONTROL_META_ACCEL, clampf(effective_profile.acceleration_multiplier, 0.60, 1.0))
+		victim.set_meta(CONTROL_META_HANDLING, clampf(effective_profile.handling_multiplier, 0.72, 1.0))
 
 	var visual: WildDashCharacterVisual = victim.get_visual()
 	if visual != null:
-		visual.play_action(&"Hit", clampf(maxf(0.22, profile.stagger_duration), 0.22, 0.72))
-	_spawn_impact_fx(victim, impact_origin, profile)
-	_try_camera_feedback(victim, profile.camera_strength)
+		visual.play_action(&"Hit", clampf(maxf(0.22, effective_profile.stagger_duration), 0.22, 0.72))
+	_spawn_impact_fx(victim, impact_origin, effective_profile)
+	_try_camera_feedback(victim, effective_profile.camera_strength)
 	_play_impact_audio(source_id, victim)
 	print("RACE IMPACT attacker=%s victim=%s source=%s impact=%s speed_loss=%.2f knockback=%.2f stagger=%.2f protection=%.2f" % [
 		_label_node(attacker), RaceManager.get_racer_label(victim), String(source_id),
-		String(profile.impact_label), profile.speed_loss_ratio, profile.knockback,
-		profile.stagger_duration, profile.protection_seconds,
+		String(effective_profile.impact_label), effective_profile.speed_loss_ratio, effective_profile.knockback,
+		effective_profile.stagger_duration, effective_profile.protection_seconds,
 	])
+	if _round1_item_source_active(source_id):
+		var direct_hit: int = 1 if source_id == &"rocket_nut" else 0
+		var area_hit: int = 1 if source_id == &"acorn_bomb" else 0
+		print("ROUND1 ITEM IMPACT PROFILE item_hit=1 effect=%s direct_hit=%d area_hit=%d knockback_applied=%.2f stagger_applied=%.2f chain_protection=%.2f multi_hit=%d" % [
+			String(source_id), direct_hit, area_hit, effective_profile.knockback,
+			effective_profile.stagger_duration, round1_chain_scale,
+			1 if round1_chain_scale < 0.999 else 0,
+		])
 	return true
+
+static func _round1_chain_scale_for(victim: WildDashCharacterController, source_id: StringName) -> float:
+	if not _round1_item_source_active(source_id) or victim == null:
+		return 1.0
+	if not ItemSystem.has_method("get_round1_chain_scale"):
+		return 1.0
+	return clampf(float(ItemSystem.call("get_round1_chain_scale", victim)), 0.25, 1.0)
+
+static func _round1_item_source_active(source_id: StringName) -> bool:
+	if GameManager.get_current_round_id() != &"grand_prix" or not RaceManager.active:
+		return false
+	return source_id in [&"rocket_nut", &"acorn_bomb", &"banana_peel", &"sticky_fruit"]
+
+static func _round1_tune_item_profile(
+	profile: WildDashRaceImpactProfile,
+	source_id: StringName,
+	chain_scale: float
+) -> WildDashRaceImpactProfile:
+	if not _round1_item_source_active(source_id):
+		return profile
+	var tuned: WildDashRaceImpactProfile = profile.copy_profile()
+	match source_id:
+		&"rocket_nut":
+			tuned.impact_strength *= ROUND1_ROCKET_KNOCKBACK_MULTIPLIER
+			tuned.knockback *= ROUND1_ROCKET_KNOCKBACK_MULTIPLIER
+			tuned.speed_loss_ratio = minf(0.34, tuned.speed_loss_ratio + 0.04)
+			tuned.slow_multiplier = minf(tuned.slow_multiplier, 1.0 - tuned.speed_loss_ratio)
+			tuned.slow_duration = minf(tuned.slow_duration, 0.65)
+			tuned.stagger_duration = minf(0.62, tuned.stagger_duration + 0.04)
+			tuned.camera_strength = minf(0.25, tuned.camera_strength * 1.15)
+		&"acorn_bomb":
+			var inner: bool = tuned.impact_label == &"HEAVY"
+			tuned.impact_strength *= ROUND1_BOMB_INNER_IMPACT_MULTIPLIER if inner else ROUND1_BOMB_OUTER_IMPACT_MULTIPLIER
+			tuned.knockback *= ROUND1_BOMB_KNOCKBACK_MULTIPLIER
+			tuned.speed_loss_ratio = clampf(tuned.speed_loss_ratio * (1.10 if inner else 1.05), 0.0, 0.45)
+			tuned.slow_multiplier = minf(tuned.slow_multiplier, 1.0 - tuned.speed_loss_ratio)
+			tuned.slow_duration = minf(tuned.slow_duration, 0.82 if inner else 0.68)
+			tuned.air_pop *= 1.15 if inner else 1.0
+			tuned.camera_strength = minf(0.28, tuned.camera_strength * 1.15)
+		&"banana_peel":
+			tuned.impact_strength *= 1.15
+			tuned.knockback *= ROUND1_BANANA_KNOCKBACK_MULTIPLIER
+			tuned.speed_loss_ratio = minf(0.40, tuned.speed_loss_ratio + 0.02)
+			tuned.slow_multiplier = minf(tuned.slow_multiplier, 1.0 - tuned.speed_loss_ratio)
+			tuned.slow_duration = minf(tuned.slow_duration, 0.72)
+			tuned.stagger_duration = minf(tuned.stagger_duration, 0.66)
+		&"sticky_fruit":
+			tuned.impact_strength *= 1.10
+			tuned.knockback *= ROUND1_TRAP_KNOCKBACK_MULTIPLIER
+			tuned.speed_loss_ratio = minf(0.29, tuned.speed_loss_ratio + 0.03)
+			tuned.slow_multiplier = minf(tuned.slow_multiplier, 1.0 - tuned.speed_loss_ratio)
+			tuned.slow_duration = minf(tuned.slow_duration, 1.10)
+			tuned.stagger_duration = minf(tuned.stagger_duration, 0.34)
+
+	if chain_scale < 0.999:
+		tuned.knockback *= chain_scale
+		tuned.impact_strength *= lerpf(0.70, 1.0, chain_scale)
+		tuned.stagger_duration *= maxf(0.35, chain_scale)
+		tuned.slow_duration *= maxf(0.45, chain_scale)
+		tuned.yaw_instability *= maxf(0.45, chain_scale)
+		tuned.air_pop *= maxf(0.45, chain_scale)
+		tuned.camera_strength *= maxf(0.55, chain_scale)
+	return tuned
 
 static func build_body_check_profile(
 	attacker: WildDashCharacterController,
