@@ -11,7 +11,7 @@ extends "res://modes/grand_prix/grand_prix_v2_mode.gd"
 ##
 ## DENSITY PASS:
 ## - 14 progress-sampled stations replace the previous 11-station layout.
-## - Start, Rally Straight and Final Straight are high-density battle stations.
+## - Meadow Straight, Rally Straight and Final Straight are high-density battle stations.
 ## - Battle stations scale to 6 / 7 / 8 boxes for 10 / 15 / 18 racer fields.
 ## - Long Downhill + River Approach and Tunnel stay clear of new item stations.
 ## - Normal stations preserve three readable Left / Center / Right choices.
@@ -22,10 +22,10 @@ extends "res://modes/grand_prix/grand_prix_v2_mode.gd"
 ## - Avoid Dictionary -> Variant -> Vector3 casts in the station sampler.
 
 const ITEM_STATION_PROGRESS: Array[float] = [
-	0.055, 0.115, 0.165, 0.225, 0.285, 0.345, 0.395,
+	0.025, 0.085, 0.145, 0.215, 0.265, 0.345, 0.395,
 	0.520, 0.585, 0.650, 0.710, 0.800, 0.910, 0.975,
 ]
-const WIDE_STATION_PROGRESS: Array[float] = [0.055, 0.345, 0.975]
+const WIDE_STATION_PROGRESS: Array[float] = [0.025, 0.345, 0.975]
 const DISTANCE_ITEM_BOX_LANE_OFFSETS: Array[float] = [-3.2, 0.0, 3.2]
 const DENSITY_ITEM_BOX_LANES_LOW: Array[float] = [-4.4, -2.2, 0.0, 2.2, 4.4]
 const DENSITY_ITEM_BOX_LANES_10: Array[float] = [-5.0, -3.0, -1.0, 1.0, 3.0, 5.0]
