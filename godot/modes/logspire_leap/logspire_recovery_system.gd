@@ -22,7 +22,7 @@ func configure(world: Node, graph: Node) -> void:
 				continue
 			if not area.body_entered.is_connected(_on_recovery_area_body_entered):
 				area.body_entered.connect(_on_recovery_area_body_entered.bind(area))
-	print("LOGSPIRE RECOVERY READY delay=%.2fs absolute_fall_y=%.1f latest_checkpoint_authority=true water_handoff=true stale_timer_guard=true" % [RECOVERY_DELAY_SECONDS, ABSOLUTE_FALL_Y])
+	print("LOGSPIRE RECOVERY READY delay=%.2fs absolute_fall_y=%.1f latest_checkpoint_authority=true water_handoff=true stale_timer_guard=true safe_exit_guard=true" % [RECOVERY_DELAY_SECONDS, ABSOLUTE_FALL_Y])
 
 func set_water_recovery(value: Node) -> void:
 	_water_recovery = value
@@ -143,6 +143,7 @@ func _recover_after_delay(racer: WildDashCharacterController, target_id: StringN
 	var target_position: Vector3 = position_value if position_value is Vector3 else Vector3.ZERO
 	var forward_value: Variant = _graph.call("get_platform_forward", target_id, &"safe")
 	var forward: Vector3 = forward_value if forward_value is Vector3 else Vector3.FORWARD
+	_qa_set_state(racer, &"RECOVERY", "checkpoint_recovery")
 	racer.reset_motion(target_position + Vector3.UP * 1.20)
 	if forward.length_squared() > 0.001:
 		forward.y = 0.0
@@ -150,10 +151,28 @@ func _recover_after_delay(racer: WildDashCharacterController, target_id: StringN
 		racer.rotation.y = atan2(-forward.x, -forward.z)
 	racer.current_speed = maxf(racer.current_speed, racer.cruise_speed * 0.72)
 	_pending.erase(racer_id)
-	print("LOGSPIRE RECOVERY racer=%s target=%s delay=%.2fs token=%d" % [
+	_qa_set_state(racer, &"SAFE_EXIT", "checkpoint_recovery")
+	_qa_release_safe_exit_after_frame(racer_id)
+	print("LOGSPIRE RECOVERY racer=%s target=%s delay=%.2fs token=%d safe_exit_guard=true" % [
 		RaceManager.get_racer_label(racer),
 		String(target_id),
 		RECOVERY_DELAY_SECONDS,
 		token,
 	])
 	racer_recovered.emit(racer, target_id)
+
+func _qa_set_state(racer: WildDashCharacterController, state: StringName, source: String) -> void:
+	var mode := get_parent()
+	if mode != null and mode.has_method("reliability_set_motion_state"):
+		mode.call("reliability_set_motion_state", racer, state, source)
+
+func _qa_release_safe_exit_after_frame(racer_id: int) -> void:
+	await get_tree().physics_frame
+	for racer_value: Variant in RaceManager.racers:
+		var racer := racer_value as WildDashCharacterController
+		if racer == null or not is_instance_valid(racer) or racer.get_instance_id() != racer_id:
+			continue
+		if _water_should_handle(racer):
+			return
+		_qa_set_state(racer, &"NORMAL" if racer.is_on_floor() else &"AIRBORNE", "checkpoint_safe_exit_complete")
+		return
