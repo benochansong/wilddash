@@ -109,6 +109,7 @@ func _finish_assisted_recovery(racer: WildDashCharacterController, exit_position
 		_qa_record_metric(&"root_success", racer, zone)
 	elif kind in [&"ladder_align", &"ladder_climb", &"ladder_exit"]:
 		_qa_record_metric(&"ladder_success", racer, zone)
+	_request_retry_grace(racer, "assisted_recovery_exit")
 	_qa_begin_safe_exit(racer, "assisted_recovery")
 
 func _finish_water_recovery(racer: WildDashCharacterController) -> void:
@@ -123,6 +124,7 @@ func _finish_water_recovery(racer: WildDashCharacterController) -> void:
 		return
 	if kind in [&"ladder_align", &"ladder_climb", &"ladder_exit"]:
 		_qa_record_metric(&"ladder_success", racer, zone)
+	_request_retry_grace(racer, "water_recovery_exit")
 	_qa_begin_safe_exit(racer, "water_recovery")
 
 func _handle_recovery_stuck(racer: WildDashCharacterController) -> void:
@@ -135,6 +137,18 @@ func _clear_reliability_runtime(racer_id: int) -> void:
 	_deep_water_elapsed_by_id.erase(racer_id)
 	_deep_water_fail_recorded_by_id.erase(racer_id)
 	super(racer_id)
+
+func _request_retry_grace(racer: WildDashCharacterController, source: String) -> void:
+	if racer == null or not is_instance_valid(racer):
+		return
+	var recovery_system := get_parent().get_node_or_null("RecoverySystem")
+	if recovery_system != null and recovery_system.has_method("begin_retry_grace"):
+		recovery_system.call("begin_retry_grace", racer, source)
+		return
+	# Fallback keeps exits safe even if the sibling recovery system is unavailable.
+	racer.current_speed = 0.0
+	racer.velocity.x = 0.0
+	racer.velocity.z = 0.0
 
 func _qa_begin_safe_exit(racer: WildDashCharacterController, source: String) -> void:
 	if racer == null or not is_instance_valid(racer):
