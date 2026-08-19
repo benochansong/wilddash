@@ -11,6 +11,7 @@ const rumbleScene = readFileSync("godot/modes/push_out/push_out.tscn", "utf8");
 const r1 = readFileSync("godot/modes/grand_prix/grand_prix_v7_wild_moments.gd", "utf8");
 const r2 = readFileSync("godot/modes/fruit_collection/fruit_frenzy_v18_wild_moments.gd", "utf8");
 const r3 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v11_wild_moments.gd", "utf8");
+const r3Integrated = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v13_integrated_qa.gd", "utf8");
 const r3Authority = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v12_reliability_authority.gd", "utf8");
 const r4 = readFileSync("godot/modes/push_out/wild_rumble_round4_wild_moments.gd", "utf8");
 
@@ -38,11 +39,12 @@ test("Replay Lite keeps only recent transforms at 10Hz for player plus four near
   assert.doesNotMatch(resultManager, /get_viewport\(\)\.get_texture|Image\.save|capture.*frame/i);
 });
 
-test("production highlights remain wired while Round 3 prioritizes the reliability authority", () => {
+test("production highlights remain wired while Round 3 prioritizes the V13 guard over reliability authority", () => {
   assert.match(grandScene, /grand_prix_v7_wild_moments\.gd/);
   assert.match(fruitScene, /fruit_frenzy_v18_wild_moments\.gd/);
   assert.match(rumbleScene, /wild_rumble_round4_wild_moments\.gd/);
-  assert.match(logspireScene, /logspire_water_recovery_v12_reliability_authority\.gd/);
+  assert.match(logspireScene, /logspire_water_recovery_v13_integrated_qa\.gd/);
+  assert.match(r3Integrated, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v12_reliability_authority\.gd"/);
   assert.doesNotMatch(logspireScene, /logspire_water_recovery_v11_wild_moments\.gd/);
   assert.match(logspireScene, /P0 CAMPAIGN-SAFE ROUND 3/);
   assert.match(r1, /extends "res:\/\/modes\/grand_prix\/grand_prix_v6_item_fairness\.gd"/);
