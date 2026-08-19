@@ -14,7 +14,9 @@ function floatArray(source, name) {
   assert.ok(match, `missing ${name}`);
   return match[1]
     .split(",")
-    .map((value) => Number(value.trim()))
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0)
+    .map(Number)
     .filter((value) => Number.isFinite(value));
 }
 
@@ -36,7 +38,7 @@ function densityGain(count) {
 test("Round 1 expands progress-sampled item stations while keeping danger sections clear", () => {
   assert.equal(stations.length, 14);
   assert.equal(battleStations.length, 3);
-  assert.equal(stations[0], 0.055);
+  assert.equal(stations[0], 0.025);
   assert.equal(stations.at(-1), 0.975);
 
   const gaps = stations.slice(1).map((value, index) => value - stations[index]);
@@ -47,6 +49,7 @@ test("Round 1 expands progress-sampled item stations while keeping danger sectio
     assert.ok(progress < 0.862 || progress > 0.899, `station ${progress} entered Tunnel danger window`);
   }
 
+  assert.match(track, /"Meadow Straight", "First Bend", "Forest Run"/);
   assert.match(track, /"Long Downhill", "River Approach", "River Bridge"/);
   assert.match(track, /"Tunnel", "Final S Curve", "Final Chicane", "Final Straight"/);
   assert.match(distribution, /DANGER_PROGRESS_WINDOWS/);
@@ -72,11 +75,12 @@ test("10, 15 and 18 racer fields receive roughly 40 to 60 percent more boxes", (
   assert.match(distribution, /density_gain=%.1f%%/);
 });
 
-test("start, Rally Straight and Final Straight use dense battle stations with staggered opening rows", () => {
-  assert.deepEqual(battleStations, [0.055, 0.345, 0.975]);
+test("Meadow Straight, Rally Straight and Final Straight use dense battle stations with staggered opening rows", () => {
+  assert.deepEqual(battleStations, [0.025, 0.345, 0.975]);
   assert.match(distribution, /START_STAGGER_METERS: float = 1\.35/);
   assert.match(distribution, /_station_longitudinal_stagger/);
   assert.match(distribution, /lane_index % 2 == 0/);
+  assert.match(track, /"Meadow Straight"/);
   assert.match(track, /"Rally Straight"/);
   assert.match(track, /"Final Straight"/);
 });
