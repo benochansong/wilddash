@@ -5,14 +5,16 @@ import fs from 'node:fs';
 const read = (path) => fs.readFileSync(path, 'utf8');
 
 const scene = read('godot/modes/logspire_leap/logspire_leap.tscn');
+const integrated = read('godot/modes/logspire_leap/logspire_water_recovery_v13_integrated_qa.gd');
 const authority = read('godot/modes/logspire_leap/logspire_water_recovery_v12_reliability_authority.gd');
 const v10 = read('godot/modes/logspire_leap/logspire_water_recovery_v10_surface_collision_guard.gd');
 const swim = read('godot/modes/logspire_leap/logspire_swim_controller.gd');
 const jump = read('godot/modes/logspire_leap/logspire_jump_rebalance_v2_phase_b.gd');
 const mobility = read('godot/modes/logspire_leap/logspire_mobility_assist.gd');
 
-test('Round 3 activates the reliability authority while preserving V10 as its proven base', () => {
-  assert.match(scene, /logspire_water_recovery_v12_reliability_authority\.gd/);
+test('Round 3 activates the V13 integrated guard over the proven V12/V10 recovery authority', () => {
+  assert.match(scene, /logspire_water_recovery_v13_integrated_qa\.gd/);
+  assert.match(integrated, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v12_reliability_authority\.gd"/);
   assert.match(authority, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v10_surface_collision_guard\.gd"/);
   assert.match(v10, /VINE_RESCUE_TRIGGER_SECONDS/);
   assert.match(v10, /STAIR_AUTO_ATTACH_RADIUS/);
@@ -26,6 +28,7 @@ test('WaterRecovery is the single vertical authority while swimming', () => {
   assert.doesNotMatch(swim, /SURFACE_BODY_OFFSET|SURFACE_LOCK_TOLERANCE|move_and_collide\(Vector3\.UP/);
   assert.match(swim, /WaterRecovery is the single Y-axis authority/);
   assert.match(swim, /racer\.velocity\.y = 0\.0/);
+  assert.match(integrated, /RECOVERY.*SAFE_EXIT/s);
 });
 
 test('deep water is reacquired before basin-floor walking can become normal movement', () => {
@@ -35,6 +38,8 @@ test('deep water is reacquired before basin-floor walking can become normal move
   assert.match(authority, /reason=deep_guard/);
   assert.match(authority, /LOGSPIRE SURFACE REACQUIRE/);
   assert.match(authority, /LOGSPIRE SURFACE BLOCKED/);
+  assert.match(integrated, /DEEP_WATER_FAIL_SECONDS: float = 0\.75/);
+  assert.match(integrated, /deep_water_fail/);
 });
 
 test('normal recovery priority is Root then Ladder then inherited Vine fail-safe', () => {
@@ -59,20 +64,25 @@ test('Root and Ladder traversal require clearance and blocked targets cannot loo
   assert.match(authority, /LOGSPIRE RECOVERY EXIT CLEAR/);
   assert.match(authority, /_blocked_targets_by_id/);
   assert.match(authority, /LOGSPIRE RECOVERY RETARGET/);
+  assert.match(integrated, /_qa_begin_safe_exit/);
+  assert.match(integrated, /await get_tree\(\)\.physics_frame/);
 });
 
-test('jump and landing assists yield before base processing while WaterRecovery owns the player', () => {
+test('jump and landing assists yield before base processing while WaterRecovery or SAFE_EXIT owns the player', () => {
+  const authorityGuard = jump.indexOf('\n\tif not _authority_allows_jump_assist(player):');
   const waterGuard = jump.indexOf('\n\tif _is_player_water_recovering(player):');
   const superCall = jump.indexOf('\n\tsuper(delta)');
-  assert.ok(waterGuard >= 0 && superCall >= 0 && waterGuard < superCall);
+  assert.ok(authorityGuard >= 0 && waterGuard > authorityGuard && superCall > waterGuard);
+  assert.match(jump, /should_handle_racer/);
   assert.match(jump, /_landing_correction_used = 0\.0/);
   assert.match(jump, /_jump_buffer_remaining = 0\.0/);
-  assert.match(mobility, /if _is_player_water_recovering\(player\):/);
+  assert.match(mobility, /_authority_allows_jump_assist\(player\)/);
   assert.match(mobility, /_reset_player_jump_assist_state\(\)/);
 });
 
 test('reliability pass does not rebalance global jump power, difficulty or graphics', () => {
+  assert.doesNotMatch(integrated, /jump_velocity\s*=/);
   assert.doesNotMatch(authority, /jump_velocity\s*=/);
-  assert.doesNotMatch(authority, /difficulty\s*=/i);
-  assert.doesNotMatch(authority, /GraphicsPhase|WorldArt|RoundVFX/);
+  assert.doesNotMatch(integrated, /difficulty\s*=/i);
+  assert.doesNotMatch(integrated, /GraphicsPhase|WorldArt|RoundVFX/);
 });
