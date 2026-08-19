@@ -22,7 +22,7 @@ func configure(world: Node, graph: Node) -> void:
 				continue
 			if not area.body_entered.is_connected(_on_recovery_area_body_entered):
 				area.body_entered.connect(_on_recovery_area_body_entered.bind(area))
-	print("LOGSPIRE RECOVERY READY delay=%.2fs absolute_fall_y=%.1f latest_checkpoint_authority=true water_handoff=true stale_timer_guard=true safe_exit_guard=true" % [RECOVERY_DELAY_SECONDS, ABSOLUTE_FALL_Y])
+	print("LOGSPIRE RECOVERY READY delay=%.2fs absolute_fall_y=%.1f latest_checkpoint_authority=true water_handoff=true stale_timer_guard=true safe_exit_guard=true pending_authority=true" % [RECOVERY_DELAY_SECONDS, ABSOLUTE_FALL_Y])
 
 func set_water_recovery(value: Node) -> void:
 	_water_recovery = value
@@ -35,7 +35,8 @@ func cancel_pending_for_water(racer: WildDashCharacterController) -> void:
 	if not _pending.has(racer_id):
 		return
 	_pending.erase(racer_id)
-	print("LOGSPIRE RECOVERY CANCELLED FOR WATER racer=%s stale_timer_invalidated=true" % RaceManager.get_racer_label(racer))
+	_qa_set_state(racer, &"WATER", "checkpoint_cancelled_for_water")
+	print("LOGSPIRE RECOVERY CANCELLED FOR WATER racer=%s stale_timer_invalidated=true authority=WATER" % RaceManager.get_racer_label(racer))
 
 func force_checkpoint_recovery(racer: WildDashCharacterController, source: String = "forced") -> void:
 	if racer == null or racer.finished or _graph == null:
@@ -117,7 +118,10 @@ func _queue_recovery(racer: WildDashCharacterController, target_id: StringName, 
 	_recovery_token_counter += 1
 	var token: int = _recovery_token_counter
 	_pending[racer_id] = token
-	print("LOGSPIRE FALL racer=%s source=%s checkpoint=%d target=%s token=%d" % [
+	# Claim recovery authority as soon as the bounded delay starts. This prevents
+	# jump/landing helpers from becoming another transform writer on the reset frame.
+	_qa_set_state(racer, &"RECOVERY", "checkpoint_recovery_pending")
+	print("LOGSPIRE FALL racer=%s source=%s checkpoint=%d target=%s token=%d authority=RECOVERY" % [
 		RaceManager.get_racer_label(racer),
 		source,
 		RaceManager.get_checkpoint_progress(racer),
@@ -137,7 +141,8 @@ func _recover_after_delay(racer: WildDashCharacterController, target_id: StringN
 		return
 	if _water_should_handle(racer):
 		_pending.erase(racer_id)
-		print("LOGSPIRE RECOVERY TIMER CANCELLED BY WATER racer=%s token=%d ladder_priority=true" % [RaceManager.get_racer_label(racer), token])
+		_qa_set_state(racer, &"WATER", "checkpoint_timer_cancelled_for_water")
+		print("LOGSPIRE RECOVERY TIMER CANCELLED BY WATER racer=%s token=%d ladder_priority=true authority=WATER" % [RaceManager.get_racer_label(racer), token])
 		return
 	var position_value: Variant = _graph.call("get_platform_position", target_id)
 	var target_position: Vector3 = position_value if position_value is Vector3 else Vector3.ZERO
