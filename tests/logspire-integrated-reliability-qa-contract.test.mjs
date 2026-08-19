@@ -6,20 +6,27 @@ const read = (path) => readFileSync(path, 'utf8');
 
 const scene = read('godot/modes/logspire_leap/logspire_leap.tscn');
 const mode = read('godot/modes/logspire_leap/logspire_leap_v4_phase_b.gd');
+const waterV15 = read('godot/modes/logspire_leap/logspire_water_recovery_v15_vine_only.gd');
+const waterV14 = read('godot/modes/logspire_leap/logspire_water_recovery_v14_safe_vine_reentry.gd');
 const waterV13 = read('godot/modes/logspire_leap/logspire_water_recovery_v13_integrated_qa.gd');
 const waterV12 = read('godot/modes/logspire_leap/logspire_water_recovery_v12_reliability_authority.gd');
 const waterV10 = read('godot/modes/logspire_leap/logspire_water_recovery_v10_surface_collision_guard.gd');
 const jump = read('godot/modes/logspire_leap/logspire_jump_rebalance_v2_phase_b.gd');
+const jumpV3 = read('godot/modes/logspire_leap/logspire_jump_rebalance_v3_titan_tree_accessibility.gd');
 const mobility = read('godot/modes/logspire_leap/logspire_mobility_assist.gd');
 const recovery = read('godot/modes/logspire_leap/logspire_recovery_system.gd');
 const audit = read('godot/modes/logspire_leap/logspire_jump_collision_reliability.gd');
 const phase3 = read('godot/modes/logspire_leap/logspire_phase3_director_v4_major_collision.gd');
 const gameManager = read('godot/scripts/game_manager.gd');
 
-test('R3 integrated QA is a thin guard over the proven water authority', () => {
-  assert.match(scene, /logspire_water_recovery_v13_integrated_qa\.gd/);
+test('R3 integrated QA keeps proven recovery authority under safe Vine-only production adapters', () => {
+  assert.match(scene, /logspire_water_recovery_v15_vine_only\.gd/);
+  assert.match(waterV15, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v14_safe_vine_reentry\.gd"/);
+  assert.match(waterV14, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v13_integrated_qa\.gd"/);
   assert.match(waterV13, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v12_reliability_authority\.gd"/);
   assert.match(waterV12, /logspire_water_recovery_v10_surface_collision_guard\.gd/);
+  assert.match(scene, /logspire_jump_rebalance_v3_titan_tree_accessibility\.gd/);
+  assert.match(jumpV3, /logspire_jump_rebalance_v2_phase_b\.gd/);
   assert.doesNotMatch(waterV13, /jump_velocity\s*=/);
   assert.doesNotMatch(waterV13, /difficulty\s*=/i);
   assert.doesNotMatch(waterV13, /GraphicsPhase|WorldArt|RoundVFX/);
