@@ -1,12 +1,12 @@
 [gd_scene load_steps=16 format=3]
 
-# P0 CAMPAIGN-SAFE ROUND 3
-# Phase B mode inherits res://modes/logspire_leap/logspire_leap_v3_recovery_camera.gd
-# Phase B combat inherits res://modes/logspire_leap/logspire_combat_safety_v2_recovery_protection.gd
-# Keep Phase A/B gameplay and stable recovery/collision layers load-critical.
-# Graphics Phase 2/3 and the Wild Moments water adapter remain source-only.
-# Water V13 adds integrated QA/state guards on top of the proven V12/V10 authority.
-# JumpCollisionAudit runs only after the final geometry/collision layers exist.
+; P0 CAMPAIGN-SAFE ROUND 3
+; Phase B mode inherits res://modes/logspire_leap/logspire_leap_v3_recovery_camera.gd
+; Phase B combat inherits res://modes/logspire_leap/logspire_combat_safety_v2_recovery_protection.gd
+; Keep Phase A/B gameplay and stable recovery/collision layers load-critical.
+; Graphics Phase 2/3 and the Wild Moments water adapter remain source-only.
+; Water V13 adds integrated QA/state guards on top of the proven V12/V10 authority.
+; JumpCollisionAudit runs only after the final geometry/collision layers exist.
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_leap_v4_phase_b.gd" id="1_mode"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_world_v2_deep_water.gd" id="2_world"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_rebalance_v2_phase_b.gd" id="2b_jump_rebalance"]
