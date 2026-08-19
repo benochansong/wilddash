@@ -37,6 +37,19 @@ test('deep water is reacquired before basin-floor walking can become normal move
   assert.match(authority, /LOGSPIRE SURFACE BLOCKED/);
 });
 
+test('normal recovery priority is Root then Ladder then inherited Vine fail-safe', () => {
+  const swimStart = authority.indexOf('func _update_swimming');
+  const surfaceStart = authority.indexOf('func _enforce_surface_lock');
+  const swimBody = authority.slice(swimStart, surfaceStart);
+  assert.ok(swimStart >= 0 && surfaceStart > swimStart);
+  assert.match(swimBody, /recovery_type == TARGET_ROOT/);
+  assert.match(swimBody, /recovery_type == TARGET_LADDER/);
+  assert.doesNotMatch(swimBody, /TARGET_JUMP_OUT/);
+  assert.doesNotMatch(swimBody, /super\(racer, delta\)/);
+  assert.match(authority, /strict_priority=ROOT_LADDER_VINE/);
+  assert.match(v10, /VINE_RESCUE_TRIGGER_SECONDS: float = 4\.80/);
+});
+
 test('Root and Ladder traversal require clearance and blocked targets cannot loop', () => {
   assert.match(authority, /func _recovery_target_clear/);
   assert.match(authority, /func _exit_position_clear/);
