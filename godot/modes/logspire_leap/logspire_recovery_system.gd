@@ -4,6 +4,11 @@ signal racer_recovered(racer: WildDashCharacterController, target_id: StringName
 
 const RECOVERY_DELAY_SECONDS: float = 0.90
 const ABSOLUTE_FALL_Y: float = -18.0
+const RECOVERY_SPAWN_HEIGHT: float = 1.24
+const RECOVERY_RUNWAY_BACKOFF_MIN: float = 0.80
+const RECOVERY_RUNWAY_BACKOFF_MAX: float = 1.60
+const RECOVERY_RETRY_GRACE_SECONDS: float = 1.25
+const RECOVERY_RETRY_GRACE_META: StringName = &"logspire_retry_grace_until"
 
 var _world: Node
 var _graph: Node
@@ -22,7 +27,7 @@ func configure(world: Node, graph: Node) -> void:
 				continue
 			if not area.body_entered.is_connected(_on_recovery_area_body_entered):
 				area.body_entered.connect(_on_recovery_area_body_entered.bind(area))
-	print("LOGSPIRE RECOVERY READY delay=%.2fs absolute_fall_y=%.1f latest_checkpoint_authority=true water_handoff=true stale_timer_guard=true safe_exit_guard=true pending_authority=true" % [RECOVERY_DELAY_SECONDS, ABSOLUTE_FALL_Y])
+	print("LOGSPIRE RECOVERY READY delay=%.2fs absolute_fall_y=%.1f latest_checkpoint_authority=true water_handoff=true stale_timer_guard=true safe_exit_guard=true pending_authority=true retry_grace=%.2fs" % [RECOVERY_DELAY_SECONDS, ABSOLUTE_FALL_Y, RECOVERY_RETRY_GRACE_SECONDS])
 
 func set_water_recovery(value: Node) -> void:
 	_water_recovery = value
@@ -50,12 +55,27 @@ func force_checkpoint_recovery(racer: WildDashCharacterController, source: Strin
 	var target_id: StringName = _latest_checkpoint_target(racer)
 	_queue_recovery(racer, target_id, source)
 
+func begin_retry_grace(racer: WildDashCharacterController, source: String = "recovery") -> void:
+	if racer == null or not is_instance_valid(racer) or racer.finished:
+		return
+	var until: float = Time.get_ticks_msec() * 0.001 + RECOVERY_RETRY_GRACE_SECONDS
+	racer.set_meta(RECOVERY_RETRY_GRACE_META, until)
+	racer.current_speed = 0.0
+	racer.velocity.x = 0.0
+	racer.velocity.z = 0.0
+	print("LOGSPIRE RETRY GRACE racer=%s source=%s duration=%.2fs auto_forward_suppressed=true" % [
+		RaceManager.get_racer_label(racer), source, RECOVERY_RETRY_GRACE_SECONDS,
+	])
+
 func _physics_process(_delta: float) -> void:
 	if _graph == null or not RaceManager.active:
 		return
 	for racer_value: Variant in RaceManager.racers.duplicate():
 		var racer := racer_value as WildDashCharacterController
-		if racer == null or racer.finished or racer.global_position.y >= ABSOLUTE_FALL_Y:
+		if racer == null or not is_instance_valid(racer) or racer.finished:
+			continue
+		_enforce_retry_grace(racer)
+		if racer.global_position.y >= ABSOLUTE_FALL_Y:
 			continue
 		if _water_should_handle(racer):
 			cancel_pending_for_water(racer)
@@ -148,23 +168,52 @@ func _recover_after_delay(racer: WildDashCharacterController, target_id: StringN
 	var target_position: Vector3 = position_value if position_value is Vector3 else Vector3.ZERO
 	var forward_value: Variant = _graph.call("get_platform_forward", target_id, &"safe")
 	var forward: Vector3 = forward_value if forward_value is Vector3 else Vector3.FORWARD
-	_qa_set_state(racer, &"RECOVERY", "checkpoint_recovery")
-	racer.reset_motion(target_position + Vector3.UP * 1.20)
-	if forward.length_squared() > 0.001:
+	if forward.length_squared() <= 0.001:
+		forward = Vector3.FORWARD
+	else:
 		forward.y = 0.0
 		forward = forward.normalized()
-		racer.rotation.y = atan2(-forward.x, -forward.z)
-	racer.current_speed = maxf(racer.current_speed, racer.cruise_speed * 0.72)
+	var landing_radius: float = 4.0
+	if _graph.has_method("get_landing_radius"):
+		landing_radius = maxf(3.0, float(_graph.call("get_landing_radius", target_id)))
+	var runway_backoff: float = clampf(landing_radius * 0.24, RECOVERY_RUNWAY_BACKOFF_MIN, RECOVERY_RUNWAY_BACKOFF_MAX)
+	var safe_spawn: Vector3 = target_position - forward * runway_backoff + Vector3.UP * RECOVERY_SPAWN_HEIGHT
+	_qa_set_state(racer, &"RECOVERY", "checkpoint_recovery")
+	racer.reset_motion(safe_spawn)
+	racer.rotation.y = atan2(-forward.x, -forward.z)
+	racer.current_speed = 0.0
+	racer.velocity.x = 0.0
+	racer.velocity.z = 0.0
+	begin_retry_grace(racer, "checkpoint_recovery")
 	_pending.erase(racer_id)
 	_qa_set_state(racer, &"SAFE_EXIT", "checkpoint_recovery")
 	_qa_release_safe_exit_after_frame(racer_id)
-	print("LOGSPIRE RECOVERY racer=%s target=%s delay=%.2fs token=%d safe_exit_guard=true" % [
+	print("LOGSPIRE RECOVERY racer=%s target=%s delay=%.2fs token=%d safe_exit_guard=true spawn=center_backoff backoff=%.2fm retry_grace=%.2fs" % [
 		RaceManager.get_racer_label(racer),
 		String(target_id),
 		RECOVERY_DELAY_SECONDS,
 		token,
+		runway_backoff,
+		RECOVERY_RETRY_GRACE_SECONDS,
 	])
 	racer_recovered.emit(racer, target_id)
+
+func _enforce_retry_grace(racer: WildDashCharacterController) -> void:
+	if racer == null or not is_instance_valid(racer) or not racer.has_meta(RECOVERY_RETRY_GRACE_META):
+		return
+	var until: float = float(racer.get_meta(RECOVERY_RETRY_GRACE_META, 0.0))
+	var now: float = Time.get_ticks_msec() * 0.001
+	if now >= until:
+		racer.remove_meta(RECOVERY_RETRY_GRACE_META)
+		print("LOGSPIRE RETRY GRACE COMPLETE racer=%s control_returned=true" % RaceManager.get_racer_label(racer))
+		return
+	# The race controller normally accelerates toward cruise speed even without
+	# throttle. Resetting horizontal motion every frame during this short grace
+	# gives the player time to read the platform and aim the next jump instead of
+	# immediately walking off the recovery deck again.
+	racer.current_speed = 0.0
+	racer.velocity.x = 0.0
+	racer.velocity.z = 0.0
 
 func _qa_set_state(racer: WildDashCharacterController, state: StringName, source: String) -> void:
 	var mode := get_parent()
