@@ -6,11 +6,13 @@ const scene = readFileSync("godot/modes/logspire_leap/logspire_leap.tscn", "utf8
 const mode = readFileSync("godot/modes/logspire_leap/logspire_leap_v4_phase_b.gd", "utf8");
 const ai = readFileSync("godot/modes/logspire_leap/logspire_platform_ai_v5_phase_b.gd", "utf8");
 const playerAssist = readFileSync("godot/modes/logspire_leap/logspire_jump_rebalance_v2_phase_b.gd", "utf8");
+const titanAssist = readFileSync("godot/modes/logspire_leap/logspire_jump_rebalance_v3_titan_tree_accessibility.gd", "utf8");
 const combat = readFileSync("godot/modes/logspire_leap/logspire_combat_safety_v3_phase_b.gd", "utf8");
 
-test("Phase B scene wires crowd AI, player ledge catch and landing protection", () => {
+test("Phase B scene wires crowd AI, inherited player ledge catch and Titan accessibility", () => {
   assert.match(scene, /logspire_leap_v4_phase_b\.gd/);
-  assert.match(scene, /logspire_jump_rebalance_v2_phase_b\.gd/);
+  assert.match(scene, /logspire_jump_rebalance_v3_titan_tree_accessibility\.gd/);
+  assert.match(titanAssist, /extends "res:\/\/modes\/logspire_leap\/logspire_jump_rebalance_v2_phase_b\.gd"/);
   assert.match(scene, /logspire_combat_safety_v3_phase_b\.gd/);
   assert.match(mode, /logspire_platform_ai_v5_phase_b\.gd/);
 });
