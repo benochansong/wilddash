@@ -40,6 +40,7 @@ test("Player near-misses get bounded ledge catch while water recovery remains au
   assert.match(playerAssist, /LEDGE_CATCH_EXTRA_RANGE: float = 0\.85/);
   assert.match(playerAssist, /LEDGE_CATCH_MAX_BELOW_TOP: float = 1\.45/);
   assert.match(playerAssist, /_is_player_water_recovering/);
+  assert.match(playerAssist, /_authority_allows_jump_assist/);
   assert.match(playerAssist, /move_and_collide\(motion\)/);
 });
 
@@ -50,9 +51,12 @@ test("crowded landings suppress only the dangerous first knockback window", () =
   assert.match(combat, /body_check_preserved=true/);
 });
 
-test("AI fall and completion telemetry support 15 and 18 racer manual validation", () => {
+test("AI fall and completion telemetry support 10, 15 and 18 racer validation", () => {
   assert.match(ai, /LOGSPIRE AI FALL REPORT/);
+  assert.match(mode, /QA_RACER_COUNTS: Array\[int\] = \[10, 15, 18\]/);
   assert.match(mode, /LOGSPIRE AI COMPLETION REPORT/);
+  assert.match(mode, /LOGSPIRE R3 QA PROFILE/);
+  assert.match(mode, /expected=10\|15\|18/);
   assert.match(mode, /zone1_success_target=97-100%%/);
   assert.match(mode, /zone2_success_target=95%%/);
   assert.match(mode, /manual_success_rate_required=true/);
