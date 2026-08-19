@@ -70,6 +70,9 @@ func _update_player_jump_assist(delta: float) -> void:
 	if player == null or player.finished or not RaceManager.active:
 		_reset_player_jump_assist_state()
 		return
+	if not _authority_allows_jump_assist(player):
+		_reset_player_jump_assist_state()
+		return
 	if _is_player_water_recovering(player):
 		_reset_player_jump_assist_state()
 		return
@@ -111,9 +114,19 @@ func _is_player_water_recovering(player: WildDashCharacterController) -> bool:
 		return false
 	if _water_recovery == null or not is_instance_valid(_water_recovery):
 		_water_recovery = get_parent().get_node_or_null("WaterRecovery")
-	if _water_recovery == null or not _water_recovery.has_method("is_water_recovering"):
+	if _water_recovery == null:
 		return false
-	return bool(_water_recovery.call("is_water_recovering", player))
+	if _water_recovery.has_method("is_water_recovering") and bool(_water_recovery.call("is_water_recovering", player)):
+		return true
+	if _water_recovery.has_method("should_handle_racer"):
+		return bool(_water_recovery.call("should_handle_racer", player))
+	return false
+
+func _authority_allows_jump_assist(player: WildDashCharacterController) -> bool:
+	var mode := get_parent()
+	if mode != null and mode.has_method("reliability_jump_assist_allowed"):
+		return bool(mode.call("reliability_jump_assist_allowed", player))
+	return true
 
 func _apply_animal_platform_identity(racer: WildDashCharacterController) -> void:
 	if racer == null:
