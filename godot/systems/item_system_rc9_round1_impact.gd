@@ -130,6 +130,8 @@ func _use_power_shockwave(character: Node) -> bool:
 	var outer_hits: int = 0
 	var center_knockback: float = POWER_SHOCKWAVE_KNOCKBACK * ROUND1_SHOCKWAVE_CENTER_MULTIPLIER
 	for value: Variant in RaceManager.racers:
+		if value == null or not is_instance_valid(value):
+			continue
 		var target: WildDashCharacterController = value as WildDashCharacterController
 		if target == null or target == source or target.finished:
 			continue
@@ -212,14 +214,20 @@ func _record_round1_chain_hit(target: Node, effect_id: StringName) -> void:
 	var hit_count: int = 0
 	if not data.is_empty() and now - float(data.get("last_hit", -100.0)) <= ROUND1_CHAIN_WINDOW_SECONDS:
 		hit_count = int(data.get("hit_count", 0))
+	# Do not retain the racer Node in this autoload-owned dictionary. The Round 1
+	# scene can be freed while ItemSystem survives into the recap scene, and a
+	# stale Object reference here can fault the debugger during transition.
 	_round1_chain_state[id] = {
-		"target": target,
+		"target_label": _label(target),
 		"last_hit": now,
 		"hit_count": mini(3, hit_count + 1),
 		"effect": effect_id,
 	}
 
 func _update_round1_chain_recovery() -> void:
+	# GameManager flips round_active to false synchronously in complete_round(),
+	# before the finished scene is freed. Clear Round 1-only state immediately at
+	# that boundary instead of waiting for RaceManager or scene teardown timing.
 	if not _round1_impact_active():
 		if not _round1_chain_state.is_empty():
 			_round1_chain_state.clear()
@@ -230,11 +238,11 @@ func _update_round1_chain_recovery() -> void:
 		var data: Dictionary = _round1_chain_state.get(id, {})
 		if now - float(data.get("last_hit", now)) <= ROUND1_CHAIN_WINDOW_SECONDS:
 			continue
-		var target: Node = data.get("target") as Node
+		var target_label: String = String(data.get("target_label", "unknown"))
 		print("ROUND1 ITEM IMPACT recovery_complete=1 target=%s chain_hits=%d last_effect=%s" % [
-			_label(target), int(data.get("hit_count", 0)), StringName(data.get("effect", &"")),
+			target_label, int(data.get("hit_count", 0)), StringName(data.get("effect", &"")),
 		])
 		_round1_chain_state.erase(id)
 
 func _round1_impact_active() -> bool:
-	return RaceManager.active and GameManager.get_current_round_id() == &"grand_prix"
+	return GameManager.round_active and RaceManager.active and GameManager.get_current_round_id() == &"grand_prix"
