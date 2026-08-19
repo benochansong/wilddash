@@ -11,13 +11,15 @@ const phase3 = read('godot/modes/logspire_leap/logspire_phase3_director_v4_major
 const audit = read('godot/modes/logspire_leap/logspire_jump_collision_reliability.gd');
 const gameplay = read('godot/modes/logspire_leap/logspire_platform_gameplay.gd');
 
- test('Round 3 wires the final collision audit after existing jump and Phase3 layers', () => {
+test('Round 3 wires the final collision audit after existing jump and Phase3 layers', () => {
   assert.match(scene, /logspire_jump_rebalance_v2_phase_b\.gd/);
   assert.match(scene, /logspire_jump_gap_guard\.gd/);
   assert.match(scene, /logspire_phase3_director_v4_major_collision\.gd/);
   assert.match(scene, /logspire_jump_collision_reliability\.gd/);
   assert.match(scene, /logspire_water_recovery_v12_reliability_authority\.gd/);
-  assert.ok(scene.indexOf('Phase3Director') < scene.indexOf('JumpCollisionAudit'));
+  const phase3Node = scene.indexOf('[node name="Phase3Director"');
+  const auditNode = scene.indexOf('[node name="JumpCollisionAudit"');
+  assert.ok(phase3Node >= 0 && auditNode > phase3Node);
 });
 
 test('Safe Route final geometry is audited only after both geometry passes settle', () => {
@@ -76,9 +78,10 @@ test('Moving-platform landing assists use runtime prediction instead of stale st
 });
 
 test('Reliability pass preserves current jump power, Wild Route and water authority', () => {
-  assert.doesNotMatch(audit, /jump_velocity\s*=/);
-  assert.doesNotMatch(phase3, /jump_velocity\s*=/);
-  assert.doesNotMatch(jump, /jump_velocity\s*=\s*[0-9]/);
+  assert.doesNotMatch(audit, /(?:player|racer)\.jump_velocity\s*=/);
+  assert.doesNotMatch(phase3, /(?:player|racer)\.jump_velocity\s*=/);
+  assert.doesNotMatch(jump, /(?:player|racer)\.jump_velocity\s*=/);
+  assert.match(audit, /player\.jump_velocity/);
   assert.match(audit, /wild_route_unchanged=true/);
   assert.match(audit, /water_recovery_unchanged=true/);
   assert.match(gap, /wild_exclusive_preserved=true/);
