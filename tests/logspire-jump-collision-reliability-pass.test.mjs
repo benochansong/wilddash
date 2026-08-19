@@ -6,18 +6,22 @@ const read = (path) => fs.readFileSync(path, 'utf8');
 
 const scene = read('godot/modes/logspire_leap/logspire_leap.tscn');
 const jump = read('godot/modes/logspire_leap/logspire_jump_rebalance_v2_phase_b.gd');
+const jumpV3 = read('godot/modes/logspire_leap/logspire_jump_rebalance_v3_titan_tree_accessibility.gd');
 const gap = read('godot/modes/logspire_leap/logspire_jump_gap_guard.gd');
 const phase3 = read('godot/modes/logspire_leap/logspire_phase3_director_v4_major_collision.gd');
 const audit = read('godot/modes/logspire_leap/logspire_jump_collision_reliability.gd');
 const gameplay = read('godot/modes/logspire_leap/logspire_platform_gameplay.gd');
 const water = read('godot/modes/logspire_leap/logspire_water_recovery_v13_integrated_qa.gd');
+const waterV15 = read('godot/modes/logspire_leap/logspire_water_recovery_v15_vine_only.gd');
 
-test('Round 3 wires the final collision audit after existing jump and Phase3 layers', () => {
-  assert.match(scene, /logspire_jump_rebalance_v2_phase_b\.gd/);
+test('Round 3 wires the final collision audit after current jump and Vine Rescue layers', () => {
+  assert.match(scene, /logspire_jump_rebalance_v3_titan_tree_accessibility\.gd/);
+  assert.match(jumpV3, /logspire_jump_rebalance_v2_phase_b\.gd/);
   assert.match(scene, /logspire_jump_gap_guard\.gd/);
   assert.match(scene, /logspire_phase3_director_v4_major_collision\.gd/);
   assert.match(scene, /logspire_jump_collision_reliability\.gd/);
-  assert.match(scene, /logspire_water_recovery_v13_integrated_qa\.gd/);
+  assert.match(scene, /logspire_water_recovery_v15_vine_only\.gd/);
+  assert.match(waterV15, /logspire_water_recovery_v14_safe_vine_reentry\.gd/);
   assert.match(water, /logspire_water_recovery_v12_reliability_authority\.gd/);
   const phase3Node = scene.indexOf('[node name="Phase3Director"');
   const auditNode = scene.indexOf('[node name="JumpCollisionAudit"');
