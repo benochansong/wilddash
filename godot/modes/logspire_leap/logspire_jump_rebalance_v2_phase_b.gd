@@ -4,6 +4,7 @@ extends "res://modes/logspire_leap/logspire_jump_rebalance.gd"
 ## Landing magnet already covers near misses from above. This adds a short,
 ## collision-respecting ledge catch for Safe Route jumps that reach the edge but
 ## would otherwise slide into the river by a few centimetres.
+## WATER recovery owns the player transform before the base landing assist runs.
 
 const LEDGE_CATCH_WINDOW_SECONDS: float = 0.42
 const LEDGE_CATCH_EXTRA_RANGE: float = 0.85
@@ -26,16 +27,26 @@ func _ready() -> void:
 	])
 
 func _physics_process(delta: float) -> void:
-	super(delta)
 	if not RaceManager.active:
 		return
 	var player := _resolve_player()
 	if player == null or player.finished:
 		_cancel_ledge_catch()
 		return
+
+	# Do this before super(delta): the base JumpRebalance owns landing magnet,
+	# forward assist, coyote time and jump buffer. None of those may move a racer
+	# while WaterRecovery owns the transform.
 	if _is_player_water_recovering(player):
 		_cancel_ledge_catch()
+		_coyote_remaining = 0.0
+		_jump_buffer_remaining = 0.0
+		_landing_correction_used = 0.0
+		_landing_assist_logged = false
+		_player_was_on_floor = false
 		return
+
+	super(delta)
 	if player.is_on_floor():
 		_cancel_ledge_catch()
 		return
