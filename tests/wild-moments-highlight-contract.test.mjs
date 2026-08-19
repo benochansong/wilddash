@@ -13,6 +13,8 @@ const r2Economy = readFileSync("godot/modes/fruit_collection/fruit_frenzy_v20_ec
 const r2Species = readFileSync("godot/modes/fruit_collection/fruit_frenzy_v19_species_interaction.gd", "utf8");
 const r2 = readFileSync("godot/modes/fruit_collection/fruit_frenzy_v18_wild_moments.gd", "utf8");
 const r3 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v11_wild_moments.gd", "utf8");
+const r3V15 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v15_vine_only.gd", "utf8");
+const r3V14 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v14_safe_vine_reentry.gd", "utf8");
 const r3Integrated = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v13_integrated_qa.gd", "utf8");
 const r3Authority = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v12_reliability_authority.gd", "utf8");
 const r4 = readFileSync("godot/modes/push_out/wild_rumble_round4_wild_moments.gd", "utf8");
@@ -41,13 +43,15 @@ test("Replay Lite keeps only recent transforms at 10Hz for player plus four near
   assert.doesNotMatch(resultManager, /get_viewport\(\)\.get_texture|Image\.save|capture.*frame/i);
 });
 
-test("production highlights remain wired while Round 3 prioritizes the V13 guard over reliability authority", () => {
+test("production highlights remain wired while Round 3 uses Vine-only V15 over the reliability stack", () => {
   assert.match(grandScene, /grand_prix_v7_wild_moments\.gd/);
   assert.match(fruitScene, /fruit_frenzy_v20_economy_combat_ai\.gd/);
   assert.match(r2Economy, /extends "res:\/\/modes\/fruit_collection\/fruit_frenzy_v19_species_interaction\.gd"/);
   assert.match(r2Species, /extends "res:\/\/modes\/fruit_collection\/fruit_frenzy_v18_wild_moments\.gd"/);
   assert.match(rumbleScene, /wild_rumble_round4_wild_moments\.gd/);
-  assert.match(logspireScene, /logspire_water_recovery_v13_integrated_qa\.gd/);
+  assert.match(logspireScene, /logspire_water_recovery_v15_vine_only\.gd/);
+  assert.match(r3V15, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v14_safe_vine_reentry\.gd"/);
+  assert.match(r3V14, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v13_integrated_qa\.gd"/);
   assert.match(r3Integrated, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v12_reliability_authority\.gd"/);
   assert.doesNotMatch(logspireScene, /logspire_water_recovery_v11_wild_moments\.gd/);
   assert.match(logspireScene, /P0 CAMPAIGN-SAFE ROUND 3/);
