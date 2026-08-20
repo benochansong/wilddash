@@ -153,7 +153,7 @@ func _load_external_theme(theme_id: String, path: String) -> void:
 		return
 	_set_stream_loop(stream, true)
 	_themes[theme_id] = stream
-	print("AUDIO external theme loaded id=%s path=%s" % [theme_id, path])
+	print("AUDIO external theme loaded id=%s path=%s" % theme_id)
 
 func _set_stream_loop(stream: AudioStream, loop: bool) -> void:
 	if stream is AudioStreamOggVorbis:
@@ -169,6 +169,12 @@ func _build_procedural_audio() -> void:
 	_themes["race_grand_prix"] = _themes["race"]
 	_themes["race_neon_harbor"] = _themes["race"]
 	_themes["race_snowpeak"] = _themes["race"]
+	# LOGSPIRE starts with light forest percussion-like pitches, becomes warmer at
+	# Titan Tree, then widens for the sky finale. External audio can replace these
+	# procedural hooks later without changing gameplay code.
+	_themes["race_logspire"] = _make_theme([196.0, 293.66, 392.0, 523.25], 3.6, 0.17)
+	_themes["race_logspire_titan"] = _make_theme([146.83, 220.0, 293.66, 440.0], 3.2, 0.19)
+	_themes["race_logspire_finale"] = _make_theme([174.61, 261.63, 392.0, 587.33], 2.8, 0.21)
 	_themes["arena"] = _make_theme([174.61, 261.63, 349.23], 3.6, 0.18)
 	_themes["arena_push_out"] = _themes["arena"]
 	_themes["arena_fruit_collection"] = _themes["arena"]
@@ -177,8 +183,41 @@ func _build_procedural_audio() -> void:
 	_sfx_library["jump"] = _make_sweep(360.0, 720.0, 0.12, 0.28)
 	_sfx_library["skill"] = _make_sweep(520.0, 220.0, 0.16, 0.30)
 	_sfx_library["item"] = _make_tone(880.0, 0.10, 0.26)
+	_sfx_library["item_gold"] = _make_sweep(740.0, 1180.0, 0.16, 0.29)
 	_sfx_library["hit"] = _make_sweep(180.0, 95.0, 0.09, 0.30)
 	_sfx_library["finish"] = _make_sweep(440.0, 880.0, 0.22, 0.34)
+	_sfx_library["boost"] = _make_sweep(260.0, 940.0, 0.17, 0.31)
+	_sfx_library["landing"] = _make_sweep(170.0, 118.0, 0.075, 0.20)
+	_sfx_library["recovery"] = _make_sweep(310.0, 570.0, 0.13, 0.22)
+	# Surface footsteps are deliberately short and quiet. They are only requested
+	# for the local racer, keeping a crowded 15 to 18-racer race sonically clean.
+	_sfx_library["foot_grass"] = _make_sweep(190.0, 145.0, 0.045, 0.12)
+	_sfx_library["foot_dirt"] = _make_sweep(155.0, 105.0, 0.045, 0.13)
+	_sfx_library["foot_wood"] = _make_sweep(290.0, 205.0, 0.040, 0.12)
+	_sfx_library["foot_sand"] = _make_sweep(135.0, 92.0, 0.050, 0.11)
+	_sfx_library["foot_water"] = _make_sweep(370.0, 210.0, 0.055, 0.11)
+	_sfx_library["foot_metal"] = _make_sweep(520.0, 340.0, 0.035, 0.10)
+	_sfx_library["fart"] = _make_cartoon_fart()
+	# Wild Tide event IDs stay inside the shared AudioManager pool. Final assets
+	# can replace these procedural placeholders without changing gameplay.
+	_sfx_library["monster_roar"] = _make_sweep(108.0, 46.0, 0.56, 0.36)
+	_sfx_library["wave"] = _make_sweep(210.0, 72.0, 0.42, 0.27)
+	_sfx_library["splash"] = _make_sweep(390.0, 105.0, 0.28, 0.30)
+	_sfx_library["tree_break"] = _make_sweep(155.0, 52.0, 0.22, 0.34)
+	_sfx_library["bomb_explosion"] = _make_sweep(132.0, 44.0, 0.24, 0.38)
+	# LOGSPIRE production hooks.
+	_sfx_library["wood_land"] = _make_sweep(240.0, 150.0, 0.08, 0.24)
+	_sfx_library["wood_crack"] = _make_sweep(310.0, 112.0, 0.13, 0.28)
+	_sfx_library["wood_break"] = _make_sweep(178.0, 48.0, 0.24, 0.36)
+	_sfx_library["log_roll"] = _make_sweep(135.0, 94.0, 0.18, 0.18)
+	_sfx_library["log_swing"] = _make_sweep(330.0, 205.0, 0.20, 0.18)
+	_sfx_library["mushroom_bounce"] = _make_sweep(260.0, 760.0, 0.18, 0.30)
+	_sfx_library["vine_swing"] = _make_sweep(490.0, 245.0, 0.22, 0.24)
+	_sfx_library["woodpecker"] = _make_tone(940.0, 0.055, 0.30)
+	_sfx_library["squirrel_rush"] = _make_sweep(720.0, 420.0, 0.20, 0.18)
+	_sfx_library["tree_creak"] = _make_sweep(122.0, 67.0, 0.52, 0.32)
+	_sfx_library["tree_fall"] = _make_sweep(96.0, 38.0, 0.66, 0.38)
+	_sfx_library["wild_finish"] = _make_sweep(523.25, 1046.5, 0.34, 0.36)
 
 func _make_theme(frequencies: Array, duration: float, amplitude: float) -> AudioStreamWAV:
 	var sample_rate := 22050
@@ -217,6 +256,30 @@ func _make_sweep(start_frequency: float, end_frequency: float, duration: float, 
 		phase += TAU * frequency / float(sample_rate)
 		var envelope := 1.0 - ratio
 		_write_sample_16(data, i, sin(phase) * amplitude * envelope)
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = sample_rate
+	stream.stereo = false
+	stream.data = data
+	return stream
+
+func _make_cartoon_fart() -> AudioStreamWAV:
+	# Deliberately synthetic and clean: a tiny low buzz plus pitch wobble. This
+	# keeps the gag readable without an external sound asset.
+	var sample_rate := 22050
+	var duration := 0.22
+	var sample_count := maxi(1, int(duration * float(sample_rate)))
+	var data := PackedByteArray()
+	data.resize(sample_count * 2)
+	var phase := 0.0
+	for i in range(sample_count):
+		var ratio := float(i) / float(sample_count)
+		var wobble := sin(TAU * 17.0 * ratio) * 18.0
+		var frequency := lerpf(128.0, 72.0, ratio) + wobble
+		phase += TAU * frequency / float(sample_rate)
+		var envelope := pow(1.0 - ratio, 1.35)
+		var sample := (sin(phase) * 0.22 + sin(phase * 0.47) * 0.10) * envelope
+		_write_sample_16(data, i, sample)
 	var stream := AudioStreamWAV.new()
 	stream.format = AudioStreamWAV.FORMAT_16_BITS
 	stream.mix_rate = sample_rate

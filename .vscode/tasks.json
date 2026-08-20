@@ -1,0 +1,70 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "WILD DASH: Git Status",
+      "type": "shell",
+      "command": "git status --short --branch",
+      "problemMatcher": []
+    },
+    {
+      "label": "WILD DASH: Typecheck",
+      "type": "npm",
+      "script": "typecheck",
+      "problemMatcher": []
+    },
+    {
+      "label": "WILD DASH: Lint",
+      "type": "npm",
+      "script": "lint",
+      "problemMatcher": []
+    },
+    {
+      "label": "WILD DASH: Test",
+      "type": "npm",
+      "script": "test",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "WILD DASH: Build",
+      "type": "npm",
+      "script": "build",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "WILD DASH: Verify Before Commit",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "WILD DASH: Typecheck",
+        "WILD DASH: Lint",
+        "WILD DASH: Test",
+        "WILD DASH: Build"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Godot: Open WILD DASH Project (godot in PATH)",
+      "type": "shell",
+      "command": "godot",
+      "args": [
+        "--editor",
+        "--path",
+        "${workspaceFolder}/godot"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Godot: Run Round 3 (godot in PATH)",
+      "type": "shell",
+      "command": "godot",
+      "args": [
+        "--path",
+        "${workspaceFolder}/godot",
+        "res://modes/logspire_leap/logspire_leap.tscn"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+[gd_scene load_steps=19 format=3]
+
+; P0 CAMPAIGN-SAFE ROUND 3
+; Phase B mode inherits res://modes/logspire_leap/logspire_leap_v3_recovery_camera.gd
+; Phase B combat inherits res://modes/logspire_leap/logspire_combat_safety_v2_recovery_protection.gd
+; Keep Phase A/B gameplay and stable recovery/collision layers load-critical.
+; Graphics Phase 2/3 and the Wild Moments water adapter remain source-only.
+; Water V15 uses direct Vine Rescue over the V14 safe re-entry authority.
+; WaterSubmergeWatchdog hard-resets any deeply submerged racer that is not in an active Vine pull.
+; LadderSystem V6 is compatibility-only and removes ladder/root-stair recovery props.
+; JumpRebalance V3 caps Titan Tree Safe Route vertical rises for playable climbing.
+; PlayerManualThrottle removes neutral auto-cruise only in Round 3.
+; CrownNestFinish treats the destination platform itself as the R3 finish area.
+; Phase3Director V5 keeps giant tree visuals out of the Safe Route and prevents phase-through.
+; JumpCollisionAudit runs only after the final geometry/collision layers exist.
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_leap_v4_phase_b.gd" id="1_mode"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_world_v2_deep_water.gd" id="2_world"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_rebalance_v3_titan_tree_accessibility.gd" id="2b_jump_rebalance"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_gap_guard.gd" id="2c_gap_guard"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_depth_guard.gd" id="2d_depth_guard"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_platform_graph.gd" id="3_graph"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_recovery_system_v2_ladder_only.gd" id="4_recovery"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_mobility_assist.gd" id="5_mobility"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_platform_gameplay.gd" id="6_gameplay"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_combat_safety_v3_phase_b.gd" id="7_combat"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_mushroom_feedback.gd" id="8_mushroom"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_phase3_director_v5_route_clearance.gd" id="9_phase3"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_ladder_system_v6_vine_only_cleanup.gd" id="10_ladder"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_recovery_v15_vine_only.gd" id="11_water"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_collision_reliability.gd" id="12_jump_collision_audit"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_player_manual_throttle.gd" id="13_manual_throttle"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_finish_authority.gd" id="14_finish_authority"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_submerge_watchdog.gd" id="15_water_watchdog"]
+
+[node name="LogspireLeap" type="Node3D"]
+script = ExtResource("1_mode")
+
+[node name="LogspireWorld" type="Node3D" parent="."]
+script = ExtResource("2_world")
+
+[node name="JumpRebalance" type="Node" parent="."]
+script = ExtResource("2b_jump_rebalance")
+
+[node name="JumpGapGuard" type="Node" parent="."]
+script = ExtResource("2c_gap_guard")
+
+[node name="WaterDepthGuard" type="Node" parent="."]
+script = ExtResource("2d_depth_guard")
+
+[node name="PlatformGraph" type="Node" parent="."]
+script = ExtResource("3_graph")
+
+[node name="LadderSystem" type="Node3D" parent="."]
+script = ExtResource("10_ladder")
+
+[node name="WaterRecovery" type="Node3D" parent="."]
+script = ExtResource("11_water")
+
+[node name="RecoverySystem" type="Node" parent="."]
+script = ExtResource("4_recovery")
+
+[node name="WaterSubmergeWatchdog" type="Node" parent="."]
+script = ExtResource("15_water_watchdog")
+
+[node name="MobilityAssist" type="Node" parent="."]
+script = ExtResource("5_mobility")
+
+[node name="PlatformGameplay" type="Node" parent="."]
+script = ExtResource("6_gameplay")
+
+[node name="CombatSafety" type="Node" parent="."]
+script = ExtResource("7_combat")
+
+[node name="MushroomFeedback" type="Node" parent="."]
+script = ExtResource("8_mushroom")
+
+[node name="Phase3Director" type="Node" parent="."]
+script = ExtResource("9_phase3")
+
+[node name="PlayerManualThrottle" type="Node" parent="."]
+script = ExtResource("13_manual_throttle")
+
+[node name="CrownNestFinish" type="Node" parent="."]
+script = ExtResource("14_finish_authority")
+
+[node name="JumpCollisionAudit" type="Node" parent="."]
+script = ExtResource("12_jump_collision_audit")

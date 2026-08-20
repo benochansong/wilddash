@@ -49,8 +49,10 @@ func evaluate_and_use_now() -> bool:
 	if _held_age < minimum_hold:
 		return false
 
-	var utility := _utility_for_item(item_id)
+	# Progress Cache V2: read rank once for this decision and pass the snapshot
+	# into utility evaluation instead of issuing a duplicate rank query.
 	var rank := RaceManager.get_rank(_racer)
+	var utility := _utility_for_item(item_id, rank)
 	var total := maxi(1, RaceManager.racers.size())
 	var threshold := 0.58 if GameManager.difficulty == &"nightmare" else 0.64
 	if rank > int(ceil(float(total) * 0.66)):
@@ -77,8 +79,8 @@ func get_utility_score_for_test(item_id: StringName) -> float:
 func get_balance_telemetry() -> Dictionary:
 	return {"item_uses": _items_used}
 
-func _utility_for_item(item_id: StringName) -> float:
-	var rank := RaceManager.get_rank(_racer)
+func _utility_for_item(item_id: StringName, rank_snapshot: int = -1) -> float:
+	var rank := rank_snapshot if rank_snapshot > 0 else RaceManager.get_rank(_racer)
 	var total := maxi(1, RaceManager.racers.size())
 	var back_ratio := float(rank - 1) / float(maxi(1, total - 1))
 	match item_id:
@@ -129,21 +131,25 @@ func _utility_for_item(item_id: StringName) -> float:
 	return 0.0
 
 func _is_long_straight() -> bool:
-	var route := RaceManager.get_route_points()
-	if route.size() < 4:
+	# Avoid allocating a duplicate of the whole route during every item decision.
+	var point_count := RaceManager.get_route_point_count()
+	if point_count < 4:
 		return true
 	var index := 1
 	if _driver != null:
-		index = clampi(_driver.get_route_index(), 1, route.size() - 2)
+		index = clampi(_driver.get_route_index(), 1, point_count - 2)
 	else:
 		var best_distance := INF
-		for i in range(1, route.size() - 1):
-			var distance := _racer.global_position.distance_squared_to(route[i])
+		for i in range(1, point_count - 1):
+			var distance := _racer.global_position.distance_squared_to(RaceManager.get_route_point(i))
 			if distance < best_distance:
 				best_distance = distance
 				index = i
-	var a := route[index] - route[index - 1]
-	var b := route[index + 1] - route[index]
+	var previous := RaceManager.get_route_point(index - 1)
+	var current := RaceManager.get_route_point(index)
+	var next := RaceManager.get_route_point(index + 1)
+	var a := current - previous
+	var b := next - current
 	a.y = 0.0
 	b.y = 0.0
 	if a.length_squared() < 0.01 or b.length_squared() < 0.01:
