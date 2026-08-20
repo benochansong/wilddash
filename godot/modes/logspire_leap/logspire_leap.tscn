@@ -6,8 +6,8 @@
 ; Keep Phase A/B gameplay and stable recovery/collision layers load-critical.
 ; Graphics Phase 2/3 and the Wild Moments water adapter remain source-only.
 ; World V3 keeps the final recovery trigger but removes the obsolete giant Z6 solid deck.
-; Water V15 uses direct Vine Rescue over the V14 safe re-entry authority.
-; WaterSubmergeWatchdog V2 preserves deep-water escape but suppresses false WATER RESET on valid Safe Route support.
+; Water V16 uses live Safe Route corridor authority over V15 direct Vine Rescue.
+; WaterSubmergeWatchdog V3 preserves deep-water escape but suppresses reset during legitimate route traversal and jump seams.
 ; LadderSystem V6 is compatibility-only and removes ladder/root-stair recovery props.
 ; JumpRebalance V3 caps Titan Tree Safe Route vertical rises for playable climbing.
 ; TitanCP5CorridorGuard removes late-spiral overlap, adds walkable CP5 exit ramps, and routes the finale outside the trunk.
@@ -31,11 +31,11 @@
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_mushroom_feedback.gd" id="8_mushroom"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_phase3_director_v6_titan_tree_safe.gd" id="9_phase3"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_ladder_system_v6_vine_only_cleanup.gd" id="10_ladder"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_recovery_v15_vine_only.gd" id="11_water"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_recovery_v16_route_corridor_authority.gd" id="11_water"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_collision_reliability_v2_route_connectors.gd" id="12_jump_collision_audit"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_player_manual_throttle.gd" id="13_manual_throttle"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_finish_authority.gd" id="14_finish_authority"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_submerge_watchdog_v2_route_support.gd" id="15_water_watchdog"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_submerge_watchdog_v3_live_route_corridor.gd" id="15_water_watchdog"]
 
 [node name="LogspireLeap" type="Node3D"]
 script = ExtResource("1_mode")
