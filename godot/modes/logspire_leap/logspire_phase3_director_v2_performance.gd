@@ -1,4 +1,4 @@
-extends "res://modes/logspire_leap/logspire_phase3_director.gd"
+extends "res://modes/logspire_leap/logspire_phase3_director_base_repaired.gd"
 
 ## Titan Tree performance pass.
 ## Keep landmark/event gameplay intact while reducing expensive rendering and
