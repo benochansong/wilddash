@@ -15,8 +15,8 @@
 ; PlatformGameplay V2 assigns local dynamic transforms before physics registration.
 ; PlayerManualThrottle removes neutral auto-cruise only in Round 3.
 ; CrownNestFinish treats the destination platform itself as the R3 finish area.
-; Phase3Director V6 keeps V5 route clearance and fixes Titan/woodpecker/finale construction transforms.
-; Phase3 inheritance contract: logspire_phase3_director_v6_titan_tree_safe.gd extends logspire_phase3_director_v5_route_clearance.gd.
+; Phase3Director V7 keeps V6 tree-safe construction and gives the Sky Finale rolling log matched physical collision plus a deep-penetration guard.
+; Phase3 inheritance contract: logspire_phase3_director_v7_finale_log_collision.gd extends logspire_phase3_director_v6_titan_tree_safe.gd extends logspire_phase3_director_v5_route_clearance.gd.
 ; JumpCollisionAudit V2 recognizes authored route connectors while rejecting unrelated blockers.
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_leap_v4_phase_b.gd" id="1_mode"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_world_v3_trigger_only_final_recovery.gd" id="2_world"]
@@ -30,7 +30,7 @@
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_platform_gameplay_v2_tree_safe.gd" id="6_gameplay"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_combat_safety_v3_phase_b.gd" id="7_combat"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_mushroom_feedback.gd" id="8_mushroom"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_phase3_director_v6_titan_tree_safe.gd" id="9_phase3"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_phase3_director_v7_finale_log_collision.gd" id="9_phase3"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_ladder_system_v6_vine_only_cleanup.gd" id="10_ladder"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_recovery_v16_route_corridor_authority.gd" id="11_water"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_collision_reliability_v2_route_connectors.gd" id="12_jump_collision_audit"]
