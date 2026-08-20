@@ -36,9 +36,8 @@ func _process_ai_swim(delta: float) -> void:
 	if ItemSystem.has_method("is_round5_leader_pressure_item"):
 		leader_pressure_item = bool(ItemSystem.call("is_round5_leader_pressure_item", item_before))
 	if leader_pressure_item:
-		# These items are designed to break runaway leaders at any distance. AI may
-		# fire them without a nearby-rival requirement, but a racer currently in
-		# first place cannot consume an anti-leader item.
+		# Anti-leader inventory bypasses ordinary local-rival use gating so AI can
+		# answer a runaway first place; the leader itself cannot consume one.
 		if RaceManager.get_rank(racer) <= 1:
 			return
 	elif provider != null and provider.has_method("should_ai_use_item_phase3"):
