@@ -1,0 +1,20 @@
+{
+  "files.exclude": {
+    "**/.godot": true,
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/release": true
+  },
+  "search.exclude": {
+    "**/.godot": true,
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/release": true
+  },
+  "editor.formatOnSave": false,
+  "editor.tabSize": 2,
+  "files.trimTrailingWhitespace": true,
+  "git.autofetch": true,
+  "git.confirmSync": false,
+  "terminal.integrated.defaultProfile.windows": "PowerShell"
+}
