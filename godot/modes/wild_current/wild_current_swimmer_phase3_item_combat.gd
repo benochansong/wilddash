@@ -31,14 +31,23 @@ func _process_ai_swim(delta: float) -> void:
 	_ai_item_timer = maxf(0.0, _ai_item_timer - delta)
 	if _ai_item_timer > 0.0 or racer.get_held_item() == &"":
 		return
-	if provider != null and provider.has_method("should_ai_use_item_phase3"):
+	var item_before := racer.get_held_item()
+	var leader_pressure_item := false
+	if ItemSystem.has_method("is_round5_leader_pressure_item"):
+		leader_pressure_item = bool(ItemSystem.call("is_round5_leader_pressure_item", item_before))
+	if leader_pressure_item:
+		# These items are designed to break runaway leaders at any distance. AI may
+		# fire them without a nearby-rival requirement, but a racer currently in
+		# first place cannot consume an anti-leader item.
+		if RaceManager.get_rank(racer) <= 1:
+			return
+	elif provider != null and provider.has_method("should_ai_use_item_phase3"):
 		if not bool(provider.call("should_ai_use_item_phase3", racer)):
 			return
-	var item_before := racer.get_held_item()
 	if ItemSystem.use_held_item(racer):
 		_ai_item_timer = AI_ITEM_DECISION_INTERVAL + float(maxi(0, ai_slot) % 4) * 0.07
-		print("r5_water_item_use racer=%s source=AI item=%s rank=%d" % [
-			RaceManager.get_racer_label(racer), String(item_before), RaceManager.get_rank(racer),
+		print("r5_water_item_use racer=%s source=AI item=%s rank=%d leader_pressure=%s" % [
+			RaceManager.get_racer_label(racer), String(item_before), RaceManager.get_rank(racer), str(leader_pressure_item),
 		])
 
 func _apply_swim_motion(delta: float, requested_speed: float) -> void:
