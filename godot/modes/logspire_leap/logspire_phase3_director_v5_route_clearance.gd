@@ -8,6 +8,10 @@ const STATIC_LIVING_BRIDGE_WIDTH: float = 3.8
 const STATIC_LIVING_BRIDGE_THICKNESS: float = 0.55
 const STATIC_LIVING_BRIDGE_SURFACE_OFFSET: float = 0.30
 const FINALE_FLAT_LOG_SIZE := Vector3(8.4, 0.45, 10.4)
+const FINALE_MOVING_BRANCH_VISUAL_SIZE := Vector3(7.4, 0.42, 8.2)
+const FINALE_LAST_BRIDGE_WIDTH: float = 4.8
+const FINALE_LAST_BRIDGE_THICKNESS: float = 0.55
+const FINALE_TITAN_CORE_RADIUS: float = 0.72
 const FINALE_RECOVERY_VOLUME_SIZE := Vector3(28.0, 2.4, 22.0)
 const FINALE_RECOVERY_DROP: float = 7.2
 const FINALE_SUPPORT_VERTICAL_BELOW: float = 0.25
@@ -32,6 +36,7 @@ var _finale_support_last_by_id: Dictionary = {}
 func configure(world: Node, graph: Node) -> void:
 	super(world, graph)
 	_stabilize_living_tree_route_bridges()
+	_stabilize_finale_titan_trunk_collision()
 	_stabilize_sky_finale_route()
 	_sync_event_geometry_visibility()
 
@@ -66,6 +71,134 @@ func _build_finale_rolling_log() -> void:
 	_finale_roll_area = null
 	print("r3_finale_log_removed object=SkyFinaleRollingLog cylinder=false replacement=flat_box collision_proxy=Z6_01")
 
+## The mushroom remains a bounce trigger, not a solid cylinder obstacle. Its
+## trigger is a simple box and the authored Z6_02 platform remains floor support.
+func _build_finale_mushroom() -> void:
+	var platform_id: StringName = &"Z6_02"
+	var top: Vector3 = _platform_position(platform_id) + Vector3.UP * 0.8
+
+	_finale_mushroom_area = Area3D.new()
+	_finale_mushroom_area.name = "SkyFinaleMushroomArea"
+	_finale_mushroom_area.collision_layer = 0
+	_finale_mushroom_area.collision_mask = 2
+	_finale_mushroom_area.monitoring = true
+	var collision := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(6.4, 2.6, 6.4)
+	collision.shape = shape
+	_finale_mushroom_area.add_child(collision)
+	_world.add_child(_finale_mushroom_area)
+	_finale_mushroom_area.global_position = top + Vector3.UP * 1.2
+	_finale_mushroom_area.body_entered.connect(_on_finale_mushroom_body_entered)
+
+	_finale_mushroom_visual = Node3D.new()
+	_finale_mushroom_visual.name = "SkyFinaleMushroomVisual"
+	_world.add_child(_finale_mushroom_visual)
+	_finale_mushroom_visual.global_position = top + Vector3.UP * 0.5
+	var cap := MeshInstance3D.new()
+	var mesh := SphereMesh.new()
+	mesh.radius = 3.1
+	mesh.height = 1.9
+	mesh.material = _make_material(Color(0.94, 0.28, 0.19), 0.82)
+	cap.mesh = mesh
+	cap.scale = Vector3(1.0, 0.46, 1.0)
+	_finale_mushroom_visual.add_child(cap)
+	print("r3_finale_collision_adjust object=SkyFinaleMushroomArea trigger_shape=box solid_collision=false support=Z6_02")
+
+## The old moving branch crossed two normal Safe Route jump arcs. Keep its visual
+## language but remove gameplay collision and motion; Z6_03/04/05 are the actual
+## flat support/jump route.
+func _build_finale_moving_branch() -> void:
+	var platform_id: StringName = &"Z6_04"
+	var base: Vector3 = _platform_position(platform_id) + Vector3.UP * 0.72
+	var forward: Vector3 = _platform_forward(platform_id)
+	_finale_moving_branch_right = Vector3(-forward.z, 0.0, forward.x).normalized()
+	_finale_moving_branch = AnimatableBody3D.new()
+	_finale_moving_branch.name = "SkyFinaleMovingBranch"
+	_finale_moving_branch.sync_to_physics = true
+	_finale_moving_branch.collision_layer = 0
+	_finale_moving_branch.collision_mask = 0
+	_world.add_child(_finale_moving_branch)
+	_finale_moving_branch.global_position = base
+	_finale_moving_branch.rotation.y = atan2(-forward.x, -forward.z)
+	_finale_moving_branch_base = base
+	var mesh := BoxMesh.new()
+	mesh.size = FINALE_MOVING_BRANCH_VISUAL_SIZE
+	mesh.material = _make_material(Color(0.52, 0.33, 0.11), 0.92)
+	var visual := MeshInstance3D.new()
+	visual.name = "VisualOnly"
+	visual.mesh = mesh
+	_finale_moving_branch.add_child(visual)
+	print("r3_finale_collision_adjust object=SkyFinaleMovingBranch visual_only=true collision=false moving=false support_route=Z6_03_Z6_04_Z6_05")
+
+## Replace the falling-tree event with one stable, flat bridge proxy. Naming the
+## body after the Safe Route pair lets the existing jump audit recognize this as
+## intended support rather than an obstruction. There is no hollow tree volume.
+func _build_last_tree_bridge() -> void:
+	var start: Vector3 = _platform_position(&"Z6_07") + Vector3.UP * 0.62
+	var crown: Vector3 = _platform_position(&"CROWN_NEST") + Vector3.UP * 0.72
+	var horizontal_direction: Vector3 = crown - start
+	horizontal_direction.y = 0.0
+	if horizontal_direction.length_squared() <= 0.001:
+		horizontal_direction = Vector3.FORWARD
+	else:
+		horizontal_direction = horizontal_direction.normalized()
+	var end: Vector3 = crown - horizontal_direction * 5.0
+	var bridge_delta: Vector3 = end - start
+	if bridge_delta.length_squared() <= 0.001:
+		bridge_delta = horizontal_direction * 6.0
+		end = start + bridge_delta
+
+	_last_tree = AnimatableBody3D.new()
+	_last_tree.name = "SafeFlowBridge_Z6_07_CROWN_NEST"
+	_last_tree.sync_to_physics = true
+	_last_tree.collision_layer = 1
+	_last_tree.collision_mask = 2
+	_world.add_child(_last_tree)
+	_last_tree.global_position = (start + end) * 0.5
+	_last_tree.look_at(end, Vector3.UP)
+
+	var bridge_size := Vector3(
+		FINALE_LAST_BRIDGE_WIDTH,
+		FINALE_LAST_BRIDGE_THICKNESS,
+		maxf(3.0, bridge_delta.length())
+	)
+	var mesh := BoxMesh.new()
+	mesh.size = bridge_size
+	mesh.material = _make_material(Color(0.40, 0.23, 0.07), 0.92)
+	var visual := MeshInstance3D.new()
+	visual.name = "FlatLogBridgeVisual"
+	visual.mesh = mesh
+	_last_tree.add_child(visual)
+	var collision := CollisionShape3D.new()
+	collision.name = "Collision"
+	var shape := BoxShape3D.new()
+	shape.size = bridge_size
+	collision.shape = shape
+	_last_tree.add_child(collision)
+
+	_last_tree_final_position = _last_tree.global_position
+	_last_tree_start_position = _last_tree_final_position
+	_last_tree_yaw = _last_tree.rotation.y
+	_last_tree_elapsed = LAST_TREE_FALL_SECONDS
+	_last_tree_state = &"BRIDGE_READY"
+
+	_final_jump_forward = horizontal_direction
+	_final_jump_area = Area3D.new()
+	_final_jump_area.name = "FinalJumpLaunchArea"
+	_final_jump_area.collision_layer = 0
+	_final_jump_area.collision_mask = 2
+	_final_jump_area.monitoring = true
+	var launch_collision := CollisionShape3D.new()
+	var launch_shape := BoxShape3D.new()
+	launch_shape.size = Vector3(7.0, 3.5, 5.0)
+	launch_collision.shape = launch_shape
+	_final_jump_area.add_child(launch_collision)
+	_world.add_child(_final_jump_area)
+	_final_jump_area.global_position = end + Vector3.UP * 1.3
+	_final_jump_area.body_entered.connect(_on_final_jump_body_entered)
+	print("r3_finale_collision_adjust object=SafeFlowBridge_Z6_07_CROWN_NEST shape=box static=true hollow=false falling_event=false final_gap=5m")
+
 ## Keep a final-gap fail-safe, but place its thin box well below valid traversal
 ## so a normal jump/landing cannot enter it by brushing a route edge.
 func _build_final_recovery_area() -> void:
@@ -94,34 +227,48 @@ func _update_finale_obstacles(_delta: float) -> void:
 	if _finale_moving_branch != null and is_instance_valid(_finale_moving_branch):
 		_finale_moving_branch.global_position = _finale_moving_branch_base
 
+## The final bridge is ready from round start; the old falling animation/camera
+## event no longer owns transforms or collision in the Safe Route.
+func _update_last_tree(_delta: float) -> void:
+	if _last_tree != null and is_instance_valid(_last_tree):
+		_last_tree_state = &"BRIDGE_READY"
+
+func _stabilize_finale_titan_trunk_collision() -> void:
+	if _major_collision_root == null or not is_instance_valid(_major_collision_root):
+		return
+	var trunk_body := _major_collision_root.get_node_or_null("TitanTrunkCollision") as StaticBody3D
+	if trunk_body == null or trunk_body.get_child_count() <= 0:
+		return
+	var collision := trunk_body.get_child(0) as CollisionShape3D
+	var shape := collision.shape as CylinderShape3D if collision != null else null
+	if shape == null:
+		return
+	var old_radius: float = shape.radius
+	shape.radius = minf(shape.radius, FINALE_TITAN_CORE_RADIUS)
+	print("r3_finale_collision_adjust object=TitanTrunkCollision old_radius=%.2f new_radius=%.2f visual_mesh_unchanged=true late_approach_clearance=true" % [
+		old_radius, shape.radius,
+	])
+
 func _stabilize_sky_finale_route() -> void:
 	if _finale_moving_branch != null and is_instance_valid(_finale_moving_branch):
 		_finale_moving_branch.global_position = _finale_moving_branch_base
-		_finale_moving_branch.collision_layer = 1
-		_finale_moving_branch.collision_mask = 2
+		_finale_moving_branch.collision_layer = 0
+		_finale_moving_branch.collision_mask = 0
 		_finale_moving_branch.visible = true
-		var collision := _finale_moving_branch.get_node_or_null("Collision") as CollisionShape3D
-		var shape := collision.shape as BoxShape3D if collision != null else null
-		if shape != null:
-			shape.size.y = maxf(shape.size.y, 0.65)
-		print("r3_finale_collision_adjust object=SkyFinaleMovingBranch shape=box static=true moving=false")
 
 	if _last_tree != null and is_instance_valid(_last_tree):
-		_last_tree.global_position = _last_tree_final_position
-		_last_tree.rotation = Vector3(0.0, _last_tree_yaw, 0.0)
 		_last_tree.collision_layer = 1
 		_last_tree.collision_mask = 2
 		_last_tree.visible = true
-		_last_tree_state = &"STATIC_READY"
+		_last_tree_state = &"BRIDGE_READY"
 		_last_tree_elapsed = LAST_TREE_FALL_SECONDS
 		if _final_jump_area != null:
 			_final_jump_area.monitoring = true
-		print("r3_finale_collision_adjust object=LastFallingTree shape=box static=true falling_event=false camera_cut=false")
 
-## Preserve the final launch assist while the bridge itself remains static.
+## Preserve the final launch assist while the bridge itself stays deterministic.
 func _on_final_jump_body_entered(body: Node3D) -> void:
 	var racer := body as WildDashCharacterController
-	if racer == null or racer.finished or _last_tree_state not in [&"STATIC_READY", &"BRIDGE_READY"]:
+	if racer == null or racer.finished or _last_tree_state != &"BRIDGE_READY":
 		return
 	var id: int = racer.get_instance_id()
 	if _final_jump_cooldowns.has(id):
@@ -316,4 +463,4 @@ func _sync_event_geometry_visibility() -> void:
 		body.visible = body.collision_layer != 0
 
 	if _last_tree != null and is_instance_valid(_last_tree):
-		_last_tree.visible = _last_tree.collision_layer != 0
+		_last_tree.visible = true
