@@ -9,6 +9,7 @@ const manager = read('godot/scripts/game_manager_rc9_round5_wild_current.gd');
 const scene = read('godot/modes/wild_current/wild_current.tscn');
 const mode = read('godot/modes/wild_current/wild_current_race.gd');
 const phase2 = read('godot/modes/wild_current/wild_current_race_phase2.gd');
+const phase3 = read('godot/modes/wild_current/wild_current_race_phase3_long_battle.gd');
 const swimmer = read('godot/modes/wild_current/wild_current_swimmer.gd');
 const current = read('godot/modes/wild_current/wild_current_volume.gd');
 const whirlpool = read('godot/modes/wild_current/wild_whirlpool_volume.gd');
@@ -21,8 +22,9 @@ test('production campaign replaces legacy Round 5 with Wild Current only', () =>
   assert.match(manager, /r5_campaign_complete[\s\S]*final_round=wild_current/);
 });
 
-test('Round 5 production scene points at the swim-only mode through the Phase 2 layer', () => {
-  assert.match(scene, /res:\/\/modes\/wild_current\/wild_current_race_phase2\.gd/);
+test('Round 5 production scene points at Phase 3 while preserving the swim-only foundation', () => {
+  assert.match(scene, /res:\/\/modes\/wild_current\/wild_current_race_phase3_long_battle\.gd/);
+  assert.match(phase3, /extends "res:\/\/modes\/wild_current\/wild_current_race_phase2\.gd"/);
   assert.match(phase2, /extends "res:\/\/modes\/wild_current\/wild_current_race\.gd"/);
   assert.match(mode, /&"wild_current"/);
   assert.match(mode, /WILD CURRENT: RIVER RUSH/);
@@ -54,18 +56,19 @@ test('currents and whirlpools are reusable non-blocking water forces', () => {
   assert.doesNotMatch(whirlpool, /reset_motion|record_finish|complete_round/);
 });
 
-test('six water checkpoints, safe water recovery and finish gate are authored', () => {
+test('Phase 1 six-checkpoint foundation remains authored beneath the longer Phase 3 course', () => {
   assert.match(mode, /func _build_checkpoint_positions\(\) -> Array\[Vector3\]/);
   const checkpointBlock = mode.match(/func _build_checkpoint_positions[\s\S]*?func _build_water_world/)[0];
   assert.equal((checkpointBlock.match(/Vector3\(/g) || []).length, 6);
-  assert.match(mode, /FinalBuoyGate/);
+  assert.match(phase3, /LONG_FINISH_Z/);
+  assert.match(phase3, /target_track=1\.3km/);
   assert.match(mode, /RaceManager\.can_finish\(racer\)/);
   assert.match(mode, /r5_finish_enter/);
   assert.match(mode, /r5_finish_clear/);
   assert.match(mode, /r5_recovery[\s\S]*dive_false_positive=false/);
 });
 
-test('vertical slice contains all six requested swimming zones and hazards', () => {
+test('vertical slice contains the original six swimming zones and hazards', () => {
   for (const zone of [
     'BLUE LAGOON',
     'CURRENT CROSSING',
