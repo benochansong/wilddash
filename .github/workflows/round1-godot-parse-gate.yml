@@ -55,6 +55,40 @@ jobs:
             exit 1
           fi
 
+      - name: Probe Round 3 Phase3 inheritance chain
+        shell: bash
+        run: |
+          set -o pipefail
+          failed=0
+          probe_script() {
+            label="$1"
+            script_path="$2"
+            cat > godot/tmp_phase_probe.tscn <<EOF
+          [gd_scene load_steps=2 format=3]
+
+          [ext_resource type="Script" path="$script_path" id="1"]
+
+          [node name="Probe" type="Node"]
+          script = ExtResource("1")
+          EOF
+            /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+              --headless --path godot res://tmp_phase_probe.tscn --quit-after 1 \
+              2>&1 | tee "/tmp/${label}.log"
+            if grep -E "SCRIPT ERROR: Parse Error|Parse Error:|Failed to load script|Could not resolve script|Cannot get class|Failed loading resource|Failed to load resource" "/tmp/${label}.log"; then
+              echo "PHASE3 PROBE FAILED: ${label} ${script_path}"
+              failed=1
+            else
+              echo "PHASE3 PROBE PASS: ${label} ${script_path}"
+            fi
+          }
+          probe_script phase3_base "res://modes/logspire_leap/logspire_phase3_director.gd"
+          probe_script phase3_v2 "res://modes/logspire_leap/logspire_phase3_director_v2_performance.gd"
+          probe_script phase3_v3 "res://modes/logspire_leap/logspire_phase3_director_v3_water_priority.gd"
+          probe_script phase3_v4 "res://modes/logspire_leap/logspire_phase3_director_v4_major_collision.gd"
+          probe_script phase3_v5 "res://modes/logspire_leap/logspire_phase3_director_v5_route_clearance.gd"
+          rm -f godot/tmp_phase_probe.tscn
+          exit "$failed"
+
       - name: Load production Round 3 scene
         shell: bash
         run: |
