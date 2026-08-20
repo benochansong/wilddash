@@ -14,8 +14,9 @@
 ; Phase3Director V5 keeps giant tree visuals out of the Safe Route and prevents phase-through.
 ; PlatformGameplay V2 preserves Finale swing timing while replacing Z6 cylinders with flat box boards.
 ; SkyFinaleVisualPolish V2 narrows the visible canopy river and masks the camera-facing water-sheet edge.
+; Mode V5 promotes direct/F6 Crown Nest finish into Round Recap -> Round 4 and seeds four AI Finale contenders.
 ; JumpCollisionAudit runs only after the final geometry/collision layers exist.
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_leap_v4_phase_b.gd" id="1_mode"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_leap_v5_finish_ai_convergence.gd" id="1_mode"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_world_v2_deep_water.gd" id="2_world"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_rebalance_v3_titan_tree_accessibility.gd" id="2b_jump_rebalance"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_gap_guard.gd" id="2c_gap_guard"]
