@@ -1,10 +1,11 @@
 extends "res://modes/logspire_leap/logspire_jump_collision_reliability.gd"
 
 ## Production collision-audit adapter.
-## Living Tree ramps and the Z6_04 moving branch are authored traversal surfaces,
-## not obstacles. The base audit already ignores ordinary endpoint platforms and
-## SafeFlowBridge connectors; this adapter adds the Phase3 route connectors while
-## preserving detection of every unrelated third-party collider.
+## Living Tree ramps, the Z6_04 moving branch, and explicitly tagged late Titan
+## CP5 traversal ramps are authored traversal surfaces, not obstacles. The base
+## audit already ignores ordinary endpoint platforms and SafeFlowBridge
+## connectors; this adapter adds the Phase3 route connectors while preserving
+## detection of every unrelated third-party collider.
 ##
 ## The base audit printed only the StaticBody name (`Collision`), which hid the
 ## owning platform. V2 reports the ancestry label as well so a third-platform
@@ -68,6 +69,11 @@ func _is_expected_pair_collider(collider: Node, from_id: StringName, to_id: Stri
 	var owner_names: Array[String] = []
 	var cursor: Node = collider
 	while cursor != null and cursor != _world:
+		if bool(cursor.get_meta("logspire_route_connector", false)):
+			var route_from := StringName(cursor.get_meta("logspire_route_from", &""))
+			var route_to := StringName(cursor.get_meta("logspire_route_to", &""))
+			if _pair_matches(from_id, to_id, route_from, route_to):
+				return true
 		owner_names.append(String(cursor.name))
 		cursor = cursor.get_parent()
 
