@@ -119,6 +119,9 @@ jobs:
           grep -q "r5_swim_start" /tmp/wilddash-round5-load.log
           grep -q "water_only=true" /tmp/wilddash-round5-load.log
           grep -q "legacy_neon_harbor=false" /tmp/wilddash-round5-load.log
+          grep -q "WILD CURRENT PHASE2 READY" /tmp/wilddash-round5-load.log
+          grep -q "R5 QA PACK MATRIX racers=15 lead=4 mid=6 back=4 total_ai=14" /tmp/wilddash-round5-load.log
+          grep -q "teleport_convergence=false" /tmp/wilddash-round5-load.log
 
       - name: Confirm production scenes parsed
         run: echo "ROUND 1 + ROUND 3 + ROUND 5 GODOT PARSE PASS"
