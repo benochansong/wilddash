@@ -10,6 +10,7 @@
 ; JumpRebalance V3 caps Titan Tree Safe Route vertical rises for playable climbing.
 ; PlayerManualThrottle removes neutral auto-cruise only in Round 3.
 ; CrownNestFinish treats the destination platform itself as the R3 finish area.
+; Phase3Director V5 keeps giant tree visuals out of the Safe Route and prevents phase-through.
 ; JumpCollisionAudit runs only after the final geometry/collision layers exist.
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_leap_v4_phase_b.gd" id="1_mode"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_world_v2_deep_water.gd" id="2_world"]
@@ -22,7 +23,7 @@
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_platform_gameplay.gd" id="6_gameplay"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_combat_safety_v3_phase_b.gd" id="7_combat"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_mushroom_feedback.gd" id="8_mushroom"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_phase3_director_v4_major_collision.gd" id="9_phase3"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_phase3_director_v5_route_clearance.gd" id="9_phase3"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_ladder_system_v6_vine_only_cleanup.gd" id="10_ladder"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_recovery_v15_vine_only.gd" id="11_water"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_collision_reliability.gd" id="12_jump_collision_audit"]
