@@ -35,6 +35,14 @@ test("visible finale log is an AnimatableBody3D with a matched cylinder collisio
   assert.match(build, /mesh_instance\.rotation\.x = deg_to_rad\(90\.0\)/);
 });
 
+test("finale log leaves a deterministic central safe lane instead of blocking Z6_01", () => {
+  const build = functionSlice(finale, "_build_finale_rolling_log", "_update_finale_obstacles");
+  assert.match(finale, /FINALE_LOG_LATERAL_OFFSET: float = 3\.80/);
+  assert.match(build, /_finale_roll_right \* FINALE_LOG_LATERAL_OFFSET/);
+  assert.match(finale, /safe_lane=true/);
+  assert.ok(3.80 > 2.15 + 0.62, "lateral offset must clear the physical log plus audited racer capsule");
+});
+
 test("finale log transform and collision children are ready before physics registration", () => {
   const build = functionSlice(finale, "_build_finale_rolling_log", "_update_finale_obstacles");
   const positionIndex = build.indexOf("body.position = _world_local(global_position)");
