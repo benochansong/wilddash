@@ -1,4 +1,4 @@
-name: WILD DASH Round 1 Godot Parse Gate
+name: WILD DASH Godot Parse Gate
 
 on:
   pull_request:
@@ -8,14 +8,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: wild-dash-round1-parse-${{ github.ref }}
+  group: wild-dash-godot-parse-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  round1-parse:
-    name: Godot 4.7.1 Round 1 parse
+  round-parse:
+    name: Godot 4.7.1 Round 1 + Round 3 parse
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -55,5 +55,19 @@ jobs:
             exit 1
           fi
 
-      - name: Confirm Round 1 parsed
-        run: echo "ROUND 1 GODOT PARSE PASS"
+      - name: Load production Round 3 scene
+        shell: bash
+        run: |
+          set -o pipefail
+          /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot \
+            res://modes/logspire_leap/logspire_leap.tscn \
+            --quit-after 5 \
+            2>&1 | tee /tmp/wilddash-round3-load.log
+          if grep -E "SCRIPT ERROR: Parse Error|Parse Error:|Failed to load script|Could not resolve script|Cannot get class|Failed loading resource|Failed to load resource" /tmp/wilddash-round3-load.log; then
+            echo "Round 3 scene load found a parser/resource error."
+            exit 1
+          fi
+
+      - name: Confirm production scenes parsed
+        run: echo "ROUND 1 + ROUND 3 GODOT PARSE PASS"
