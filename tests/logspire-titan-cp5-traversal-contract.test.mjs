@@ -5,7 +5,8 @@ import test from "node:test";
 const scene = readFileSync("godot/modes/logspire_leap/logspire_leap.tscn", "utf8");
 const guard = readFileSync("godot/modes/logspire_leap/logspire_titan_cp5_corridor_guard.gd", "utf8");
 const audit = readFileSync("godot/modes/logspire_leap/logspire_jump_collision_reliability_v2_route_connectors.gd", "utf8");
-const phase3 = readFileSync("godot/modes/logspire_leap/logspire_phase3_director_v6_titan_tree_safe.gd", "utf8");
+const phase3 = readFileSync("godot/modes/logspire_leap/logspire_phase3_director_v7_finale_log_collision.gd", "utf8");
+const phase3V6 = readFileSync("godot/modes/logspire_leap/logspire_phase3_director_v6_titan_tree_safe.gd", "utf8");
 
 function functionSlice(source, name, nextName) {
   const start = source.indexOf(`func ${name}`);
@@ -14,10 +15,12 @@ function functionSlice(source, name, nextName) {
   return source.slice(start, end >= 0 ? end : source.length);
 }
 
-test("Round 3 production wires the Titan tree-safe Phase3 director", () => {
-  assert.match(scene, /logspire_phase3_director_v6_titan_tree_safe\.gd/);
-  assert.match(phase3, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director_v5_route_clearance\.gd"/);
-  assert.match(phase3, /LOGSPIRE PHASE3 TREE SAFE READY/);
+test("Round 3 production wires the V7 finale-log collision director over the tree-safe Phase3 director", () => {
+  assert.match(scene, /logspire_phase3_director_v7_finale_log_collision\.gd/);
+  assert.match(phase3, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director_v6_titan_tree_safe\.gd"/);
+  assert.match(phase3V6, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director_v5_route_clearance\.gd"/);
+  assert.match(phase3, /LOGSPIRE FINALE LOG COLLISION READY/);
+  assert.match(phase3V6, /LOGSPIRE PHASE3 TREE SAFE READY/);
 });
 
 test("CP5 late Titan route has five explicit zero-speed traversal connectors", () => {
@@ -53,9 +56,9 @@ test("collision audit accepts a tagged connector only for its authored route pai
 });
 
 test("Titan and Woodpecker builders no longer write orphan global positions", () => {
-  const titan = functionSlice(phase3, "_build_titan_tree", "_make_animatable_bridge");
-  const woodpecker = functionSlice(phase3, "_build_woodpecker_hazard", "_build_wood_chip_multimesh");
-  const chips = functionSlice(phase3, "_build_wood_chip_multimesh", "_build_squirrel_stampede");
+  const titan = functionSlice(phase3V6, "_build_titan_tree", "_make_animatable_bridge");
+  const woodpecker = functionSlice(phase3V6, "_build_woodpecker_hazard", "_build_wood_chip_multimesh");
+  const chips = functionSlice(phase3V6, "_build_wood_chip_multimesh", "_build_squirrel_stampede");
   assert.doesNotMatch(titan, /\.global_position\s*=/);
   assert.doesNotMatch(woodpecker, /\.global_position\s*=/);
   assert.doesNotMatch(chips, /\.global_position\s*=/);
