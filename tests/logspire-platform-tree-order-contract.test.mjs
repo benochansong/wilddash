@@ -12,38 +12,40 @@ function sliceFunction(name, nextName) {
   return treeSafe.slice(start, end >= 0 ? end : treeSafe.length);
 }
 
-function assertAddBeforeGlobalPosition(source, addText, globalText, label) {
+function assertTransformBeforeAdd(source, transformText, addText, label) {
+  const transform = source.indexOf(transformText);
   const add = source.indexOf(addText);
-  const global = source.indexOf(globalText);
+  assert.ok(transform >= 0, `${label}: missing pre-tree transform`);
   assert.ok(add >= 0, `${label}: missing add_child`);
-  assert.ok(global >= 0, `${label}: missing global_position assignment`);
-  assert.ok(add < global, `${label}: node must enter SceneTree before global_position`);
+  assert.ok(transform < add, `${label}: local transform must be set before SceneTree registration`);
 }
 
 test("Round 3 production wires tree-safe platform gameplay", () => {
   assert.match(scene, /logspire_platform_gameplay_v2_tree_safe\.gd/);
   assert.match(treeSafe, /extends "res:\/\/modes\/logspire_leap\/logspire_platform_gameplay\.gd"/);
   assert.match(treeSafe, /LOGSPIRE PLATFORM TREE ORDER READY/);
+  assert.match(treeSafe, /first_physics_transform_valid=true/);
 });
 
-test("Rolling Grove log replacement enters the tree before global transform", () => {
-  const fn = sliceFunction("_make_log_body", "_make_box_body");
-  assertAddBeforeGlobalPosition(fn, "_world.add_child(body)", "body.global_position =", "rolling log");
+test("Rolling Grove moving bodies register at their authored transform on the first physics frame", () => {
+  const logBody = sliceFunction("_make_log_body", "_make_box_body");
+  const boxBody = sliceFunction("_make_box_body", "_build_mushroom");
+  assertTransformBeforeAdd(logBody, "body.transform = _local_transform_for", "_world.add_child(body)", "rolling log");
+  assertTransformBeforeAdd(boxBody, "body.transform = _local_transform_for", "_world.add_child(body)", "box platform");
+  assert.doesNotMatch(logBody, /body\.global_position\s*=/);
+  assert.doesNotMatch(boxBody, /body\.global_position\s*=/);
 });
 
-test("Rolling Grove balance and cracking replacements enter the tree before global transform", () => {
-  const fn = sliceFunction("_make_box_body", "_build_mushroom");
-  assertAddBeforeGlobalPosition(fn, "_world.add_child(body)", "body.global_position =", "box platform");
-});
-
-test("Mushroom trigger and visual enter the tree before global transforms", () => {
+test("Mushroom trigger and visual use parent-local coordinates before registration", () => {
   const fn = sliceFunction("_build_mushroom", "_build_vine");
-  assertAddBeforeGlobalPosition(fn, "_world.add_child(area)", "area.global_position =", "mushroom area");
-  assertAddBeforeGlobalPosition(fn, "_world.add_child(cap)", "cap.global_position =", "mushroom visual");
+  assertTransformBeforeAdd(fn, "area.position = _local_position_for", "_world.add_child(area)", "mushroom area");
+  assertTransformBeforeAdd(fn, "cap.position = _local_position_for", "_world.add_child(cap)", "mushroom visual");
+  assert.doesNotMatch(fn, /\.global_position\s*=/);
 });
 
-test("Vine trigger and visual enter the tree before global transforms", () => {
+test("Vine trigger and visual use parent-local coordinates before registration", () => {
   const fn = sliceFunction("_build_vine", null);
-  assertAddBeforeGlobalPosition(fn, "_world.add_child(area)", "area.global_position =", "vine area");
-  assertAddBeforeGlobalPosition(fn, "_world.add_child(vine)", "vine.global_position =", "vine visual");
+  assertTransformBeforeAdd(fn, "area.position = _local_position_for", "_world.add_child(area)", "vine area");
+  assertTransformBeforeAdd(fn, "vine.position = _local_position_for", "_world.add_child(vine)", "vine visual");
+  assert.doesNotMatch(fn, /\.global_position\s*=/);
 });
