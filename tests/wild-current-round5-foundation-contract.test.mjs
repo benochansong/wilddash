@@ -8,6 +8,7 @@ const project = read('godot/project.godot');
 const manager = read('godot/scripts/game_manager_rc9_round5_wild_current.gd');
 const scene = read('godot/modes/wild_current/wild_current.tscn');
 const mode = read('godot/modes/wild_current/wild_current_race.gd');
+const phase2 = read('godot/modes/wild_current/wild_current_race_phase2.gd');
 const swimmer = read('godot/modes/wild_current/wild_current_swimmer.gd');
 const current = read('godot/modes/wild_current/wild_current_volume.gd');
 const whirlpool = read('godot/modes/wild_current/wild_whirlpool_volume.gd');
@@ -20,8 +21,9 @@ test('production campaign replaces legacy Round 5 with Wild Current only', () =>
   assert.match(manager, /r5_campaign_complete[\s\S]*final_round=wild_current/);
 });
 
-test('Round 5 production scene points at the swim-only mode', () => {
-  assert.match(scene, /res:\/\/modes\/wild_current\/wild_current_race\.gd/);
+test('Round 5 production scene points at the swim-only mode through the Phase 2 layer', () => {
+  assert.match(scene, /res:\/\/modes\/wild_current\/wild_current_race_phase2\.gd/);
+  assert.match(phase2, /extends "res:\/\/modes\/wild_current\/wild_current_race\.gd"/);
   assert.match(mode, /&"wild_current"/);
   assert.match(mode, /WILD CURRENT: RIVER RUSH/);
   assert.match(mode, /ContinuousWaterSurface/);
