@@ -3,13 +3,16 @@ extends Node
 ## Final Round 3 submerged fail-safe.
 ## WaterRecovery keeps the authored Vine Rescue path, but no racer may remain
 ## stranded below the water surface because recovery state or target selection
-## became inconsistent. A genuinely submerged, unsupported racer that is not
-## already moving through a Vine Rescue is reset directly to the latest Safe
-## Route checkpoint after a very short confirmation window.
+## became inconsistent. A genuinely submerged racer that is not already moving
+## through a Vine Rescue is reset directly to the latest Safe Route checkpoint
+## after a very short confirmation window. Near-surface support still protects
+## rounded logs and platform edges, but support far below the waterline is never
+## considered valid racing ground.
 
 const WATER_META: StringName = &"logspire_water_recovery_active"
 const TRAVERSAL_LOCK_META: StringName = &"logspire_traversal_action_lock"
 const HARD_SUBMERGE_DEPTH: float = 0.58
+const SUPPORTED_FLOOR_ESCAPE_DEPTH: float = 1.20
 const HARD_SUBMERGE_CONFIRM_SECONDS: float = 0.14
 const HARD_SPAWN_HEIGHT: float = 1.24
 const HARD_RUNWAY_BACKOFF_MIN: float = 0.80
@@ -34,8 +37,8 @@ func _bootstrap() -> void:
 	if _water == null or _graph == null:
 		push_error("LOGSPIRE SUBMERGE WATCHDOG INIT FAIL missing water/graph")
 		return
-	print("LOGSPIRE SUBMERGE WATCHDOG READY depth=%.2fm confirm=%.2fs direct_checkpoint=true swim_stall=false camera_reset=true" % [
-		HARD_SUBMERGE_DEPTH, HARD_SUBMERGE_CONFIRM_SECONDS,
+	print("LOGSPIRE SUBMERGE WATCHDOG READY depth=%.2fm supported_floor_escape=%.2fm confirm=%.2fs direct_checkpoint=true swim_stall=false camera_reset=true" % [
+		HARD_SUBMERGE_DEPTH, SUPPORTED_FLOOR_ESCAPE_DEPTH, HARD_SUBMERGE_CONFIRM_SECONDS,
 	])
 
 func _physics_process(delta: float) -> void:
@@ -56,12 +59,28 @@ func _physics_process(delta: float) -> void:
 		if submerged_depth < HARD_SUBMERGE_DEPTH:
 			_submerged_elapsed_by_id.erase(racer_id)
 			continue
-		if _has_surface_support(racer):
+
+		# Surface support is trustworthy only near the waterline. The old watchdog
+		# treated ANY floor hit as safety, including hidden recovery floors and the
+		# river bed many metres below the surface. That let a racer walk forever
+		# below the map while V10 retried water entry and V15 rejected it every frame.
+		var has_surface_support: bool = _has_surface_support(racer)
+		var supported_floor_invalid: bool = has_surface_support and submerged_depth >= SUPPORTED_FLOOR_ESCAPE_DEPTH
+		if has_surface_support and not supported_floor_invalid:
 			_submerged_elapsed_by_id.erase(racer_id)
 			continue
 		if _vine_rescue_active(racer_id):
 			_submerged_elapsed_by_id.erase(racer_id)
 			continue
+
+		if supported_floor_invalid and not _submerged_elapsed_by_id.has(racer_id):
+			print("LOGSPIRE SUBMERGED FLOOR INVALID racer=%s zone=%d body_y=%.2f water_y=%.2f depth=%.2f support_ignored=true force_checkpoint_pending=true" % [
+				RaceManager.get_racer_label(racer),
+				int(pool.get("zone", 0)) + 1,
+				racer.global_position.y,
+				water_y,
+				submerged_depth,
+			])
 
 		var elapsed: float = float(_submerged_elapsed_by_id.get(racer_id, 0.0)) + delta
 		_submerged_elapsed_by_id[racer_id] = elapsed
