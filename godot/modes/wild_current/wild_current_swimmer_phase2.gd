@@ -11,6 +11,8 @@ const STUCK_STEER_SECONDS: float = 1.35
 const STUCK_REACQUIRE_SECONDS: float = 2.25
 const DRAFT_ACCEL_SCALE: float = 1.06
 const MAX_DRAFT_SPEED_BONUS: float = 0.62
+const WATER_COMBAT_PUSH_DECAY: float = 9.5
+const WATER_COMBAT_PUSH_MAX: float = 11.5
 
 var pack_role: StringName = &"PLAYER"
 var ai_slot: int = -1
@@ -35,6 +37,7 @@ var _stuck_seconds: float = 0.0
 var _recovery_steer: float = 0.0
 var _reacquire_logged: bool = false
 var _last_ai_line: StringName = &""
+var _water_combat_push_velocity: Vector3 = Vector3.ZERO
 
 func configure_competition(role: StringName, profile: Dictionary, slot: int) -> void:
 	pack_role = role
@@ -203,7 +206,8 @@ func _apply_swim_motion(delta: float, requested_speed: float) -> void:
 			water_force = sampled
 	water_force.x *= _lateral_current_scale
 
-	var desired_planar := forward * _swim_speed + water_force
+	_water_combat_push_velocity = _water_combat_push_velocity.move_toward(Vector3.ZERO, WATER_COMBAT_PUSH_DECAY * delta)
+	var desired_planar := forward * _swim_speed + water_force + _water_combat_push_velocity
 	var current_planar := Vector3(racer.velocity.x, 0.0, racer.velocity.z)
 	var drag_response := WATER_DRAG_RESPONSE / _momentum_scale
 	var blended := current_planar.lerp(desired_planar, clampf(drag_response * delta, 0.0, 0.32))
@@ -221,6 +225,27 @@ func _apply_swim_motion(delta: float, requested_speed: float) -> void:
 			var escape_sign := -1.0 if ((ai_slot + _route_index) % 2 == 0) else 1.0
 			racer.rotate_y(escape_sign * (0.10 + obstacle_avoidance * 0.12))
 	racer.current_speed = Vector2(racer.velocity.x, racer.velocity.z).length()
+
+func apply_water_combat_push(direction: Vector3, strength: float, speed_retention: float = 0.82) -> bool:
+	if racer == null or racer.finished:
+		return false
+	var planar := Vector3(direction.x, 0.0, direction.z)
+	if planar.length_squared() <= 0.0001:
+		return false
+	var impulse := planar.normalized() * clampf(strength, 0.0, WATER_COMBAT_PUSH_MAX)
+	_water_combat_push_velocity += impulse
+	if _water_combat_push_velocity.length() > WATER_COMBAT_PUSH_MAX:
+		_water_combat_push_velocity = _water_combat_push_velocity.normalized() * WATER_COMBAT_PUSH_MAX
+	# Immediate kick plus persistent water-drift component. This is intentionally
+	# handled by the Round 5 swimmer because land CharacterController physics is
+	# disabled while WILD CURRENT is active.
+	racer.velocity.x += impulse.x * 0.58
+	racer.velocity.z += impulse.z * 0.58
+	_swim_speed = maxf(MIN_SWIM_SPEED, _swim_speed * clampf(speed_retention, 0.65, 1.0))
+	print("r5_water_combat_push racer=%s strength=%.2f retention=%.2f diving=%s" % [
+		RaceManager.get_racer_label(racer), strength, speed_retention, str(is_diving()),
+	])
+	return true
 
 func _try_swim_burst() -> void:
 	if _burst_cooldown > 0.0 or racer == null:
