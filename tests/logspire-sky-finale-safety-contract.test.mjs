@@ -31,12 +31,59 @@ test("playable Finale log is flat and has no hollow cylinder or rolling force", 
   assert.match(phase3V5, /r3_finale_log_removed/);
 });
 
-test("moving Finale route pieces are converted to stable box traversal", () => {
-  assert.match(phase3V5, /SkyFinaleMovingBranch shape=box static=true moving=false/);
+test("mushroom boost is a box trigger and never becomes a solid cylinder obstacle", () => {
+  const buildMushroom = functionBlock(phase3V5, "_build_finale_mushroom() -> void:");
+  assert.match(buildMushroom, /BoxShape3D\.new\(\)/);
+  assert.doesNotMatch(buildMushroom, /CylinderShape3D/);
+  assert.match(buildMushroom, /collision_layer = 0/);
+  assert.match(buildMushroom, /support=Z6_02/);
+});
+
+test("moving branch is visual-only and cannot block Z6 Safe Route jumps", () => {
+  const buildBranch = functionBlock(phase3V5, "_build_finale_moving_branch() -> void:");
+  assert.match(buildBranch, /collision_layer = 0/);
+  assert.match(buildBranch, /collision_mask = 0/);
+  assert.doesNotMatch(buildBranch, /CollisionShape3D\.new\(\)/);
+  assert.match(phase3V5, /SkyFinaleMovingBranch visual_only=true collision=false moving=false/);
   assert.match(phase3V5, /_finale_moving_branch\.global_position = _finale_moving_branch_base/);
-  assert.match(phase3V5, /_last_tree_state = &"STATIC_READY"/);
-  assert.match(phase3V5, /LastFallingTree shape=box static=true falling_event=false camera_cut=false/);
+});
+
+test("final tree is a flat expected Safe Route bridge with no hollow or falling collision state", () => {
+  const buildBridge = functionBlock(phase3V5, "_build_last_tree_bridge() -> void:");
+  assert.match(buildBridge, /SafeFlowBridge_Z6_07_CROWN_NEST/);
+  assert.match(buildBridge, /BoxMesh\.new\(\)/);
+  assert.match(buildBridge, /BoxShape3D\.new\(\)/);
+  assert.match(buildBridge, /FINALE_LAST_BRIDGE_THICKNESS/);
+  assert.match(buildBridge, /_last_tree_state = &"BRIDGE_READY"/);
+  assert.doesNotMatch(buildBridge, /CylinderShape3D/);
+  assert.doesNotMatch(buildBridge, /FALLING/);
+  assert.match(phase3V5, /func _update_last_tree\(_delta: float\) -> void:/);
+  assert.match(phase3V5, /falling_event=false/);
   assert.match(phase3V5, /_final_jump_area\.monitoring = true/);
+});
+
+test("Titan trunk collision core is narrowed after V4 build for Finale approach clearance", () => {
+  const stabilize = functionBlock(phase3V5, "_stabilize_finale_titan_trunk_collision() -> void:");
+  assert.match(phase3V5, /FINALE_TITAN_CORE_RADIUS: float = 0\.72/);
+  assert.match(stabilize, /TitanTrunkCollision/);
+  assert.match(stabilize, /shape\.radius = minf\(shape\.radius, FINALE_TITAN_CORE_RADIUS\)/);
+  assert.match(stabilize, /late_approach_clearance=true/);
+});
+
+test("Finale runtime builders attach nodes before assigning global transforms", () => {
+  for (const functionName of [
+    "_build_finale_rolling_log() -> void:",
+    "_build_finale_mushroom() -> void:",
+    "_build_finale_moving_branch() -> void:",
+    "_build_last_tree_bridge() -> void:",
+    "_build_final_recovery_area() -> void:",
+  ]) {
+    const block = functionBlock(phase3V5, functionName);
+    const addChild = block.indexOf("_world.add_child(");
+    const globalPosition = block.indexOf(".global_position =");
+    assert.ok(addChild >= 0, `${functionName} should attach a node to the world`);
+    assert.ok(globalPosition > addChild, `${functionName} should attach before its first global_position assignment`);
+  }
 });
 
 test("final gap recovery volume is deep, bounded, and support-first", () => {
