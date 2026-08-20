@@ -4,8 +4,14 @@ extends Node
 ## WaterRecovery keeps the authored Vine Rescue path, but no racer may remain
 ## stranded below the water surface because recovery state or target selection
 ## became inconsistent. A genuinely submerged, unsupported racer that is not
-## already moving through a Vine Rescue is reset directly to the latest Safe
-## Route checkpoint after a very short confirmation window.
+## already moving through a Vine Rescue is reset to a bounded Safe Route exit.
+##
+## Sky Log Finale adds a route-support guard in front of this fail-safe. The
+## generic water sampler remains authoritative, but authored Z6/Crown platform
+## geometry is also checked so a supported racer cannot be mistaken for a deep
+## swimmer because one ray missed a thin edge or seam. Genuine Finale water falls
+## recover to the nearest bounded Z6 platform instead of snapping all the way
+## back to the single Z6_START checkpoint.
 
 const WATER_META: StringName = &"logspire_water_recovery_active"
 const TRAVERSAL_LOCK_META: StringName = &"logspire_traversal_action_lock"
@@ -14,11 +20,38 @@ const HARD_SUBMERGE_CONFIRM_SECONDS: float = 0.14
 const HARD_SPAWN_HEIGHT: float = 1.24
 const HARD_RUNWAY_BACKOFF_MIN: float = 0.80
 const HARD_RUNWAY_BACKOFF_MAX: float = 1.60
+const FINALE_SUPPORT_VERTICAL_BELOW: float = 0.25
+const FINALE_SUPPORT_VERTICAL_ABOVE: float = 1.55
+const FINALE_SUPPORT_EXTRA_RADIUS: float = 0.90
+const FINALE_RECOVERY_MAX_PLANAR_DISTANCE: float = 12.5
+const FINALE_GUARD_LOG_COOLDOWN_MSEC: int = 1500
+const FINALE_SUPPORT_IDS: Array[StringName] = [
+	&"Z6_START",
+	&"Z6_01",
+	&"Z6_02",
+	&"Z6_03",
+	&"Z6_04",
+	&"Z6_05",
+	&"Z6_06",
+	&"Z6_07",
+	&"CROWN_NEST",
+]
+const FINALE_RECOVERY_IDS: Array[StringName] = [
+	&"Z6_START",
+	&"Z6_01",
+	&"Z6_02",
+	&"Z6_03",
+	&"Z6_04",
+	&"Z6_05",
+	&"Z6_06",
+	&"Z6_07",
+]
 
 var _water: Node
 var _graph: Node
 var _recovery: Node
 var _submerged_elapsed_by_id: Dictionary = {}
+var _finale_guard_last_log_msec_by_id: Dictionary = {}
 
 func _ready() -> void:
 	call_deferred("_bootstrap")
@@ -34,7 +67,7 @@ func _bootstrap() -> void:
 	if _water == null or _graph == null:
 		push_error("LOGSPIRE SUBMERGE WATCHDOG INIT FAIL missing water/graph")
 		return
-	print("LOGSPIRE SUBMERGE WATCHDOG READY depth=%.2fm confirm=%.2fs direct_checkpoint=true swim_stall=false camera_reset=true" % [
+	print("LOGSPIRE SUBMERGE WATCHDOG READY depth=%.2fm confirm=%.2fs direct_checkpoint=true swim_stall=false camera_reset=true finale_support_guard=true" % [
 		HARD_SUBMERGE_DEPTH, HARD_SUBMERGE_CONFIRM_SECONDS,
 	])
 
@@ -56,8 +89,15 @@ func _physics_process(delta: float) -> void:
 		if submerged_depth < HARD_SUBMERGE_DEPTH:
 			_submerged_elapsed_by_id.erase(racer_id)
 			continue
-		if _has_surface_support(racer):
+
+		# Support always wins over visual/Area water overlap. The generic nine-ray
+		# probe handles arbitrary geometry; the Finale route guard additionally
+		# recognizes the authored flat Z6 platforms by their known landing bounds.
+		var finale_support_id: StringName = _finale_route_support_platform(racer)
+		if _has_surface_support(racer) or finale_support_id != &"":
 			_submerged_elapsed_by_id.erase(racer_id)
+			if finale_support_id != &"":
+				_log_finale_false_water_blocked(racer, finale_support_id, submerged_depth)
 			continue
 		if _vine_rescue_active(racer_id):
 			_submerged_elapsed_by_id.erase(racer_id)
@@ -83,6 +123,44 @@ func _has_surface_support(racer: WildDashCharacterController) -> bool:
 		return racer.is_on_floor()
 	return bool(_water.call("_has_nearby_surface_support", racer))
 
+func _finale_route_support_platform(racer: WildDashCharacterController) -> StringName:
+	if racer == null or not is_instance_valid(racer) or _graph == null:
+		return &""
+	for platform_id: StringName in FINALE_SUPPORT_IDS:
+		var position_value: Variant = _graph.call("get_platform_position", platform_id)
+		if not (position_value is Vector3):
+			continue
+		var position: Vector3 = position_value
+		var landing_radius: float = 4.0
+		if _graph.has_method("get_landing_radius"):
+			landing_radius = maxf(3.0, float(_graph.call("get_landing_radius", platform_id)))
+		var planar_distance: float = Vector2(
+			racer.global_position.x - position.x,
+			racer.global_position.z - position.z
+		).length()
+		var platform_top_y: float = position.y + 0.40
+		var foot_delta: float = racer.global_position.y - platform_top_y
+		if planar_distance <= landing_radius + FINALE_SUPPORT_EXTRA_RADIUS and foot_delta >= -FINALE_SUPPORT_VERTICAL_BELOW and foot_delta <= FINALE_SUPPORT_VERTICAL_ABOVE:
+			return platform_id
+	return &""
+
+func _log_finale_false_water_blocked(
+	racer: WildDashCharacterController,
+	platform_id: StringName,
+	submerged_depth: float
+) -> void:
+	if racer == null:
+		return
+	var racer_id: int = racer.get_instance_id()
+	var now_msec: int = Time.get_ticks_msec()
+	var last_msec: int = int(_finale_guard_last_log_msec_by_id.get(racer_id, -1000000))
+	if now_msec - last_msec < FINALE_GUARD_LOG_COOLDOWN_MSEC:
+		return
+	_finale_guard_last_log_msec_by_id[racer_id] = now_msec
+	print("r3_finale_false_water_blocked racer=%s source=submerge_watchdog object=%s depth=%.2f support_priority=true" % [
+		RaceManager.get_racer_label(racer), String(platform_id), submerged_depth,
+	])
+
 func _vine_rescue_active(racer_id: int) -> bool:
 	if _water == null:
 		return false
@@ -95,7 +173,15 @@ func _hard_checkpoint_escape(racer: WildDashCharacterController, submerged_depth
 	if racer == null or not is_instance_valid(racer) or _graph == null:
 		return
 	var racer_id: int = racer.get_instance_id()
-	var target_id: StringName = _latest_checkpoint_target(racer)
+
+	# The generic checkpoint list contains only Z6_START for the Finale. Use the
+	# nearest non-finish Z6 platform when the fall is horizontally inside the
+	# Finale corridor; this avoids a large backwards screen snap while preserving
+	# a bounded, fair re-entry. Outside the Finale, retain the established logic.
+	var finale_target_id: StringName = _nearest_finale_recovery_target(racer)
+	var target_id: StringName = finale_target_id
+	if target_id == &"":
+		target_id = _latest_checkpoint_target(racer)
 	if target_id == &"":
 		target_id = _first_safe_route_target()
 	if target_id == &"":
@@ -122,6 +208,11 @@ func _hard_checkpoint_escape(racer: WildDashCharacterController, submerged_depth
 		HARD_RUNWAY_BACKOFF_MAX
 	)
 	var safe_spawn: Vector3 = target_position - forward * runway_backoff + Vector3.UP * HARD_SPAWN_HEIGHT
+	var finale_recovery: bool = finale_target_id != &""
+	if finale_recovery:
+		print("r3_finale_recovery_trigger racer=%s source=submerge_watchdog target=%s depth=%.2f supported=false" % [
+			RaceManager.get_racer_label(racer), String(target_id), submerged_depth,
+		])
 
 	# Cancel all transform ownership left by the water stack before reset.
 	if _recovery != null:
@@ -158,12 +249,35 @@ func _hard_checkpoint_escape(racer: WildDashCharacterController, submerged_depth
 		_recovery.call("begin_retry_grace", racer, "hard_water_escape")
 	if _water.has_method("_set_hud_message") and racer.is_player and DisplayServer.get_name() != "headless":
 		_water.call("_set_hud_message", "BACK TO THE RACE · WATER RESET")
+	if finale_recovery:
+		print("r3_finale_recovery_exit racer=%s target=%s safe_spawn=true loop_guard=true source=submerge_watchdog" % [
+			RaceManager.get_racer_label(racer), String(target_id),
+		])
 	print("LOGSPIRE HARD WATER ESCAPE racer=%s target=%s depth=%.2f checkpoint=%d immediate=true water_authority_cleared=true camera_normalized=true" % [
 		RaceManager.get_racer_label(racer),
 		String(target_id),
 		submerged_depth,
 		RaceManager.get_checkpoint_progress(racer),
 	])
+
+func _nearest_finale_recovery_target(racer: WildDashCharacterController) -> StringName:
+	if racer == null or _graph == null:
+		return &""
+	var best_id: StringName = &""
+	var best_distance: float = FINALE_RECOVERY_MAX_PLANAR_DISTANCE
+	for platform_id: StringName in FINALE_RECOVERY_IDS:
+		var position_value: Variant = _graph.call("get_platform_position", platform_id)
+		if not (position_value is Vector3):
+			continue
+		var position: Vector3 = position_value
+		var distance: float = Vector2(
+			racer.global_position.x - position.x,
+			racer.global_position.z - position.z
+		).length()
+		if distance <= best_distance:
+			best_distance = distance
+			best_id = platform_id
+	return best_id
 
 func _reset_recovery_camera(racer: WildDashCharacterController) -> void:
 	if racer == null or not racer.is_player:
@@ -180,9 +294,6 @@ func _reset_recovery_camera(racer: WildDashCharacterController) -> void:
 		camera.call("clear_recovery_focus")
 	if camera.has_method("clear_race_focus"):
 		camera.call("clear_race_focus")
-	# set_target immediately recalculates an obstruction-safe chase position, so
-	# the first post-reset jump cannot inherit a water-camera transform buried in
-	# Titan geometry.
 	if camera.has_method("set_target"):
 		camera.call("set_target", racer)
 	print("LOGSPIRE WATER CAMERA RESET racer=%s recovery_mode=false race_focus=false obstruction_recheck=true" % RaceManager.get_racer_label(racer))
