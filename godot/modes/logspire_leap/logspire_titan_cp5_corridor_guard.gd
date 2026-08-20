@@ -8,10 +8,13 @@ extends Node
 ## start also bends back toward the estimated Titan centre, so the last spiral
 ## exit can cross the trunk collision.
 ##
-## This guard runs after JumpGapGuard and before PlatformGraph/Phase3 setup. It
-## keeps the generous landing feel without allowing neighbouring spiral slabs to
-## overlap, then sends the finale outward along the spiral tangent instead of
-## through the Titan trunk.
+## The CP5 checkpoint also exposed a second gameplay issue: after recovery the
+## player can be stationary on Z5_SPIRAL_06 while the next platform centres are
+## still about 15.75m apart. The collision audit proves that the air corridor is
+## clear, but it does not prove that a zero-speed player can physically make the
+## jump. Production therefore adds narrow, sloped route connectors from CP5 to
+## the finale exit. They preserve the spiral silhouette while making the late
+## Safe Route traversable without requiring a full-speed running jump.
 
 const SPIRAL_IDS: Array[StringName] = [
 	&"Z5_SPIRAL_01", &"Z5_SPIRAL_02", &"Z5_SPIRAL_03", &"Z5_SPIRAL_04", &"Z5_SPIRAL_05",
@@ -20,12 +23,22 @@ const SPIRAL_IDS: Array[StringName] = [
 const FINALE_IDS: Array[StringName] = [
 	&"Z6_START", &"Z6_01", &"Z6_02", &"Z6_03", &"Z6_04", &"Z6_05", &"Z6_06", &"Z6_07", &"CROWN_NEST",
 ]
+const LATE_TRAVERSAL_PAIRS: Array[Array] = [
+	[&"Z5_SPIRAL_06", &"Z5_SPIRAL_07"],
+	[&"Z5_SPIRAL_07", &"Z5_SPIRAL_08"],
+	[&"Z5_SPIRAL_08", &"Z5_SPIRAL_09"],
+	[&"Z5_SPIRAL_09", &"Z5_SPIRAL_10"],
+	[&"Z5_SPIRAL_10", &"Z6_START"],
+]
 const SPIRAL_PLATFORM_WIDTH: float = 10.0
 const SPIRAL_PLATFORM_LENGTH: float = 12.0
 const CHECKPOINT_PLATFORM_WIDTH: float = 11.0
 const CHECKPOINT_PLATFORM_LENGTH: float = 12.0
 const EXIT_TANGENT_DISTANCE: float = 18.0
 const EXIT_OUTWARD_DISTANCE: float = 6.0
+const LATE_CONNECTOR_WIDTH: float = 5.8
+const LATE_CONNECTOR_THICKNESS: float = 0.42
+const LATE_CONNECTOR_SURFACE_LIFT: float = 0.08
 
 var _world: Node3D
 
@@ -37,14 +50,16 @@ func _ready() -> void:
 	_repair_spiral_platform_footprints()
 	_reflow_finale_exit_around_trunk()
 	_refresh_affected_geometry()
+	_build_late_titan_connectors()
 	_update_course_length()
-	print("LOGSPIRE TITAN CP5 CORRIDOR READY spiral_size=%.1fx%.1f checkpoint_size=%.1fx%.1f finale_tangent=%.1fm outward=%.1fm trunk_crossing=false" % [
+	print("LOGSPIRE TITAN CP5 CORRIDOR READY spiral_size=%.1fx%.1f checkpoint_size=%.1fx%.1f finale_tangent=%.1fm outward=%.1fm trunk_crossing=false late_connectors=%d no_runup_required=true" % [
 		SPIRAL_PLATFORM_WIDTH,
 		SPIRAL_PLATFORM_LENGTH,
 		CHECKPOINT_PLATFORM_WIDTH,
 		CHECKPOINT_PLATFORM_LENGTH,
 		EXIT_TANGENT_DISTANCE,
 		EXIT_OUTWARD_DISTANCE,
+		LATE_TRAVERSAL_PAIRS.size(),
 	])
 
 func _repair_spiral_platform_footprints() -> void:
@@ -157,6 +172,72 @@ func _refresh_affected_geometry() -> void:
 					shape.size = size
 
 	_refresh_route_rotations(positions, index_by_id)
+
+func _build_late_titan_connectors() -> void:
+	var old_root := _world.get_node_or_null("TitanCP5Traversal")
+	if old_root != null:
+		old_root.queue_free()
+
+	var connector_root := Node3D.new()
+	connector_root.name = "TitanCP5Traversal"
+	_world.add_child(connector_root)
+
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.72, 0.43, 0.13)
+	material.roughness = 0.92
+	var built: int = 0
+	var max_slope_degrees: float = 0.0
+
+	for pair: Array in LATE_TRAVERSAL_PAIRS:
+		var from_id: StringName = pair[0]
+		var to_id: StringName = pair[1]
+		var from: Vector3 = _world.call("get_platform_position", from_id) + Vector3.UP * LATE_CONNECTOR_SURFACE_LIFT
+		var to: Vector3 = _world.call("get_platform_position", to_id) + Vector3.UP * LATE_CONNECTOR_SURFACE_LIFT
+		var delta: Vector3 = to - from
+		if delta.length_squared() <= 0.001:
+			continue
+		var planar: float = Vector2(delta.x, delta.z).length()
+		var slope_degrees: float = rad_to_deg(atan2(absf(delta.y), maxf(0.001, planar)))
+		max_slope_degrees = maxf(max_slope_degrees, slope_degrees)
+
+		var body := StaticBody3D.new()
+		body.name = "TitanCP5Connector_%s_%s" % [String(from_id), String(to_id)]
+		body.collision_layer = 1
+		body.collision_mask = 0
+		body.set_meta("logspire_route_connector", true)
+		body.set_meta("logspire_route_from", from_id)
+		body.set_meta("logspire_route_to", to_id)
+
+		var desired_global := Transform3D(
+			Basis.looking_at(delta.normalized(), Vector3.UP),
+			(from + to) * 0.5
+		)
+		body.transform = connector_root.global_transform.affine_inverse() * desired_global
+
+		var mesh := BoxMesh.new()
+		mesh.size = Vector3(LATE_CONNECTOR_WIDTH, LATE_CONNECTOR_THICKNESS, delta.length())
+		mesh.material = material
+		var visual := MeshInstance3D.new()
+		visual.name = "Mesh"
+		visual.mesh = mesh
+		body.add_child(visual)
+
+		var collision := CollisionShape3D.new()
+		collision.name = "Collision"
+		var shape := BoxShape3D.new()
+		shape.size = mesh.size
+		collision.shape = shape
+		body.add_child(collision)
+		connector_root.add_child(body)
+		built += 1
+
+		print("LOGSPIRE TITAN CP5 CONNECTOR from=%s to=%s length=%.2fm rise=%.2fm slope=%.1fdeg width=%.1fm walkable=true" % [
+			String(from_id), String(to_id), delta.length(), delta.y, slope_degrees, LATE_CONNECTOR_WIDTH,
+		])
+
+	print("LOGSPIRE TITAN CP5 TRAVERSAL READY connectors=%d expected=%d max_slope=%.1fdeg checkpoint_exit=true zero_speed_escape=true" % [
+		built, LATE_TRAVERSAL_PAIRS.size(), max_slope_degrees,
+	])
 
 func _refresh_route_rotations(positions: Array, index_by_id: Dictionary) -> void:
 	var route_value: Variant = _world.call("get_route_ids", &"safe")
