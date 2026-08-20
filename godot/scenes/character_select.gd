@@ -18,9 +18,11 @@ var _preview_racer: WildDashCharacterController
 var _summary_label: Label
 var _mode_label: Label
 var _start_button: Button
+var _stats_panel: WildDashAnimalStatsPanel
 var _palette_index := 0
 var _pattern_index := 0
 var _slot_labels: Dictionary = {}
+var _animal_buttons: Dictionary = {}
 
 func _ready() -> void:
 	GameManager.set_state(GameManager.GameState.CHARACTER_SELECT)
@@ -33,7 +35,7 @@ func _ready() -> void:
 	_build_preview_stage()
 	_build_ui()
 	_refresh_preview()
-	print("CHARACTER SELECT READY basic=12 chimera_parts=4")
+	print("CHARACTER SELECT READY basic=12 chimera_parts=4 stats=canonical6 responsive_right=true")
 
 func _process(delta: float) -> void:
 	if _preview_racer != null:
@@ -135,17 +137,32 @@ func _build_ui() -> void:
 	layer.name = "CharacterSelectUI"
 	add_child(layer)
 
+	var ui_root := Control.new()
+	ui_root.name = "ResponsiveRoot"
+	ui_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(ui_root)
+
 	var shade := ColorRect.new()
+	shade.name = "LeftShade"
 	shade.color = Color(0.015, 0.025, 0.05, 0.92)
-	shade.position = Vector2(0, 0)
-	shade.size = Vector2(610, 900)
-	layer.add_child(shade)
+	shade.set_anchors_preset(Control.PRESET_LEFT_WIDE)
+	shade.offset_right = 610.0
+	ui_root.add_child(shade)
+
+	var left_margin := MarginContainer.new()
+	left_margin.name = "LeftControls"
+	left_margin.set_anchors_preset(Control.PRESET_LEFT_WIDE)
+	left_margin.offset_left = 34.0
+	left_margin.offset_right = 574.0
+	left_margin.offset_top = 22.0
+	left_margin.offset_bottom = -26.0
+	ui_root.add_child(left_margin)
 
 	var box := VBoxContainer.new()
-	box.position = Vector2(34, 22)
-	box.custom_minimum_size = Vector2(540, 852)
+	box.custom_minimum_size = Vector2(540, 0)
+	box.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	box.add_theme_constant_override("separation", 7)
-	layer.add_child(box)
+	left_margin.add_child(box)
 
 	var title := Label.new()
 	title.text = "WILD DASH — CHOOSE YOUR RACER"
@@ -154,7 +171,7 @@ func _build_ui() -> void:
 	box.add_child(title)
 
 	var subtitle := Label.new()
-	subtitle.text = "12 UNIQUE RACERS · 동물마다 주행·체급·아레나·스킬 튜닝이 다릅니다."
+	subtitle.text = "12 UNIQUE RACERS · 6개 실제 능력치·체급·스킬을 비교하고 선택하세요."
 	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(subtitle)
 
@@ -184,10 +201,16 @@ func _build_ui() -> void:
 		var definition := WildDashAnimalCatalog.get_definition(animal_id)
 		var button := Button.new()
 		button.text = definition.display_name.to_upper()
-		button.tooltip_text = "%s · %s · %s" % [definition.display_name, definition.role, definition.skill_name]
+		button.tooltip_text = "%s · %s · %s" % [
+			definition.display_name,
+			WildDashAnimalSelectionPresentation.get_identity(animal_id),
+			definition.skill_name,
+		]
 		button.custom_minimum_size = Vector2(170, 48)
+		button.toggle_mode = true
 		button.pressed.connect(select_animal.bind(animal_id))
 		animal_grid.add_child(button)
+		_animal_buttons[animal_id] = button
 
 	var divider := HSeparator.new()
 	box.add_child(divider)
@@ -235,10 +258,28 @@ func _build_ui() -> void:
 	box.add_child(_start_button)
 
 	var hints := Label.new()
-	hints.text = "1~4: Core racers · 나머지 8종은 버튼 선택 · H/B/T: Chimera · Enter: Start"
+	hints.text = "동물 선택 → 오른쪽 6능력치 비교 · H/B/T: Chimera · Enter: Start"
 	hints.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hints.modulate = Color(0.7, 0.76, 0.86)
 	box.add_child(hints)
+
+	var right_column := MarginContainer.new()
+	right_column.name = "RightDetailColumn"
+	right_column.set_anchors_preset(Control.PRESET_RIGHT_WIDE)
+	right_column.offset_left = -448.0
+	right_column.offset_right = -28.0
+	right_column.offset_top = 35.0
+	right_column.offset_bottom = -35.0
+	right_column.add_theme_constant_override("margin_left", 5)
+	right_column.add_theme_constant_override("margin_right", 5)
+	ui_root.add_child(right_column)
+
+	_stats_panel = WildDashAnimalStatsPanel.new()
+	_stats_panel.name = "AnimalStatsPanel"
+	_stats_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_stats_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	right_column.add_child(_stats_panel)
+
 	basic_button.grab_focus()
 
 func _add_slot_row(parent: VBoxContainer, slot: StringName, caption: String) -> void:
@@ -283,15 +324,32 @@ func _refresh_preview() -> void:
 		_slot_labels[&"body"].text = String(_loadout.body_id).to_upper()
 		_slot_labels[&"tail"].text = String(_loadout.tail_id).to_upper()
 		_start_button.text = "SAVE BUILD & START"
+		var body_definition := WildDashAnimalCatalog.get_definition(_loadout.body_id)
+		if _stats_panel != null:
+			_stats_panel.show_animal(_loadout.body_id, body_definition, true)
 	else:
 		_preview_racer.configure_animal(_selected_animal)
 		var definition := WildDashAnimalCatalog.get_definition(_selected_animal)
-		_mode_label.text = "MODE: %s · %s" % [definition.display_name.to_upper(), definition.role]
+		_mode_label.text = "MODE: %s · %s" % [
+			definition.display_name.to_upper(),
+			WildDashAnimalSelectionPresentation.get_identity(_selected_animal),
+		]
 		_summary_label.text = "Speed %.1f · Accel %.1f · Handling %.2f · Jump %.1f · Arena %.1f\nSkill: %s · Cooldown %.1fs\n%s" % [
 			definition.max_speed, definition.acceleration, definition.turn_speed, definition.jump_velocity,
 			definition.arena_move_speed, definition.skill_name, definition.skill_cooldown, definition.skill_description,
 		]
 		_start_button.text = "START AS %s" % definition.display_name.to_upper()
+		if _stats_panel != null:
+			_stats_panel.show_animal(_selected_animal, definition, false)
+	_refresh_animal_button_states()
+
+func _refresh_animal_button_states() -> void:
+	for raw_id: Variant in _animal_buttons.keys():
+		var animal_id: StringName = StringName(raw_id)
+		var button: Button = _animal_buttons[raw_id] as Button
+		if button == null:
+			continue
+		button.button_pressed = not _chimera_mode and animal_id == _selected_animal
 
 func _cycle_palette() -> void:
 	_palette_index = (_palette_index + 1) % WildDashChimeraSystem.PALETTES.size()
@@ -319,7 +377,10 @@ func _start_run() -> void:
 	else:
 		GameManager.disable_chimera()
 		GameManager.configure_run(_selected_animal, _difficulty, {}, requested_ai)
-		print("CHARACTER SELECT START animal=%s role=%s" % [_selected_animal, WildDashAnimalCatalog.get_definition(_selected_animal).role])
+		print("CHARACTER SELECT START animal=%s role=%s" % [
+			_selected_animal,
+			WildDashAnimalSelectionPresentation.get_identity(_selected_animal),
+		])
 	GameManager.start_campaign()
 
 func _unhandled_key_input(event: InputEvent) -> void:

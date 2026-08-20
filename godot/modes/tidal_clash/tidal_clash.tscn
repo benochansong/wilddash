@@ -1,0 +1,51 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://modes/tidal_clash/tidal_clash.gd" id="1_mode"]
+[ext_resource type="Script" path="res://modes/tidal_clash/tidal_clash_track.gd" id="2_track"]
+[ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="3_feel"]
+[ext_resource type="Script" path="res://systems/racing_action_controller.gd" id="4_actions"]
+[ext_resource type="Script" path="res://systems/elephant_trunk_lunge_controller.gd" id="5_lunge"]
+[ext_resource type="Script" path="res://systems/race_combat_core_v3_power.gd" id="6_combat"]
+[ext_resource type="Script" path="res://systems/bear_combat_v2_controller.gd" id="7_bear"]
+[ext_resource type="Script" path="res://items/item_combat_expansion_long_bomb.gd" id="8_items"]
+[ext_resource type="Script" path="res://modes/tidal_clash/tidal_clash_world_controller.gd" id="9_world"]
+[ext_resource type="Script" path="res://modes/tidal_clash/tidal_clash_hazard_controller.gd" id="10_hazard"]
+[ext_resource type="Script" path="res://modes/tidal_clash/tidal_clash_ai_water_strategy.gd" id="11_ai"]
+
+[node name="TidalClash" type="Node3D"]
+script = ExtResource("1_mode")
+
+[node name="TidalClashTrack" type="Node3D" parent="."]
+script = ExtResource("2_track")
+
+[node name="RacingActionController" type="Node" parent="."]
+script = ExtResource("4_actions")
+
+[node name="RaceCombatCoreV3" type="Node" parent="."]
+script = ExtResource("6_combat")
+
+[node name="RaceCombatAIDirector" type="Node" parent="."]
+script = ExtResource("11_ai")
+round_id = &"tidal_clash"
+
+[node name="ElephantTrunkLungeController" type="Node" parent="."]
+script = ExtResource("5_lunge")
+
+[node name="BearCombatV2Controller" type="Node" parent="."]
+script = ExtResource("7_bear")
+
+[node name="RacingFeelController" type="Node" parent="."]
+script = ExtResource("3_feel")
+fov_gain = 8.0
+boost_fov_bonus = 3.4
+slip_strength = 0.08
+boost_slip_multiplier = 1.18
+
+[node name="ItemCombatExpansionController" type="Node" parent="."]
+script = ExtResource("8_items")
+
+[node name="TidalClashWorldController" type="Node3D" parent="."]
+script = ExtResource("9_world")
+
+[node name="TidalClashHazardController" type="Node3D" parent="."]
+script = ExtResource("10_hazard")
