@@ -1,18 +1,8 @@
 extends "res://modes/logspire_leap/logspire_phase3_director_v5_route_clearance_core.gd"
 
-## Final R3 event-geometry visibility, Titan corridor, and Sky Log Finale safety guard.
-##
-## The original Living Tree event created two large bridge bodies above the
-## spiral route, rotated them steeply while collision was disabled, then dropped
-## them into place at 64% progress. Production keeps the authored bridge idea but
-## removes unstable motion from the Safe Route.
-##
-## Sky Log Finale follows the same reliability rule: gameplay collision is flat,
-## simple, and continuously readable. The old rolling cylinder is visual-only in
-## the historical base script; this production override replaces it with a flat
-## log-board visual over the existing box platform, freezes the moving branch,
-## keeps the last-tree bridge ready and static, and only permits final-gap
-## recovery after support and water authorities agree the racer has truly failed.
+## Production Round 3 route-clearance guard.
+## Keeps the Titan approach stable and makes Sky Log Finale use simple, flat,
+## deterministic gameplay collision with support-first recovery.
 
 const STATIC_LIVING_BRIDGE_WIDTH: float = 3.8
 const STATIC_LIVING_BRIDGE_THICKNESS: float = 0.55
@@ -52,9 +42,8 @@ func _physics_process(delta: float) -> void:
 	_sync_event_geometry_visibility()
 	_log_finale_entries_and_support()
 
-## Replace the playable rolling cylinder with a log-looking flat board. The
-## authored Z6_01 platform remains the collision authority (BoxShape3D), so there
-## is no hollow/round volume a capsule can enter or become trapped inside.
+## The visual still reads as a log, but the playable route uses the authored
+## Z6_01 BoxShape platform. No cylinder collision and no lateral rolling Area3D.
 func _build_finale_rolling_log() -> void:
 	var platform_id: StringName = &"Z6_01"
 	var position: Vector3 = _platform_position(platform_id) + Vector3.UP * 0.64
@@ -62,9 +51,9 @@ func _build_finale_rolling_log() -> void:
 	_finale_roll_right = Vector3(-forward.z, 0.0, forward.x).normalized()
 	_finale_roll_visual = Node3D.new()
 	_finale_roll_visual.name = "SkyFinaleRollingLog"
+	_world.add_child(_finale_roll_visual)
 	_finale_roll_visual.global_position = position
 	_finale_roll_visual.rotation.y = atan2(-forward.x, -forward.z)
-	_world.add_child(_finale_roll_visual)
 
 	var mesh_instance := MeshInstance3D.new()
 	mesh_instance.name = "FlatLogBoardVisual"
@@ -74,21 +63,19 @@ func _build_finale_rolling_log() -> void:
 	mesh_instance.mesh = mesh
 	_finale_roll_visual.add_child(mesh_instance)
 
-	# No influence Area3D is needed on the Safe Route. The historical lateral
-	# rolling force could continuously steer a supported racer toward an edge.
 	_finale_roll_area = null
 	print("r3_finale_log_removed object=SkyFinaleRollingLog cylinder=false replacement=flat_box collision_proxy=Z6_01")
 
-## Keep final-gap recovery as a bounded fail-safe, but place it well below the
-## valid route instead of allowing a broad volume to overlap normal traversal.
+## Keep a final-gap fail-safe, but place its thin box well below valid traversal
+## so a normal jump/landing cannot enter it by brushing a route edge.
 func _build_final_recovery_area() -> void:
 	if _final_recovery_area != null and is_instance_valid(_final_recovery_area):
 		_final_recovery_area.queue_free()
 	var start: Vector3 = _platform_position(&"Z6_07")
 	var crown: Vector3 = _platform_position(&"CROWN_NEST")
+	var recovery_position: Vector3 = (start + crown) * 0.5 + Vector3.DOWN * FINALE_RECOVERY_DROP
 	_final_recovery_area = Area3D.new()
 	_final_recovery_area.name = "FinalJumpRecoveryBranch"
-	_final_recovery_area.global_position = (start + crown) * 0.5 + Vector3.DOWN * FINALE_RECOVERY_DROP
 	_final_recovery_area.collision_layer = 0
 	_final_recovery_area.collision_mask = 2
 	_final_recovery_area.monitoring = true
@@ -98,11 +85,11 @@ func _build_final_recovery_area() -> void:
 	collision.shape = shape
 	_final_recovery_area.add_child(collision)
 	_world.add_child(_final_recovery_area)
+	_final_recovery_area.global_position = recovery_position
 	_final_recovery_area.body_entered.connect(_on_final_recovery_body_entered)
 	print("r3_finale_collision_adjust object=FinalJumpRecoveryBranch shape=box deep_fail_only=true drop=%.1f" % FINALE_RECOVERY_DROP)
 
-## The safe route is intentionally deterministic. Visual motion can remain in
-## other zones, but Finale traversal boards themselves do not translate or roll.
+## Finale safe-route geometry does not translate or roll under racers.
 func _update_finale_obstacles(_delta: float) -> void:
 	if _finale_moving_branch != null and is_instance_valid(_finale_moving_branch):
 		_finale_moving_branch.global_position = _finale_moving_branch_base
@@ -125,15 +112,13 @@ func _stabilize_sky_finale_route() -> void:
 		_last_tree.collision_layer = 1
 		_last_tree.collision_mask = 2
 		_last_tree.visible = true
-		# A custom ready state prevents the inherited falling animation and its
-		# camera/FOV event from running globally while still allowing launch assist.
 		_last_tree_state = &"STATIC_READY"
 		_last_tree_elapsed = LAST_TREE_FALL_SECONDS
 		if _final_jump_area != null:
 			_final_jump_area.monitoring = true
 		print("r3_finale_collision_adjust object=LastFallingTree shape=box static=true falling_event=false camera_cut=false")
 
-## Preserve the final launch assist without requiring the old falling-tree state.
+## Preserve the final launch assist while the bridge itself remains static.
 func _on_final_jump_body_entered(body: Node3D) -> void:
 	var racer := body as WildDashCharacterController
 	if racer == null or racer.finished or _last_tree_state not in [&"STATIC_READY", &"BRIDGE_READY"]:
@@ -151,8 +136,8 @@ func _on_final_jump_body_entered(body: Node3D) -> void:
 		_final_jump_logged[id] = true
 		print("LOGSPIRE FINAL JUMP racer=%s launch=true target=CROWN_NEST recovery_below=true static_bridge=true" % RaceManager.get_racer_label(racer))
 
-## Final-gap recovery is subordinate to support and WaterRecovery. A racer that
-## lands during the delay must never be snapped back to Z6_07.
+## Inherited _on_final_recovery_body_entered owns _final_recovery_pending.
+## Clear that same dictionary on every exit so the fail-safe cannot loop or lock.
 func _recover_final_after_delay(racer: WildDashCharacterController, racer_id: int) -> void:
 	await get_tree().create_timer(FINAL_RECOVERY_DELAY_SECONDS).timeout
 	if racer == null or not is_instance_valid(racer) or racer.finished:
@@ -161,7 +146,7 @@ func _recover_final_after_delay(racer: WildDashCharacterController, racer_id: in
 
 	var support_id: StringName = _finale_route_support_platform(racer)
 	if support_id != &"":
-		_finale_recovery_pending.erase(racer_id)
+		_final_recovery_pending.erase(racer_id)
 		_log_finale_support_once(racer, support_id)
 		print("r3_finale_false_water_blocked racer=%s source=final_recovery reason=valid_support object=%s" % [
 			RaceManager.get_racer_label(racer), String(support_id),
@@ -197,17 +182,13 @@ func _recover_final_after_delay(racer: WildDashCharacterController, racer_id: in
 	var recovery := get_parent().get_node_or_null("RecoverySystem")
 	if recovery != null and recovery.has_method("begin_retry_grace"):
 		recovery.call("begin_retry_grace", racer, "r3_finale_gap")
-	_finale_recovery_pending.erase(racer_id)
+	_final_recovery_pending.erase(racer_id)
 	_finale_support_last_by_id.erase(racer_id)
 	print("r3_finale_recovery_exit racer=%s target=Z6_07 safe_spawn=true loop_guard=true" % RaceManager.get_racer_label(racer))
 
 func _finale_route_support_platform(racer: WildDashCharacterController) -> StringName:
 	if racer == null or not is_instance_valid(racer) or _world == null:
 		return &""
-
-	# First use authored platform geometry. CharacterRoot is the foot origin, so
-	# a narrow vertical band around each flat platform is a reliable fallback when
-	# is_on_floor() briefly drops at a seam or edge.
 	for platform_id: StringName in FINALE_SAFE_IDS:
 		var platform_position: Vector3 = _platform_position(platform_id)
 		var landing_radius: float = 4.0
@@ -222,8 +203,6 @@ func _finale_route_support_platform(racer: WildDashCharacterController) -> Strin
 		if planar <= landing_radius + FINALE_SUPPORT_EXTRA_RADIUS and foot_delta >= -FINALE_SUPPORT_VERTICAL_BELOW and foot_delta <= FINALE_SUPPORT_VERTICAL_ABOVE:
 			return platform_id
 
-	# The production water layer owns a nine-ray support sampler. If it confirms
-	# solid support, map that support to the nearest Finale route object for logs.
 	var water := get_parent().get_node_or_null("WaterRecovery")
 	var physics_supported: bool = racer.is_on_floor()
 	if not physics_supported and water != null and water.has_method("_has_nearby_surface_support"):
