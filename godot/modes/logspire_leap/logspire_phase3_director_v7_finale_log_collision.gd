@@ -9,12 +9,15 @@ extends "res://modes/logspire_leap/logspire_phase3_director_v6_titan_tree_safe.g
 ##
 ## V7 makes the rendered log and the physical obstacle the same AnimatableBody3D.
 ## The collision cylinder matches the visual radius/length and shares its axis.
-## The influence zone is also cylinder-shaped and parented to the log so it can
-## never drift out of alignment. A smaller interior-only overlap guard repairs a
-## rare tunnelling/deep-penetration state without resetting race progress/speed.
+## The obstacle is deliberately offset from the Safe Route centre so it remains a
+## hazard with a readable bypass lane instead of becoming a mandatory hard block.
+## The influence zone is cylinder-shaped and parented to the log so it can never
+## drift out of alignment. A smaller interior-only overlap guard repairs a rare
+## tunnelling/deep-penetration state without resetting race progress/speed.
 
 const FINALE_LOG_RADIUS: float = 2.15
 const FINALE_LOG_LENGTH: float = 10.5
+const FINALE_LOG_LATERAL_OFFSET: float = 3.80
 const FINALE_LOG_INFLUENCE_RADIUS: float = 2.95
 const FINALE_LOG_INFLUENCE_LENGTH: float = 11.4
 const FINALE_LOG_INTERIOR_RADIUS: float = 1.92
@@ -27,16 +30,23 @@ var _finale_roll_penetration_log_once: Dictionary = {}
 
 func configure(world: Node, graph: Node) -> void:
 	super(world, graph)
-	print("LOGSPIRE FINALE LOG COLLISION READY body=AnimatableBody3D radius=%.2f length=%.2f aligned_influence=true penetration_guard=true" % [
+	print("LOGSPIRE FINALE LOG COLLISION READY body=AnimatableBody3D radius=%.2f length=%.2f lateral_offset=%.2f safe_lane=true aligned_influence=true penetration_guard=true" % [
 		FINALE_LOG_RADIUS,
 		FINALE_LOG_LENGTH,
+		FINALE_LOG_LATERAL_OFFSET,
 	])
 
 func _build_finale_rolling_log() -> void:
 	var platform_id: StringName = &"Z6_01"
-	var global_position: Vector3 = _platform_position(platform_id) + Vector3.UP * 1.25
 	var forward: Vector3 = _platform_forward(platform_id)
 	_finale_roll_right = Vector3(-forward.z, 0.0, forward.x).normalized()
+	if _finale_roll_right.length_squared() <= 0.001:
+		_finale_roll_right = Vector3.RIGHT
+	var global_position: Vector3 = (
+		_platform_position(platform_id)
+		+ _finale_roll_right * FINALE_LOG_LATERAL_OFFSET
+		+ Vector3.UP * 1.25
+	)
 
 	var body := AnimatableBody3D.new()
 	body.name = "SkyFinaleRollingLog"
