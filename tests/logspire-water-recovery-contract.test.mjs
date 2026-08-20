@@ -25,19 +25,21 @@ const ladderV4 = readFileSync("godot/modes/logspire_leap/logspire_ladder_system_
 const ladderV5 = readFileSync("godot/modes/logspire_leap/logspire_ladder_system_v5_traversal_paths.gd", "utf8");
 const ladderV6 = readFileSync("godot/modes/logspire_leap/logspire_ladder_system_v6_vine_only_cleanup.gd", "utf8");
 const phase3V4 = readFileSync("godot/modes/logspire_leap/logspire_phase3_director_v4_major_collision.gd", "utf8");
+const phase3V5 = readFileSync("godot/modes/logspire_leap/logspire_phase3_director_v5_route_clearance.gd", "utf8");
 const combatV2 = readFileSync("godot/modes/logspire_leap/logspire_combat_safety_v2_recovery_protection.gd", "utf8");
 const recovery = readFileSync("godot/modes/logspire_leap/logspire_recovery_system.gd", "utf8");
 const recoveryV2 = readFileSync("godot/modes/logspire_leap/logspire_recovery_system_v2_ladder_only.gd", "utf8");
 const graph = readFileSync("godot/modes/logspire_leap/logspire_platform_graph.gd", "utf8");
 const character = readFileSync("godot/characters/character_controller.gd", "utf8");
 
-test("Logspire scene wires Vine-only V15 over V14/V13/V12/V10 and retires ladder props", () => {
+test("Logspire scene wires Vine-only V15, V5 route clearance and retires ladder props", () => {
   assert.match(scene, /logspire_leap_v3_recovery_camera\.gd/);
   assert.match(scene, /logspire_water_recovery_v15_vine_only\.gd/);
   assert.match(waterV15, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v14_safe_vine_reentry\.gd"/);
   assert.match(waterV14, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v13_integrated_qa\.gd"/);
   assert.match(waterV13, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v12_reliability_authority\.gd"/);
-  assert.match(scene, /logspire_phase3_director_v4_major_collision\.gd/);
+  assert.match(scene, /logspire_phase3_director_v5_route_clearance\.gd/);
+  assert.match(phase3V5, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director_v4_major_collision\.gd"/);
   assert.match(scene, /logspire_ladder_system_v6_vine_only_cleanup\.gd/);
   assert.match(ladderV6, /extends "res:\/\/modes\/logspire_leap\/logspire_ladder_system_v5_traversal_paths\.gd"/);
   assert.match(scene, /logspire_water_depth_guard\.gd/);
@@ -133,13 +135,16 @@ test("Legacy Ladder traversal remains preserved below the Vine-only adapter", ()
   assert.match(waterV12, /LOGSPIRE RECOVERY EXIT CLEAR/);
 });
 
-test("Major Titan geometry has real gameplay collision and traversal-only query layer", () => {
+test("Major Titan geometry has real gameplay collision and V5 visible/collision synchronization", () => {
   assert.match(phase3V4, /TitanTrunkCollision/);
   assert.match(phase3V4, /TITAN_TRUNK_COLLISION_RADIUS: float = 9\.15/);
   assert.match(phase3V4, /TitanRootCollision_/);
   assert.match(phase3V4, /MAJOR_WORLD_COLLISION_LAYER: int = 5/);
   assert.match(phase3V4, /logspire_major_world_collision/);
   assert.match(phase3V4, /LOGSPIRE MAJOR WORLD COLLISION READY/);
+  assert.match(phase3V5, /TITAN_CLEAR_ROOT_SIZE := Vector3\(3\.8, 1\.8, 12\.0\)/);
+  assert.match(phase3V5, /_sync_visible_geometry_to_collision/);
+  assert.match(phase3V5, /_eject_racers_from_major_geometry/);
   assert.match(waterV10, /MAJOR_WORLD_QUERY_MASK: int = 4/);
   assert.match(waterV10, /move_and_collide\(motion, true\)/);
   assert.match(waterV10, /LOGSPIRE RECOVERY WORLD BLOCK/);
