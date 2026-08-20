@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   round-parse:
-    name: Godot 4.7.1 Round 1 + Round 3 parse
+    name: Godot 4.7.1 Round 1 + Round 3 + Round 5 parse
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -103,5 +103,22 @@ jobs:
             exit 1
           fi
 
+      - name: Load production Round 5 Wild Current scene
+        shell: bash
+        run: |
+          set -o pipefail
+          /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot \
+            res://modes/wild_current/wild_current.tscn \
+            --quit-after 5 \
+            2>&1 | tee /tmp/wilddash-round5-load.log
+          if grep -E "SCRIPT ERROR: Parse Error|Parse Error:|Failed to load script|Could not resolve script|Cannot get class|Failed loading resource|Failed to load resource" /tmp/wilddash-round5-load.log; then
+            echo "Round 5 Wild Current scene load found a parser/resource error."
+            exit 1
+          fi
+          grep -q "r5_swim_start" /tmp/wilddash-round5-load.log
+          grep -q "water_only=true" /tmp/wilddash-round5-load.log
+          grep -q "legacy_neon_harbor=false" /tmp/wilddash-round5-load.log
+
       - name: Confirm production scenes parsed
-        run: echo "ROUND 1 + ROUND 3 GODOT PARSE PASS"
+        run: echo "ROUND 1 + ROUND 3 + ROUND 5 GODOT PARSE PASS"
