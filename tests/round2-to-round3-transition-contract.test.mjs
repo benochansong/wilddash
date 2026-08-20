@@ -6,6 +6,7 @@ const gameManager = readFileSync("godot/scripts/game_manager.gd", "utf8");
 const modeBase = readFileSync("godot/modes/mode_base.gd", "utf8");
 const fruit = readFileSync("godot/modes/fruit_collection/fruit_collection_mode.gd", "utf8");
 const logspireScene = readFileSync("godot/modes/logspire_leap/logspire_leap.tscn", "utf8");
+const phase3V5 = readFileSync("godot/modes/logspire_leap/logspire_phase3_director_v5_route_clearance.gd", "utf8");
 const vineOnly = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v15_vine_only.gd", "utf8");
 const safeVine = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v14_safe_vine_reentry.gd", "utf8");
 const waterIntegrated = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v13_integrated_qa.gd", "utf8");
@@ -21,9 +22,10 @@ test("Round 2 completion delegates to GameManager and campaign index advances in
   assert.match(gameManager, /_load_current_round\(\)/);
 });
 
-test("Campaign Round 3 keeps Phase B and V4 director while production recovery uses Vine-only V15", () => {
+test("Campaign Round 3 keeps Phase B and V5 route-clearance over V4 collision while recovery uses Vine-only V15", () => {
   assert.match(logspireScene, /logspire_leap_v4_phase_b\.gd/);
-  assert.match(logspireScene, /logspire_phase3_director_v4_major_collision\.gd/);
+  assert.match(logspireScene, /logspire_phase3_director_v5_route_clearance\.gd/);
+  assert.match(phase3V5, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director_v4_major_collision\.gd"/);
   assert.doesNotMatch(logspireScene, /logspire_phase3_director_v5_fun_pass\.gd/);
   assert.match(logspireScene, /logspire_water_recovery_v15_vine_only\.gd/);
   assert.match(vineOnly, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v14_safe_vine_reentry\.gd"/);
