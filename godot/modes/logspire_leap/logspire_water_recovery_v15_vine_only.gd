@@ -19,6 +19,9 @@ extends "res://modes/logspire_leap/logspire_water_recovery_v14_safe_vine_reentry
 ## before choosing a ladder/root route. V15 keeps their bookkeeping but restores
 ## the actual fall position in the same physics step and starts Vine Rescue
 ## immediately, so the camera never cuts to a temporary water-surface tableau.
+## If an inherited layer has already started checkpoint recovery, V15 must not
+## overwrite that RECOVERY_EXIT state. If no safe Vine target exists, checkpoint
+## recovery is the mandatory fail-safe; a racer must never remain swimming.
 
 const VINE_ONLY_CAPTURE_DELAY_SECONDS: float = 0.22
 const VINE_ONLY_REQUIRED_FOOT_SUBMERSION: float = 0.26
@@ -177,12 +180,21 @@ func _enter_water(racer: WildDashCharacterController, zone: int, water_y: float)
 			])
 			return
 
-	# Preserve the true fall position. Older recovery code temporarily snaps the
-	# racer to water_y + 0.62, which produced the visible one-frame camera cut to
-	# the water surface even though R3 immediately uses Vine Rescue afterward.
+	# Preserve the true fall position only when the inherited stack has not
+	# already committed to checkpoint recovery.
 	var fall_position: Vector3 = racer.global_position
 	super(racer, zone, water_y)
 	if racer == null or not is_instance_valid(racer) or not is_water_recovering(racer):
+		return
+
+	# The base water layer can legitimately choose checkpoint fallback when the
+	# production ladder/root set is retired. Do not overwrite RECOVERY_EXIT with
+	# SWIMMING; that was the bug that could strand the racer underwater.
+	var inherited_state: int = int(_state_by_id.get(racer_id, WaterState.RACING))
+	if inherited_state == WaterState.RECOVERY_EXIT:
+		print("LOGSPIRE WATER CHECKPOINT PRESERVED racer=%s zone=%d reason=inherited_fallback v15_override=false" % [
+			RaceManager.get_racer_label(racer), zone + 1,
+		])
 		return
 
 	racer.global_position = fall_position
@@ -196,14 +208,20 @@ func _enter_water(racer: WildDashCharacterController, zone: int, water_y: float)
 	_clear_recovery_camera_focus_if_needed(racer)
 	_set_ux_state(racer, RecoveryUXState.SWIMMING)
 
-	# Start the direct pull in the same physics step. This removes the obsolete
-	# intermediate water-surface tableau while retaining the visible vine motion.
+	# Start the direct pull in the same physics step. If V14 cannot find an audited
+	# safe re-entry target, checkpoint recovery is mandatory instead of swimming.
 	_begin_vine_rescue(racer)
 	var direct_started: bool = StringName(_traversal_kind_by_id.get(racer_id, &"")) == &"vine_rescue"
+	if not direct_started:
+		print("LOGSPIRE WATER CHECKPOINT FALLBACK racer=%s zone=%d reason=vine_target_unavailable no_swim_stall=true" % [
+			RaceManager.get_racer_label(racer), zone + 1,
+		])
+		_start_checkpoint_fallback(racer, "vine_target_unavailable")
+		return
 	if racer.is_player and DisplayServer.get_name() != "headless":
-		_set_hud_message("VINE RESCUE · HOLD ON!" if direct_started else "VINE RESCUE · INCOMING")
-	print("LOGSPIRE VINE ONLY RECOVERY START racer=%s zone=%d direct_vine=%s water_surface_snap=false foot_submersion=%.2fm support_guard=9ray ladder=false stairs=false" % [
-		RaceManager.get_racer_label(racer), zone + 1, str(direct_started), VINE_ONLY_REQUIRED_FOOT_SUBMERSION,
+		_set_hud_message("VINE RESCUE · HOLD ON!")
+	print("LOGSPIRE VINE ONLY RECOVERY START racer=%s zone=%d direct_vine=true water_surface_snap=false foot_submersion=%.2fm support_guard=9ray ladder=false stairs=false" % [
+		RaceManager.get_racer_label(racer), zone + 1, VINE_ONLY_REQUIRED_FOOT_SUBMERSION,
 	])
 
 func _update_swimming(racer: WildDashCharacterController, delta: float) -> void:
@@ -212,6 +230,9 @@ func _update_swimming(racer: WildDashCharacterController, delta: float) -> void:
 	_cancel_stale_checkpoint_recovery(racer)
 	racer.collision_mask = 1
 	var racer_id: int = racer.get_instance_id()
+	var state: int = int(_state_by_id.get(racer_id, WaterState.RACING))
+	if state == WaterState.RECOVERY_EXIT:
+		return
 	var traversal_kind := StringName(_traversal_kind_by_id.get(racer_id, &""))
 	if traversal_kind != &"":
 		return
@@ -234,6 +255,14 @@ func _update_swimming(racer: WildDashCharacterController, delta: float) -> void:
 		print("LOGSPIRE VINE ONLY CAPTURE racer=%s elapsed=%.2f direct_pull=true ladder=false stairs=false" % [
 			RaceManager.get_racer_label(racer), elapsed,
 		])
+		return
+
+	# Final bounded fail-safe: never leave the player or AI idling in the river
+	# because no Vine target passed the safe re-entry audit.
+	print("LOGSPIRE WATER CHECKPOINT FALLBACK racer=%s reason=vine_retry_failed elapsed=%.2f no_swim_stall=true" % [
+		RaceManager.get_racer_label(racer), elapsed,
+	])
+	_start_checkpoint_fallback(racer, "vine_retry_failed")
 
 func _choose_recovery_target(_racer: WildDashCharacterController, _zone: int) -> Dictionary:
 	return {}
