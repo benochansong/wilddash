@@ -11,21 +11,22 @@ const crocodileVisual = readFileSync('godot/characters/crocodile_visual.gd', 'ut
 test('Round 5 production scene wires the crocodile aquatic specialization', () => {
   assert.match(scene, /wild_current_crocodile_swim_advantage\.gd/);
   assert.match(scene, /CrocodileSwimAdvantage/);
-  assert.match(scene, /wild_current_race_phase2\.gd/);
+  assert.match(scene, /wild_current_race_phase3_long_battle\.gd/);
 });
 
-test('crocodile has a clearly superior Round 5 water speed profile', () => {
+test('crocodile keeps a strong water profile without an unbeatable raw top-speed gap', () => {
   const max = Number(helper.match(/CROCODILE_MAX_SWIM_SPEED: float = ([0-9.]+)/)?.[1]);
   const cruise = Number(helper.match(/CROCODILE_CRUISE_SWIM_SPEED: float = ([0-9.]+)/)?.[1]);
   const response = Number(helper.match(/CROCODILE_MOMENTUM_RESPONSE_SCALE: float = ([0-9.]+)/)?.[1]);
   const lateral = Number(helper.match(/CROCODILE_LATERAL_CURRENT_SCALE: float = ([0-9.]+)/)?.[1]);
   const dive = Number(helper.match(/CROCODILE_DIVE_RECHARGE_SCALE: float = ([0-9.]+)/)?.[1]);
 
-  assert.ok(max >= 14.0, `expected crocodile max swim speed >= 14.0, got ${max}`);
-  assert.ok(cruise >= 10.0, `expected crocodile cruise swim speed >= 10.0, got ${cruise}`);
+  assert.ok(max >= 13.4 && max <= 13.8, `expected crocodile max swim speed around 13.6, got ${max}`);
+  assert.ok(cruise >= 9.6 && cruise <= 10.0, `expected crocodile cruise around 9.8, got ${cruise}`);
   assert.ok(response <= 0.93, `expected stronger propulsion response, got ${response}`);
   assert.ok(lateral <= 0.92, `expected reduced lateral current displacement, got ${lateral}`);
   assert.ok(dive <= 0.90, `expected faster dive recharge, got ${dive}`);
+  assert.match(helper, /raw_speed_trimmed=true/);
 });
 
 test('crocodile gains a strong but bounded Round 5 tail sweep in water', () => {
