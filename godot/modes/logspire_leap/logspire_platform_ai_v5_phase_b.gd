@@ -137,7 +137,8 @@ func _apply_tutorial_air_assist(delta: float) -> void:
 	else:
 		response = PHASE_B_SAFE_LANDING_RESPONSE if near_landing else PHASE_B_SAFE_AIR_RESPONSE
 	var max_blend: float = 0.30 if contender_late and near_landing else (0.24 if near_landing else 0.16)
-	var adjusted := current_velocity.lerp(desired_velocity, clampf(delta * response, 0.0, max_blend))
+	var blend: float = clampf(delta * response, 0.0, max_blend)
+	var adjusted := current_velocity.lerp(desired_velocity, blend)
 	_racer.velocity.x = adjusted.x
 	_racer.velocity.z = adjusted.z
 
