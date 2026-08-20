@@ -6,6 +6,7 @@ const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), '
 
 const scene = read('godot/modes/wild_current/wild_current.tscn');
 const phase1 = read('godot/modes/wild_current/wild_current_race.gd');
+const swimmer1 = read('godot/modes/wild_current/wild_current_swimmer.gd');
 const phase2 = read('godot/modes/wild_current/wild_current_race_phase2.gd');
 const swimmer2 = read('godot/modes/wild_current/wild_current_swimmer_phase2.gd');
 const manager = read('godot/scripts/game_manager_rc9_round5_wild_current.gd');
@@ -15,7 +16,7 @@ test('production Round 5 now layers competitive Phase 2 over the Phase 1 swim fo
   assert.match(phase2, /extends "res:\/\/modes\/wild_current\/wild_current_race\.gd"/);
   assert.match(swimmer2, /extends "res:\/\/modes\/wild_current\/wild_current_swimmer\.gd"/);
   assert.match(phase1, /ContinuousWaterSurface/);
-  assert.match(phase1, /racer\.set_physics_process\(false\)/);
+  assert.match(swimmer1, /racer\.set_physics_process\(false\)/);
 });
 
 test('15-racer target is split into lead, mid and back packs without teleport or raw pack speed cheats', () => {
