@@ -8,6 +8,7 @@ const round2 = read('godot/modes/fruit_collection/fruit_frenzy_v16_clear_balance
 const recapScene = read('godot/scenes/round_recap.tscn');
 const recap = read('godot/scenes/round_recap.gd');
 const round3Scene = read('godot/modes/logspire_leap/logspire_leap.tscn');
+const phase3V5 = read('godot/modes/logspire_leap/logspire_phase3_director_v5_route_clearance.gd');
 const vineOnly = read('godot/modes/logspire_leap/logspire_water_recovery_v15_vine_only.gd');
 const safeVine = read('godot/modes/logspire_leap/logspire_water_recovery_v14_safe_vine_reentry.gd');
 const waterIntegrated = read('godot/modes/logspire_leap/logspire_water_recovery_v13_integrated_qa.gd');
@@ -33,7 +34,7 @@ test('campaign order advances Round 2 recap directly to Logspire Round 3', () =>
   assert.match(gameManager, /call_deferred\("_load_current_round"\)/);
 });
 
-test('Round 3 campaign scene uses Vine-only V15 over the proven reliability stack', () => {
+test('Round 3 campaign scene uses Vine-only V15 and V5 route clearance over the proven reliability stack', () => {
   assert.match(round3Scene, /P0 CAMPAIGN-SAFE ROUND 3/);
   assert.match(round3Scene, /logspire_leap_v4_phase_b\.gd/);
   assert.match(round3Scene, /logspire_water_recovery_v15_vine_only\.gd/);
@@ -43,7 +44,8 @@ test('Round 3 campaign scene uses Vine-only V15 over the proven reliability stac
   assert.match(waterAuthority, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v10_surface_collision_guard\.gd"/);
   assert.match(round3Scene, /logspire_jump_rebalance_v3_titan_tree_accessibility\.gd/);
   assert.match(round3Scene, /logspire_ladder_system_v6_vine_only_cleanup\.gd/);
-  assert.match(round3Scene, /logspire_phase3_director_v4_major_collision\.gd/);
+  assert.match(round3Scene, /logspire_phase3_director_v5_route_clearance\.gd/);
+  assert.match(phase3V5, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director_v4_major_collision\.gd"/);
   assert.doesNotMatch(round3Scene, /graphics_phase2_world_art\.gd/);
   assert.doesNotMatch(round3Scene, /round_vfx_safe_loader\.gd/);
   assert.doesNotMatch(round3Scene, /logspire_water_recovery_v11_wild_moments\.gd/);
