@@ -10,6 +10,7 @@ test("Round 3 production wires an independent deep-water watchdog", () => {
   assert.match(scene, /logspire_water_submerge_watchdog\.gd/);
   assert.match(scene, /\[node name="WaterSubmergeWatchdog" type="Node" parent="\."\]/);
   assert.match(watchdog, /HARD_SUBMERGE_DEPTH: float = 0\.58/);
+  assert.match(watchdog, /SUPPORTED_FLOOR_ESCAPE_DEPTH: float = 1\.20/);
   assert.match(watchdog, /HARD_SUBMERGE_CONFIRM_SECONDS: float = 0\.14/);
   assert.match(watchdog, /_hard_checkpoint_escape\(racer, submerged_depth\)/);
 });
@@ -21,6 +22,14 @@ test("working Vine Rescue is preserved but an unsupported deep-water stall is no
   assert.match(watchdog, /submerged_depth < HARD_SUBMERGE_DEPTH/);
   assert.match(watchdog, /racer\.reset_motion\(safe_spawn\)/);
   assert.match(watchdog, /BACK TO THE RACE · WATER RESET/);
+});
+
+test("a hidden floor far below the waterline can no longer exempt a racer from recovery", () => {
+  assert.match(watchdog, /var has_surface_support: bool = _has_surface_support\(racer\)/);
+  assert.match(watchdog, /supported_floor_invalid: bool = has_surface_support and submerged_depth >= SUPPORTED_FLOOR_ESCAPE_DEPTH/);
+  assert.match(watchdog, /if has_surface_support and not supported_floor_invalid:/);
+  assert.match(watchdog, /LOGSPIRE SUBMERGED FLOOR INVALID/);
+  assert.match(watchdog, /support_ignored=true force_checkpoint_pending=true/);
 });
 
 test("hard escape clears water authority before restoring the racer", () => {
