@@ -2,8 +2,10 @@ extends Node
 
 const LIVING_TREE_TRIGGER_PERCENT: float = 64.0
 const LIVING_TREE_MOVE_SECONDS: float = 1.45
+const LIVING_BRANCH_REVEAL_T: float = 0.58
 const LAST_TREE_TRIGGER_PERCENT: float = 89.0
 const LAST_TREE_FALL_SECONDS: float = 1.55
+const LAST_TREE_REVEAL_T: float = 0.58
 const FINAL_RECOVERY_DELAY_SECONDS: float = 0.80
 const WOODPECKER_REARM_SECONDS: float = 6.5
 const SQUIRREL_REARM_SECONDS: float = 8.0
@@ -264,6 +266,9 @@ func _build_living_tree_event_geometry() -> void:
 		body.global_position = start_position
 		body.rotation = Vector3(deg_to_rad(-58.0 * side), final_yaw, deg_to_rad(14.0 * side))
 		body.collision_layer = 0
+		# Never leave a giant visible branch in the course while its collision is
+		# disabled. This was the source of the camera/player phase-through wall.
+		body.visible = false
 		branch_data["start_position"] = start_position
 		branch_data["start_rotation"] = body.rotation
 		branch_data["final_rotation"] = Vector3(0.0, final_yaw, 0.0)
@@ -524,6 +529,9 @@ func _build_last_tree_bridge() -> void:
 	_last_tree.global_position = _last_tree_start_position
 	_last_tree.rotation = Vector3(deg_to_rad(-72.0), _last_tree_yaw, deg_to_rad(8.0))
 	_last_tree.collision_layer = 0
+	# Same rule as LivingBranch: invisible while non-colliding so the camera can
+	# never be visually buried inside a fake solid wall before the finale event.
+	_last_tree.visible = false
 
 	_final_jump_forward = direction
 	_final_jump_area = Area3D.new()
@@ -534,89 +542,44 @@ func _build_last_tree_bridge() -> void:
 	_final_jump_area.monitoring = false
 	var launch_collision := CollisionShape3D.new()
 	var launch_shape := BoxShape3D.new()
-	launch_shape.size = Vector3(7.0, 3.5, 5.0)
+	launch_shape.size = Vector3(9.0, 3.0, 7.5)
 	launch_collision.shape = launch_shape
 	_final_jump_area.add_child(launch_collision)
 	_world.add_child(_final_jump_area)
-	_final_jump_area.body_entered.connect(_on_final_jump_body_entered)
 
-func _build_final_recovery_area() -> void:
-	var start: Vector3 = _platform_position(&"Z6_07")
-	var crown: Vector3 = _platform_position(&"CROWN_NEST")
 	_final_recovery_area = Area3D.new()
-	_final_recovery_area.name = "FinalJumpRecoveryBranch"
-	_final_recovery_area.global_position = (start + crown) * 0.5 + Vector3.DOWN * 4.6
+	_final_recovery_area.name = "FinalRecoveryArea"
+	_final_recovery_area.global_position = (start + crown) * 0.5 - Vector3.UP * 3.5
 	_final_recovery_area.collision_layer = 0
 	_final_recovery_area.collision_mask = 2
 	_final_recovery_area.monitoring = true
-	var collision := CollisionShape3D.new()
-	var shape := BoxShape3D.new()
-	shape.size = Vector3(38.0, 4.5, 30.0)
-	collision.shape = shape
-	_final_recovery_area.add_child(collision)
+	var recovery_collision := CollisionShape3D.new()
+	var recovery_shape := BoxShape3D.new()
+	recovery_shape.size = Vector3(32.0, 5.0, 24.0)
+	recovery_collision.shape = recovery_shape
+	_final_recovery_area.add_child(recovery_collision)
 	_world.add_child(_final_recovery_area)
 	_final_recovery_area.body_entered.connect(_on_final_recovery_body_entered)
 
 func _build_crown_nest_polish() -> void:
-	var center: Vector3 = _platform_position(&"CROWN_NEST") + Vector3.UP * 1.0
-	var root := Node3D.new()
-	root.name = "CrownNestProduction"
-	root.global_position = center
-	_world.add_child(root)
-	var nest_material := _make_material(Color(0.58, 0.37, 0.12), 0.94)
-	var feather_material := _make_material(Color(0.94, 0.92, 0.78), 0.72)
-	for i: int in range(14):
-		var angle: float = TAU * float(i) / 14.0
-		var position := Vector3(sin(angle) * 10.5, 0.45 + float(i % 2) * 0.18, cos(angle) * 8.0)
-		var log := _make_box_visual(Vector3(1.15, 0.8, 8.0), nest_material, position, angle)
-		log.name = "NestLog_%02d" % i
-		root.add_child(log)
-	for i: int in range(10):
-		var feather := _make_box_visual(
-			Vector3(0.20, 0.05, 1.05),
-			feather_material,
-			Vector3(-4.5 + float(i) * 0.95, 1.2 + float(i % 3) * 0.35, sin(float(i)) * 3.0),
-			float(i) * 0.55
-		)
-		feather.rotation.x = deg_to_rad(18.0 + float(i % 4) * 6.0)
-		feather.name = "Feather_%02d" % i
-		root.add_child(feather)
-	for side: float in [-1.0, 1.0]:
-		var pole := MeshInstance3D.new()
-		var pole_mesh := CylinderMesh.new()
-		pole_mesh.top_radius = 0.12
-		pole_mesh.bottom_radius = 0.15
-		pole_mesh.height = 5.0
-		pole_mesh.material = nest_material
-		pole.mesh = pole_mesh
-		pole.position = Vector3(side * 8.0, 2.5, 4.8)
-		root.add_child(pole)
-		var flag := _make_box_visual(Vector3(2.2, 1.2, 0.08), _make_material(Color(0.95, 0.58, 0.10), 0.74), Vector3(side * 6.9, 3.6, 4.8), 0.0)
-		root.add_child(flag)
-	var finish_light := OmniLight3D.new()
-	finish_light.name = "CrownNestSunlight"
-	finish_light.position = Vector3(0.0, 8.0, 0.0)
-	finish_light.light_color = Color(1.0, 0.88, 0.58)
-	finish_light.light_energy = 2.2
-	finish_light.omni_range = 28.0
-	root.add_child(finish_light)
+	var crown := _world.get_node_or_null("CROWN_NEST") as Node3D
+	if crown == null:
+		return
+	var nest_material := _make_material(Color(0.76, 0.53, 0.18), 0.90)
+	for i: int in range(24):
+		var angle: float = TAU * float(i) / 24.0
+		var twig := MeshInstance3D.new()
+		var mesh := BoxMesh.new()
+		mesh.size = Vector3(0.42, 0.22, 8.0 + float(i % 5) * 0.8)
+		mesh.material = nest_material
+		twig.mesh = mesh
+		twig.position = Vector3(sin(angle) * 6.2, 0.65 + float(i % 3) * 0.12, cos(angle) * 6.2)
+		twig.rotation.y = angle + deg_to_rad(float((i % 5) - 2) * 8.0)
+		crown.add_child(twig)
 
 func _update_visual_progression(delta: float) -> void:
 	var checkpoint: int = RaceManager.get_checkpoint_progress(_player)
-	var zone: int = 0
-	if checkpoint <= 0:
-		zone = 0
-	elif checkpoint == 1:
-		zone = 1
-	elif checkpoint == 2:
-		zone = 2
-	elif checkpoint == 3:
-		zone = 3
-	elif checkpoint <= 5:
-		zone = 4
-	else:
-		zone = 5
-	zone = clampi(zone, 0, 5)
+	var zone: int = clampi(checkpoint, 0, ZONE_BACKGROUND_COLORS.size() - 1)
 	if zone != _current_visual_zone:
 		_current_visual_zone = zone
 		print("LOGSPIRE VISUAL ZONE zone=%d background_progression=true" % (zone + 1))
@@ -643,7 +606,7 @@ func _update_living_tree(delta: float) -> void:
 		_camera_shake_remaining = 0.70
 		_camera_shake_strength = 0.10
 		_broadcast_phase3_state(&"living_tree_transition")
-		print("LOGSPIRE LIVING TREE EVENT START progress=%.1f warning=true collision_during_move=false" % progress)
+		print("LOGSPIRE LIVING TREE EVENT START progress=%.1f warning=true hidden_until_collision=true" % progress)
 
 	if _living_tree_state == &"TRANSITION":
 		_living_tree_elapsed += delta
@@ -660,6 +623,9 @@ func _update_living_tree(delta: float) -> void:
 			var final_rotation: Vector3 = data.get("final_rotation", Vector3.ZERO)
 			body.global_position = start_position.lerp(final_position, eased)
 			body.rotation = start_rotation.lerp(final_rotation, eased)
+			var collision_ready: bool = t >= LIVING_BRANCH_REVEAL_T
+			body.visible = collision_ready
+			body.collision_layer = 1 if collision_ready else 0
 		_update_living_leaves()
 		if _titan_light != null:
 			_titan_light.light_energy = lerpf(1.15, 2.35, sin(t * PI))
@@ -668,11 +634,12 @@ func _update_living_tree(delta: float) -> void:
 			for data: Dictionary in _living_branches:
 				var body := data.get("body") as AnimatableBody3D
 				if body != null:
+					body.visible = true
 					body.collision_layer = 1
 			if _graph.has_method("set_world_state"):
 				_graph.call("set_world_state", &"STATE_B")
 			_broadcast_phase3_state(&"living_tree_state_b")
-			print("LOGSPIRE LIVING TREE STATE B branches=%d safety_corridor=true graph_state=STATE_B crush_guard=true" % _living_branches.size())
+			print("LOGSPIRE LIVING TREE STATE B branches=%d safety_corridor=true visible_collision_match=true graph_state=STATE_B crush_guard=true" % _living_branches.size())
 	elif _living_tree_state == &"STATE_B" and _living_leaves != null and _living_leaves.visible:
 		_living_leaf_elapsed += delta
 		_update_living_leaves()
@@ -823,7 +790,7 @@ func _update_last_tree(delta: float) -> void:
 		_camera_shake_remaining = 0.85
 		_camera_shake_strength = 0.12
 		_broadcast_phase3_state(&"final_tree_falling")
-		print("LOGSPIRE FINAL TREE FALL START progress=%.1f warning=true collision_during_fall=false" % progress)
+		print("LOGSPIRE FINAL TREE FALL START progress=%.1f warning=true hidden_until_collision=true" % progress)
 	if _last_tree_state != &"FALLING":
 		return
 	_last_tree_elapsed += delta
@@ -831,14 +798,18 @@ func _update_last_tree(delta: float) -> void:
 	var eased: float = t * t * (3.0 - 2.0 * t)
 	_last_tree.global_position = _last_tree_start_position.lerp(_last_tree_final_position, eased)
 	_last_tree.rotation = Vector3(lerpf(deg_to_rad(-72.0), 0.0, eased), _last_tree_yaw, lerpf(deg_to_rad(8.0), 0.0, eased))
+	var collision_ready: bool = t >= LAST_TREE_REVEAL_T
+	_last_tree.visible = collision_ready
+	_last_tree.collision_layer = 1 if collision_ready else 0
 	if t >= 1.0:
 		_last_tree_state = &"BRIDGE_READY"
+		_last_tree.visible = true
 		_last_tree.collision_layer = 1
 		if _final_jump_area != null:
 			_final_jump_area.monitoring = true
 		AudioManager.play_sfx_id("tree_fall", 0.92)
 		_broadcast_phase3_state(&"final_bridge_ready")
-		print("LOGSPIRE FINAL TREE BRIDGE READY collision=true final_jump_gap=5m crush_guard=true")
+		print("LOGSPIRE FINAL TREE BRIDGE READY collision=true visible_collision_match=true final_jump_gap=5m crush_guard=true")
 
 func _update_final_jump_readability() -> void:
 	if _last_tree_state != &"BRIDGE_READY" or _player == null:
@@ -881,21 +852,13 @@ func _on_finale_mushroom_body_entered(body: Node3D) -> void:
 	if _finale_mushroom_cooldowns.has(id):
 		return
 	_finale_mushroom_cooldowns[id] = 1.15
-	var forward: Vector3 = _platform_forward(&"Z6_02")
-	racer.velocity.y = maxf(racer.velocity.y, racer.jump_velocity * 1.18)
-	racer.current_speed = maxf(racer.current_speed, racer.max_speed * 1.04)
-	var impulse_value: Variant = racer.get("_skill_impulse_velocity")
-	var impulse: Vector3 = impulse_value if impulse_value is Vector3 else Vector3.ZERO
-	racer.set("_skill_impulse_velocity", impulse + forward * 4.6)
-	AudioManager.play_sfx_id("mushroom_bounce", 0.78)
-	if _finale_mushroom_visual != null:
-		var tween := _finale_mushroom_visual.create_tween()
-		tween.tween_property(_finale_mushroom_visual, "scale", Vector3(1.12, 0.58, 1.12), 0.08)
-		tween.tween_property(_finale_mushroom_visual, "scale", Vector3.ONE, 0.16)
+	racer.velocity.y = maxf(racer.velocity.y, racer.jump_velocity * 1.22)
+	AudioManager.play_sfx_id("mushroom_bounce", 0.86)
+	print("LOGSPIRE FINALE MUSHROOM racer=%s bounce=true safe_height=true" % RaceManager.get_racer_label(racer))
 
 func _on_final_jump_body_entered(body: Node3D) -> void:
 	var racer := body as WildDashCharacterController
-	if racer == null or racer.finished or _last_tree_state != &"BRIDGE_READY":
+	if racer == null or racer.finished:
 		return
 	var id: int = racer.get_instance_id()
 	if _final_jump_cooldowns.has(id):
