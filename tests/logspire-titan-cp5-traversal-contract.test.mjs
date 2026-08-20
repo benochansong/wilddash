@@ -15,11 +15,13 @@ function functionSlice(source, name, nextName) {
   return source.slice(start, end >= 0 ? end : source.length);
 }
 
-test("Round 3 production wires the V7 finale-log collision director over the tree-safe Phase3 director", () => {
+test("Round 3 production wires the V7 finale safety override over the tree-safe Phase3 director", () => {
   assert.match(scene, /logspire_phase3_director_v7_finale_log_collision\.gd/);
   assert.match(phase3, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director_v6_titan_tree_safe\.gd"/);
   assert.match(phase3V6, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director_v5_route_clearance\.gd"/);
-  assert.match(phase3, /LOGSPIRE FINALE LOG COLLISION READY/);
+  assert.match(phase3, /LOGSPIRE FINALE ROLLING LOG REMOVED/);
+  assert.match(phase3, /_finale_roll_visual = null/);
+  assert.match(phase3, /_finale_roll_area = null/);
   assert.match(phase3V6, /LOGSPIRE PHASE3 TREE SAFE READY/);
 });
 
