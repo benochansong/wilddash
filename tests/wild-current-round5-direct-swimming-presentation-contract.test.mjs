@@ -9,7 +9,7 @@ const presentation = read('godot/modes/wild_current/wild_current_swim_presentati
 const race2 = read('godot/modes/wild_current/wild_current_race_phase2.gd');
 
 test('production Round 5 wires a direct-swimming presentation layer', () => {
-  assert.match(scene, /wild_current_race_phase2\.gd/);
+  assert.match(scene, /wild_current_race_phase3_long_battle\.gd/);
   assert.match(scene, /wild_current_swim_presentation\.gd/);
   assert.match(scene, /DirectSwimPresentation/);
   assert.match(presentation, /rideable_mesh=false/);
