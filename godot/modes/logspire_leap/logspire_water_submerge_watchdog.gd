@@ -34,7 +34,7 @@ func _bootstrap() -> void:
 	if _water == null or _graph == null:
 		push_error("LOGSPIRE SUBMERGE WATCHDOG INIT FAIL missing water/graph")
 		return
-	print("LOGSPIRE SUBMERGE WATCHDOG READY depth=%.2fm confirm=%.2fs direct_checkpoint=true swim_stall=false" % [
+	print("LOGSPIRE SUBMERGE WATCHDOG READY depth=%.2fm confirm=%.2fs direct_checkpoint=true swim_stall=false camera_reset=true" % [
 		HARD_SUBMERGE_DEPTH, HARD_SUBMERGE_CONFIRM_SECONDS,
 	])
 
@@ -153,16 +153,39 @@ func _hard_checkpoint_escape(racer: WildDashCharacterController, submerged_depth
 	racer.rotation.y = atan2(-forward.x, -forward.z)
 	racer.current_speed = 0.0
 	racer.velocity = Vector3.ZERO
+	_reset_recovery_camera(racer)
 	if _recovery != null and _recovery.has_method("begin_retry_grace"):
 		_recovery.call("begin_retry_grace", racer, "hard_water_escape")
 	if _water.has_method("_set_hud_message") and racer.is_player and DisplayServer.get_name() != "headless":
 		_water.call("_set_hud_message", "BACK TO THE RACE · WATER RESET")
-	print("LOGSPIRE HARD WATER ESCAPE racer=%s target=%s depth=%.2f checkpoint=%d immediate=true water_authority_cleared=true" % [
+	print("LOGSPIRE HARD WATER ESCAPE racer=%s target=%s depth=%.2f checkpoint=%d immediate=true water_authority_cleared=true camera_normalized=true" % [
 		RaceManager.get_racer_label(racer),
 		String(target_id),
 		submerged_depth,
 		RaceManager.get_checkpoint_progress(racer),
 	])
+
+func _reset_recovery_camera(racer: WildDashCharacterController) -> void:
+	if racer == null or not racer.is_player:
+		return
+	if _water != null and _water.has_method("_clear_recovery_camera_focus_if_needed"):
+		_water.call("_clear_recovery_camera_focus_if_needed", racer)
+	var root := get_parent()
+	if root == null:
+		return
+	var camera := root.get_node_or_null("ChaseCamera") as Camera3D
+	if camera == null:
+		return
+	if camera.has_method("clear_recovery_focus"):
+		camera.call("clear_recovery_focus")
+	if camera.has_method("clear_race_focus"):
+		camera.call("clear_race_focus")
+	# set_target immediately recalculates an obstruction-safe chase position, so
+	# the first post-reset jump cannot inherit a water-camera transform buried in
+	# Titan geometry.
+	if camera.has_method("set_target"):
+		camera.call("set_target", racer)
+	print("LOGSPIRE WATER CAMERA RESET racer=%s recovery_mode=false race_focus=false obstruction_recheck=true" % RaceManager.get_racer_label(racer))
 
 func _latest_checkpoint_target(racer: WildDashCharacterController) -> StringName:
 	if racer == null or _graph == null or not _graph.has_method("get_last_checkpoint_id"):
