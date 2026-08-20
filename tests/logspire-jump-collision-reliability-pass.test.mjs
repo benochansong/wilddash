@@ -10,6 +10,7 @@ const jumpV3 = read('godot/modes/logspire_leap/logspire_jump_rebalance_v3_titan_
 const gap = read('godot/modes/logspire_leap/logspire_jump_gap_guard.gd');
 const phase3 = read('godot/modes/logspire_leap/logspire_phase3_director_v4_major_collision.gd');
 const phase3V5 = read('godot/modes/logspire_leap/logspire_phase3_director_v5_route_clearance.gd');
+const phase3V5Core = read('godot/modes/logspire_leap/logspire_phase3_director_v5_route_clearance_core.gd');
 const audit = read('godot/modes/logspire_leap/logspire_jump_collision_reliability.gd');
 const gameplay = read('godot/modes/logspire_leap/logspire_platform_gameplay.gd');
 const water = read('godot/modes/logspire_leap/logspire_water_recovery_v13_integrated_qa.gd');
@@ -20,7 +21,8 @@ test('Round 3 wires the final collision audit after current jump, V5 route clear
   assert.match(jumpV3, /logspire_jump_rebalance_v2_phase_b\.gd/);
   assert.match(scene, /logspire_jump_gap_guard\.gd/);
   assert.match(scene, /logspire_phase3_director_v5_route_clearance\.gd/);
-  assert.match(phase3V5, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director_v4_major_collision\.gd"/);
+  assert.match(phase3V5, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director_v5_route_clearance_core\.gd"/);
+  assert.match(phase3V5Core, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director_v4_major_collision\.gd"/);
   assert.match(scene, /logspire_jump_collision_reliability\.gd/);
   assert.match(scene, /logspire_water_recovery_v15_vine_only\.gd/);
   assert.match(waterV15, /logspire_water_recovery_v14_safe_vine_reentry\.gd/);
@@ -62,8 +64,9 @@ test('Titan and Giant Root collision are gameplay-only and audited against Safe 
   assert.match(phase3, /visual_mesh_unchanged=true/);
   assert.match(phase3, /LOGSPIRE TITAN COLLISION AUDIT/);
   assert.match(phase3, /LOGSPIRE COLLISION OVERLAP/);
-  assert.match(phase3V5, /_sync_visible_geometry_to_collision/);
-  assert.match(phase3V5, /_eject_racers_from_major_geometry/);
+  assert.match(phase3V5Core, /_sync_visible_geometry_to_collision/);
+  assert.match(phase3V5Core, /_eject_racers_from_major_geometry/);
+  assert.match(phase3V5, /_sync_event_geometry_visibility/);
 });
 
 test('Landing Magnet and Ledge Catch never move before test_move approves the motion', () => {
@@ -93,6 +96,7 @@ test('Moving-platform landing assists use runtime prediction instead of stale st
 test('Reliability pass preserves current jump power, Wild Route and water authority', () => {
   assert.doesNotMatch(audit, /(?:player|racer)\.jump_velocity\s*=/);
   assert.doesNotMatch(phase3, /(?:player|racer)\.jump_velocity\s*=/);
+  assert.doesNotMatch(phase3V5Core, /(?:player|racer)\.jump_velocity\s*=/);
   assert.doesNotMatch(phase3V5, /(?:player|racer)\.jump_velocity\s*=/);
   assert.doesNotMatch(jump, /(?:player|racer)\.jump_velocity\s*=/);
   assert.match(audit, /player\.jump_velocity/);
@@ -103,7 +107,7 @@ test('Reliability pass preserves current jump power, Wild Route and water author
 });
 
 test('Required collision reliability telemetry remains available', () => {
-  const combined = `${audit}\n${phase3}\n${phase3V5}\n${jump}`;
+  const combined = `${audit}\n${phase3}\n${phase3V5Core}\n${phase3V5}\n${jump}`;
   for (const marker of [
     'LOGSPIRE JUMP CLEARANCE',
     'LOGSPIRE HEAD BLOCK',
