@@ -1,4 +1,4 @@
-[gd_scene load_steps=19 format=3]
+[gd_scene load_steps=20 format=3]
 
 ; P0 CAMPAIGN-SAFE ROUND 3
 ; Phase B mode inherits res://modes/logspire_leap/logspire_leap_v3_recovery_camera.gd
@@ -12,6 +12,7 @@
 ; PlayerManualThrottle removes neutral auto-cruise only in Round 3.
 ; CrownNestFinish treats the destination platform itself as the R3 finish area.
 ; Phase3Director V5 keeps giant tree visuals out of the Safe Route and prevents phase-through.
+; SkyFinaleVisualPolish adds collision-free river banks, waterfall, roots and mist around CanopyRiver_Z6.
 ; JumpCollisionAudit runs only after the final geometry/collision layers exist.
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_leap_v4_phase_b.gd" id="1_mode"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_world_v2_deep_water.gd" id="2_world"]
@@ -31,6 +32,7 @@
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_player_manual_throttle.gd" id="13_manual_throttle"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_finish_authority.gd" id="14_finish_authority"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_submerge_watchdog.gd" id="15_water_watchdog"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_finale_visual_polish.gd" id="16_finale_visual"]
 
 [node name="LogspireLeap" type="Node3D"]
 script = ExtResource("1_mode")
@@ -76,6 +78,9 @@ script = ExtResource("8_mushroom")
 
 [node name="Phase3Director" type="Node" parent="."]
 script = ExtResource("9_phase3")
+
+[node name="SkyFinaleVisualPolish" type="Node" parent="."]
+script = ExtResource("16_finale_visual")
 
 [node name="PlayerManualThrottle" type="Node" parent="."]
 script = ExtResource("13_manual_throttle")
