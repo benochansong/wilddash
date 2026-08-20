@@ -26,6 +26,7 @@ const ladderV5 = readFileSync("godot/modes/logspire_leap/logspire_ladder_system_
 const ladderV6 = readFileSync("godot/modes/logspire_leap/logspire_ladder_system_v6_vine_only_cleanup.gd", "utf8");
 const phase3V4 = readFileSync("godot/modes/logspire_leap/logspire_phase3_director_v4_major_collision.gd", "utf8");
 const phase3V5 = readFileSync("godot/modes/logspire_leap/logspire_phase3_director_v5_route_clearance.gd", "utf8");
+const phase3V5Core = readFileSync("godot/modes/logspire_leap/logspire_phase3_director_v5_route_clearance_core.gd", "utf8");
 const combatV2 = readFileSync("godot/modes/logspire_leap/logspire_combat_safety_v2_recovery_protection.gd", "utf8");
 const recovery = readFileSync("godot/modes/logspire_leap/logspire_recovery_system.gd", "utf8");
 const recoveryV2 = readFileSync("godot/modes/logspire_leap/logspire_recovery_system_v2_ladder_only.gd", "utf8");
@@ -39,7 +40,8 @@ test("Logspire scene wires Vine-only V15, V5 route clearance and retires ladder 
   assert.match(waterV14, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v13_integrated_qa\.gd"/);
   assert.match(waterV13, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v12_reliability_authority\.gd"/);
   assert.match(scene, /logspire_phase3_director_v5_route_clearance\.gd/);
-  assert.match(phase3V5, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director_v4_major_collision\.gd"/);
+  assert.match(phase3V5, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director_v5_route_clearance_core\.gd"/);
+  assert.match(phase3V5Core, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director_v4_major_collision\.gd"/);
   assert.match(scene, /logspire_ladder_system_v6_vine_only_cleanup\.gd/);
   assert.match(ladderV6, /extends "res:\/\/modes\/logspire_leap\/logspire_ladder_system_v5_traversal_paths\.gd"/);
   assert.match(scene, /logspire_water_depth_guard\.gd/);
@@ -142,9 +144,10 @@ test("Major Titan geometry has real gameplay collision and V5 visible/collision 
   assert.match(phase3V4, /MAJOR_WORLD_COLLISION_LAYER: int = 5/);
   assert.match(phase3V4, /logspire_major_world_collision/);
   assert.match(phase3V4, /LOGSPIRE MAJOR WORLD COLLISION READY/);
-  assert.match(phase3V5, /TITAN_CLEAR_ROOT_SIZE := Vector3\(3\.8, 1\.8, 12\.0\)/);
-  assert.match(phase3V5, /_sync_visible_geometry_to_collision/);
-  assert.match(phase3V5, /_eject_racers_from_major_geometry/);
+  assert.match(phase3V5Core, /TITAN_CLEAR_ROOT_SIZE := Vector3\(3\.8, 1\.8, 12\.0\)/);
+  assert.match(phase3V5Core, /_sync_visible_geometry_to_collision/);
+  assert.match(phase3V5Core, /_eject_racers_from_major_geometry/);
+  assert.match(phase3V5, /_sync_event_geometry_visibility/);
   assert.match(waterV10, /MAJOR_WORLD_QUERY_MASK: int = 4/);
   assert.match(waterV10, /move_and_collide\(motion, true\)/);
   assert.match(waterV10, /LOGSPIRE RECOVERY WORLD BLOCK/);
