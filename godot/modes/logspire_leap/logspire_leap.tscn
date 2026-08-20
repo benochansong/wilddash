@@ -15,6 +15,7 @@
 ; PlayerManualThrottle removes neutral auto-cruise only in Round 3.
 ; CrownNestFinish treats the destination platform itself as the R3 finish area.
 ; Phase3Director V6 keeps V5 route clearance and fixes Titan/woodpecker/finale construction transforms.
+; Phase3 inheritance contract: logspire_phase3_director_v6_titan_tree_safe.gd extends logspire_phase3_director_v5_route_clearance.gd.
 ; JumpCollisionAudit V2 recognizes authored route connectors while rejecting unrelated blockers.
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_leap_v4_phase_b.gd" id="1_mode"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_world_v3_trigger_only_final_recovery.gd" id="2_world"]
