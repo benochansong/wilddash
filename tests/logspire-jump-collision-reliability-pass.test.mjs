@@ -23,7 +23,7 @@ test('Round 3 wires the final collision audit after current jump, V5 route clear
   assert.match(scene, /logspire_phase3_director_v5_route_clearance\.gd/);
   assert.match(phase3V5, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director_v5_route_clearance_core\.gd"/);
   assert.match(phase3V5Core, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director_v4_major_collision\.gd"/);
-  assert.match(scene, /logspire_jump_collision_reliability\.gd/);
+  assert.match(scene, /logspire_jump_collision_reliability_v2_route_connectors\.gd/);
   assert.match(scene, /logspire_water_recovery_v15_vine_only\.gd/);
   assert.match(waterV15, /logspire_water_recovery_v14_safe_vine_reentry\.gd/);
   assert.match(water, /logspire_water_recovery_v12_reliability_authority\.gd/);

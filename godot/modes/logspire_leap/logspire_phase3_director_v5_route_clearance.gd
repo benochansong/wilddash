@@ -17,6 +17,7 @@ extends "res://modes/logspire_leap/logspire_phase3_director_v5_route_clearance_c
 const STATIC_LIVING_BRIDGE_WIDTH: float = 3.8
 const STATIC_LIVING_BRIDGE_THICKNESS: float = 0.55
 const STATIC_LIVING_BRIDGE_SURFACE_OFFSET: float = 0.30
+const RETRY_GRACE_META: StringName = &"logspire_retry_grace_until"
 
 func configure(world: Node, graph: Node) -> void:
 	super(world, graph)
@@ -86,6 +87,30 @@ func _stabilize_living_tree_route_bridges() -> void:
 	if _graph != null and _graph.has_method("set_world_state"):
 		_graph.call("set_world_state", &"STATE_B")
 	print("LOGSPIRE LIVING TREE ROUTE STABLE bridges=%d static=true sloped=true moving_event=false camera_cut=false" % count)
+
+func _do_woodpecker_shake() -> void:
+	_woodpecker_shake_remaining = 0.34
+	var forward: Vector3 = _platform_forward(&"Z5_SPIRAL_07")
+	var right := Vector3(-forward.z, 0.0, forward.x).normalized()
+	var pushed: int = 0
+	var protected: int = 0
+	for body_value: Node3D in _woodpecker_area.get_overlapping_bodies():
+		var racer := body_value as WildDashCharacterController
+		if racer == null or racer.finished:
+			continue
+		if _has_retry_grace(racer):
+			protected += 1
+			continue
+		var side: float = 1.0 if (racer.global_position - _woodpecker_area.global_position).dot(right) >= 0.0 else -1.0
+		racer.apply_knockback(right * side, 0.95)
+		pushed += 1
+	print("LOGSPIRE WOODPECKER shake=true push=0.95 pushed=%d retry_grace_protected=%d instant_kill=false predictable=true" % [pushed, protected])
+
+func _has_retry_grace(racer: WildDashCharacterController) -> bool:
+	if racer == null or not is_instance_valid(racer) or not racer.has_meta(RETRY_GRACE_META):
+		return false
+	var until: float = float(racer.get_meta(RETRY_GRACE_META, 0.0))
+	return Time.get_ticks_msec() * 0.001 < until
 
 func _sync_event_geometry_visibility() -> void:
 	for data: Dictionary in _living_branches:
