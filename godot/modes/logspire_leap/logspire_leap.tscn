@@ -11,6 +11,7 @@
 ; LadderSystem V6 is compatibility-only and removes ladder/root-stair recovery props.
 ; JumpRebalance V3 caps Titan Tree Safe Route vertical rises for playable climbing.
 ; TitanCP5CorridorGuard removes late-spiral overlap and routes the finale outside the trunk.
+; PlatformGameplay V2 adds dynamic nodes to the SceneTree before assigning global transforms.
 ; PlayerManualThrottle removes neutral auto-cruise only in Round 3.
 ; CrownNestFinish treats the destination platform itself as the R3 finish area.
 ; Phase3Director V5 keeps giant tree visuals out of the Safe Route and prevents phase-through.
@@ -24,7 +25,7 @@
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_platform_graph.gd" id="3_graph"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_recovery_system_v2_ladder_only.gd" id="4_recovery"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_mobility_assist.gd" id="5_mobility"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_platform_gameplay.gd" id="6_gameplay"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_platform_gameplay_v2_tree_safe.gd" id="6_gameplay"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_combat_safety_v3_phase_b.gd" id="7_combat"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_mushroom_feedback.gd" id="8_mushroom"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_phase3_director_v5_route_clearance.gd" id="9_phase3"]
