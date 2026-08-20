@@ -3,7 +3,9 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const racerScene = readFileSync("godot/characters/test_racer.tscn", "utf8");
+const baseWater = readFileSync("godot/modes/logspire_leap/logspire_water_recovery.gd", "utf8");
 const v3 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v3_entry_guard.gd", "utf8");
+const v10 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v10_surface_collision_guard.gd", "utf8");
 const v15 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v15_vine_only.gd", "utf8");
 
 test("CharacterRoot is the foot origin and Vine-only recovery keeps floor/descent guards", () => {
@@ -44,4 +46,19 @@ test("Other R3 assists do not take water authority while the racer still has sup
   assert.match(v15, /func should_handle_racer\(racer: WildDashCharacterController\) -> bool:/);
   assert.match(v15, /if racer\.is_on_floor\(\) or _has_nearby_surface_support\(racer\):\n\t\treturn false/);
   assert.match(v15, /water_y - VINE_ONLY_REQUIRED_FOOT_SUBMERSION \* 0\.5/);
+});
+
+test("V10 deep reacquire cannot bypass the V15 strict entry authority", () => {
+  assert.match(v10, /_enter_water\(racer, int\(pool\.get\("zone", 0\)\), water_y\)/);
+  assert.match(v15, /if not is_water_recovering\(racer\) and state in \[WaterState\.RACING, WaterState\.FALLING\]:/);
+  assert.match(v15, /if not _is_real_water_entry\(racer, water_y\):/);
+  assert.match(v15, /LOGSPIRE VINE ENTRY BYPASS REJECT/);
+});
+
+test("confirmed R3 falls skip the obsolete water-surface camera tableau", () => {
+  assert.match(baseWater, /position\.y = water_y \+ 0\.62/);
+  assert.match(v15, /var fall_position: Vector3 = racer\.global_position/);
+  assert.match(v15, /racer\.global_position = fall_position/);
+  assert.match(v15, /_begin_vine_rescue\(racer\)/);
+  assert.match(v15, /water_surface_snap=false/);
 });
