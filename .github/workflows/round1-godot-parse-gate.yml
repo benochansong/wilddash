@@ -89,7 +89,7 @@ jobs:
           rm -f godot/tmp_phase_probe.tscn
           exit "$failed"
 
-      - name: Load production Round 3 scene
+      - name: Load production Round 3 scene and verify Safe Route
         shell: bash
         run: |
           set -o pipefail
@@ -102,6 +102,14 @@ jobs:
             echo "Round 3 scene load found a parser/resource error."
             exit 1
           fi
+          if grep -E "LOGSPIRE SAFE ROUTE PASS .*pass=false" /tmp/wilddash-round3-load.log; then
+            echo "Round 3 Safe Route collision audit failed."
+            exit 1
+          fi
+          if ! grep -E "LOGSPIRE SAFE ROUTE PASS .*pass=true" /tmp/wilddash-round3-load.log; then
+            echo "Round 3 Safe Route audit did not produce a passing result."
+            exit 1
+          fi
 
-      - name: Confirm production scenes parsed
-        run: echo "ROUND 1 + ROUND 3 GODOT PARSE PASS"
+      - name: Confirm production scenes and R3 Safe Route
+        run: echo "ROUND 1 + ROUND 3 GODOT SAFE ROUTE PASS"
