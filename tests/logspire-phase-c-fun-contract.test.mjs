@@ -5,6 +5,7 @@ import test from "node:test";
 const scene = readFileSync("godot/modes/logspire_leap/logspire_leap.tscn", "utf8");
 const phaseC = readFileSync("godot/modes/logspire_leap/logspire_phase3_director_v5_fun_pass.gd", "utf8");
 const phase3V5 = readFileSync("godot/modes/logspire_leap/logspire_phase3_director_v5_route_clearance.gd", "utf8");
+const phase3V5Core = readFileSync("godot/modes/logspire_leap/logspire_phase3_director_v5_route_clearance_core.gd", "utf8");
 const camera = readFileSync("godot/modes/logspire_leap/logspire_recovery_chase_camera.gd", "utf8");
 const graph = readFileSync("godot/modes/logspire_leap/logspire_platform_graph.gd", "utf8");
 const phaseA = readFileSync("godot/modes/logspire_leap/logspire_jump_gap_guard.gd", "utf8");
@@ -17,7 +18,8 @@ test("Phase C source is preserved while campaign Round 3 uses validated Titan ac
   assert.match(titanAssist, /extends "res:\/\/modes\/logspire_leap\/logspire_jump_rebalance_v2_phase_b\.gd"/);
   assert.match(scene, /logspire_jump_gap_guard\.gd/);
   assert.match(scene, /logspire_phase3_director_v5_route_clearance\.gd/);
-  assert.match(phase3V5, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director_v4_major_collision\.gd"/);
+  assert.match(phase3V5, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director_v5_route_clearance_core\.gd"/);
+  assert.match(phase3V5Core, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director_v4_major_collision\.gd"/);
   assert.doesNotMatch(scene, /logspire_phase3_director_v5_fun_pass\.gd/);
   assert.match(phaseC, /extends "res:\/\/modes\/logspire_leap\/logspire_phase3_director_v4_major_collision\.gd"/);
   assert.match(phaseB, /PHASE_B_FIVE_LANES: int = 5/);
