@@ -7,6 +7,7 @@
 ; Graphics Phase 2/3 and the Wild Moments water adapter remain source-only.
 ; World V3 keeps the final recovery trigger but removes the obsolete giant Z6 solid deck.
 ; Water V16 uses live Safe Route corridor authority over V15 direct Vine Rescue.
+; Water inheritance contract: logspire_water_recovery_v16_route_corridor_authority.gd extends logspire_water_recovery_v15_vine_only.gd.
 ; WaterSubmergeWatchdog V3 preserves deep-water escape but suppresses reset during legitimate route traversal and jump seams.
 ; LadderSystem V6 is compatibility-only and removes ladder/root-stair recovery props.
 ; JumpRebalance V3 caps Titan Tree Safe Route vertical rises for playable climbing.
