@@ -1,4 +1,4 @@
-[gd_scene load_steps=17 format=3]
+[gd_scene load_steps=18 format=3]
 
 ; P0 CAMPAIGN-SAFE ROUND 3
 ; Phase B mode inherits res://modes/logspire_leap/logspire_leap_v3_recovery_camera.gd
@@ -9,6 +9,7 @@
 ; LadderSystem V6 is compatibility-only and removes ladder/root-stair recovery props.
 ; JumpRebalance V3 caps Titan Tree Safe Route vertical rises for playable climbing.
 ; PlayerManualThrottle removes neutral auto-cruise only in Round 3.
+; CrownNestFinish treats the destination platform itself as the R3 finish area.
 ; JumpCollisionAudit runs only after the final geometry/collision layers exist.
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_leap_v4_phase_b.gd" id="1_mode"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_world_v2_deep_water.gd" id="2_world"]
@@ -26,6 +27,7 @@
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_recovery_v15_vine_only.gd" id="11_water"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_collision_reliability.gd" id="12_jump_collision_audit"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_player_manual_throttle.gd" id="13_manual_throttle"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_finish_authority.gd" id="14_finish_authority"]
 
 [node name="LogspireLeap" type="Node3D"]
 script = ExtResource("1_mode")
@@ -71,6 +73,9 @@ script = ExtResource("9_phase3")
 
 [node name="PlayerManualThrottle" type="Node" parent="."]
 script = ExtResource("13_manual_throttle")
+
+[node name="CrownNestFinish" type="Node" parent="."]
+script = ExtResource("14_finish_authority")
 
 [node name="JumpCollisionAudit" type="Node" parent="."]
 script = ExtResource("12_jump_collision_audit")
