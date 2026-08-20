@@ -13,6 +13,12 @@ extends "res://modes/logspire_leap/logspire_water_recovery_v14_safe_vine_reentry
 ## never enough to enter recovery. The feet must be meaningfully below the water
 ## surface, no solid support may exist under the footprint, and that unsupported
 ## submerged state must persist for a short confirmation window.
+##
+## Direct-vine handoff:
+## older recovery layers snap a confirmed fall to the visible water surface
+## before choosing a ladder/root route. V15 keeps their bookkeeping but restores
+## the actual fall position in the same physics step and starts Vine Rescue
+## immediately, so the camera never cuts to a temporary water-surface tableau.
 
 const VINE_ONLY_CAPTURE_DELAY_SECONDS: float = 0.22
 const VINE_ONLY_REQUIRED_FOOT_SUBMERSION: float = 0.26
@@ -156,20 +162,48 @@ func _has_nearby_surface_support(racer: WildDashCharacterController) -> bool:
 	return false
 
 func _enter_water(racer: WildDashCharacterController, zone: int, water_y: float) -> void:
+	if racer == null or not is_instance_valid(racer) or racer.finished or not RaceManager.active:
+		return
+	var racer_id: int = racer.get_instance_id()
+	var state: int = int(_state_by_id.get(racer_id, WaterState.RACING))
+
+	# V10 has an emergency deep-water reacquire path that can call _enter_water()
+	# without going through V3/V15 entry guards. Make this function the final
+	# authority too, so no inherited path can bypass the rounded-log protection.
+	if not is_water_recovering(racer) and state in [WaterState.RACING, WaterState.FALLING]:
+		if not _is_real_water_entry(racer, water_y):
+			print("LOGSPIRE VINE ENTRY BYPASS REJECT racer=%s zone=%d body_y=%.2f water_y=%.2f strict_guard=true" % [
+				RaceManager.get_racer_label(racer), zone + 1, racer.global_position.y, water_y,
+			])
+			return
+
+	# Preserve the true fall position. Older recovery code temporarily snaps the
+	# racer to water_y + 0.62, which produced the visible one-frame camera cut to
+	# the water surface even though R3 immediately uses Vine Rescue afterward.
+	var fall_position: Vector3 = racer.global_position
 	super(racer, zone, water_y)
 	if racer == null or not is_instance_valid(racer) or not is_water_recovering(racer):
 		return
-	var racer_id: int = racer.get_instance_id()
+
+	racer.global_position = fall_position
+	racer.velocity = Vector3.ZERO
+	racer.current_speed = 0.0
 	_vine_only_entry_candidate_since_msec_by_id.erase(racer_id)
 	_vine_only_last_support_msec_by_id.erase(racer_id)
-	_vine_only_elapsed_by_id[racer_id] = 0.0
+	_vine_only_elapsed_by_id[racer_id] = VINE_ONLY_CAPTURE_DELAY_SECONDS
 	_preferred_target_by_id.erase(racer_id)
 	_ladder_by_id.erase(racer_id)
+	_clear_recovery_camera_focus_if_needed(racer)
 	_set_ux_state(racer, RecoveryUXState.SWIMMING)
+
+	# Start the direct pull in the same physics step. This removes the obsolete
+	# intermediate water-surface tableau while retaining the visible vine motion.
+	_begin_vine_rescue(racer)
+	var direct_started: bool = StringName(_traversal_kind_by_id.get(racer_id, &"")) == &"vine_rescue"
 	if racer.is_player and DisplayServer.get_name() != "headless":
-		_set_hud_message("VINE RESCUE · INCOMING")
-	print("LOGSPIRE VINE ONLY RECOVERY START racer=%s zone=%d splash_delay=%.2fs foot_submersion=%.2fm support_guard=9ray ladder=false stairs=false" % [
-		RaceManager.get_racer_label(racer), zone + 1, VINE_ONLY_CAPTURE_DELAY_SECONDS, VINE_ONLY_REQUIRED_FOOT_SUBMERSION,
+		_set_hud_message("VINE RESCUE · HOLD ON!" if direct_started else "VINE RESCUE · INCOMING")
+	print("LOGSPIRE VINE ONLY RECOVERY START racer=%s zone=%d direct_vine=%s water_surface_snap=false foot_submersion=%.2fm support_guard=9ray ladder=false stairs=false" % [
+		RaceManager.get_racer_label(racer), zone + 1, str(direct_started), VINE_ONLY_REQUIRED_FOOT_SUBMERSION,
 	])
 
 func _update_swimming(racer: WildDashCharacterController, delta: float) -> void:
