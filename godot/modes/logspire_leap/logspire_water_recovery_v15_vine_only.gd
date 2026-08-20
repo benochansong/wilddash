@@ -2,57 +2,69 @@ extends "res://modes/logspire_leap/logspire_water_recovery_v14_safe_vine_reentry
 
 ## Round 3 vine-only recovery authority.
 ## Falling into water no longer asks the player or AI to find a root stair or
-## ladder. After a very short readable splash pause, Vine Rescue pulls the racer
-## back to the audited Safe Route re-entry supplied by V14.
+## ladder. After a short confirmed submersion, Vine Rescue pulls the racer back
+## to the audited Safe Route re-entry supplied by V14.
 ## Existing ladder/root source stays preserved, but production recovery does not
 ## select or traverse those routes.
 ##
 ## Water-graze safety:
-## touching the water Area3D is not enough to start recovery. Round 3 contains
-## low logs and cylinders whose tops sit close to the water surface, so a racer
-## can briefly lose Godot's is_on_floor state while still being physically
-## supported. V15 therefore requires meaningful immersion, no nearby dry/world
-## support under the racer, and a short sustained-water confirmation window.
+## CharacterRoot is the racer foot origin. Merely overlapping the water Area3D,
+## brushing the surface, or momentarily losing is_on_floor() on a rounded log is
+## never enough to enter recovery. The feet must be meaningfully below the water
+## surface, no solid support may exist under the footprint, and that unsupported
+## submerged state must persist for a short confirmation window.
 
 const VINE_ONLY_CAPTURE_DELAY_SECONDS: float = 0.22
-const VINE_ONLY_ENTRY_MAX_BODY_ABOVE_SURFACE: float = 0.72
-const VINE_ONLY_ENTRY_CONFIRM_SECONDS: float = 0.12
-const VINE_ONLY_SUPPORT_PROBE_UP: float = 0.18
-const VINE_ONLY_SUPPORT_PROBE_DEPTH: float = 1.65
-const VINE_ONLY_SUPPORT_SURFACE_TOLERANCE: float = 0.20
-const VINE_ONLY_WORLD_SUPPORT_MASK: int = 1
+const VINE_ONLY_REQUIRED_FOOT_SUBMERSION: float = 0.26
+const VINE_ONLY_ENTRY_CONFIRM_SECONDS: float = 0.18
+const VINE_ONLY_SUPPORT_GRACE_SECONDS: float = 0.24
+const VINE_ONLY_SUPPORT_PROBE_UP: float = 0.24
+const VINE_ONLY_SUPPORT_PROBE_DEPTH: float = 1.35
+const VINE_ONLY_SUPPORT_SAMPLE_RADIUS_MIN: float = 0.42
+const VINE_ONLY_SUPPORT_SAMPLE_RADIUS_MAX: float = 0.72
+const VINE_ONLY_SUPPORT_MAX_DROP: float = 0.92
+const VINE_ONLY_WORLD_SUPPORT_MASK: int = 5
 
 var _vine_only_elapsed_by_id: Dictionary = {}
 var _vine_only_entry_candidate_since_msec_by_id: Dictionary = {}
+var _vine_only_last_support_msec_by_id: Dictionary = {}
 
 func _is_real_water_entry(racer: WildDashCharacterController, water_y: float) -> bool:
-	if racer == null or not is_instance_valid(racer):
+	if racer == null or not is_instance_valid(racer) or racer.finished or not RaceManager.active:
 		return false
 	var racer_id: int = racer.get_instance_id()
-
-	# Keep all proven V3 entry guards first: racers on a floor, racers that are
-	# not descending, and bodies still clearly above the surface are rejected.
-	if not super(racer, water_y):
-		_vine_only_entry_candidate_since_msec_by_id.erase(racer_id)
-		return false
-
-	# V3 intentionally had a generous 1.05 m body band. For the low cylinders in
-	# Titan Tree that can classify a foot-level graze as water entry. Require the
-	# body to sink farther before Vine-only recovery is even considered.
-	if racer.global_position.y > water_y + VINE_ONLY_ENTRY_MAX_BODY_ABOVE_SURFACE:
-		_vine_only_entry_candidate_since_msec_by_id.erase(racer_id)
-		return false
-
-	# is_on_floor() can flicker false for a physics frame on rounded logs. A short
-	# world-only ray catches the actual support surface and keeps the racer alive
-	# when a log/cylinder is still directly underneath at water level or above.
-	if _has_nearby_surface_support(racer, water_y):
-		_vine_only_entry_candidate_since_msec_by_id.erase(racer_id)
-		return false
-
-	# A splash/graze must persist briefly before becoming authoritative water
-	# recovery. A genuine fall keeps descending and passes this window naturally.
 	var now_msec: int = Time.get_ticks_msec()
+
+	# Grounded racers and racers with any nearby solid support under their foot
+	# footprint are still racing. This is the key rounded-log/cylinder guard.
+	if racer.is_on_floor() or _has_nearby_surface_support(racer):
+		_vine_only_last_support_msec_by_id[racer_id] = now_msec
+		_vine_only_entry_candidate_since_msec_by_id.erase(racer_id)
+		return false
+
+	# A genuine fall must still be descending. Surface skim, jump apex and upward
+	# bounce frames cannot become water recovery.
+	if racer.velocity.y > WATER_ENTRY_MIN_DOWN_SPEED:
+		_vine_only_entry_candidate_since_msec_by_id.erase(racer_id)
+		return false
+
+	# CharacterRoot is the foot origin. Require the feet themselves to be below
+	# the surface instead of accepting a body capsule that merely touches water.
+	if racer.global_position.y > water_y - VINE_ONLY_REQUIRED_FOOT_SUBMERSION:
+		_vine_only_entry_candidate_since_msec_by_id.erase(racer_id)
+		return false
+
+	# Rounded moving logs can lose floor contact for a frame at an edge. Give the
+	# last confirmed support a short grace period before water can take authority.
+	var last_support_msec: int = int(_vine_only_last_support_msec_by_id.get(racer_id, -1000000))
+	if last_support_msec > 0:
+		var since_support_seconds: float = float(now_msec - last_support_msec) / 1000.0
+		if since_support_seconds < VINE_ONLY_SUPPORT_GRACE_SECONDS:
+			_vine_only_entry_candidate_since_msec_by_id.erase(racer_id)
+			return false
+
+	# The unsupported, foot-submerged state must persist. A real fall naturally
+	# remains valid; a one-frame graze resets before Vine Rescue can begin.
 	if not _vine_only_entry_candidate_since_msec_by_id.has(racer_id):
 		_vine_only_entry_candidate_since_msec_by_id[racer_id] = now_msec
 		return false
@@ -60,27 +72,88 @@ func _is_real_water_entry(racer: WildDashCharacterController, water_y: float) ->
 	var confirmed_seconds: float = float(now_msec - started_msec) / 1000.0
 	return confirmed_seconds >= VINE_ONLY_ENTRY_CONFIRM_SECONDS
 
-func _has_nearby_surface_support(racer: WildDashCharacterController, water_y: float) -> bool:
+func should_handle_racer(racer: WildDashCharacterController) -> bool:
+	if racer == null or not is_instance_valid(racer):
+		return false
+	if bool(racer.get_meta(WATER_META, false)):
+		return true
+	var racer_id: int = racer.get_instance_id()
+	var state: int = int(_state_by_id.get(racer_id, WaterState.RACING))
+	if state not in [WaterState.RACING, WaterState.FALLING]:
+		return true
+	if racer.is_on_floor() or _has_nearby_surface_support(racer):
+		return false
+	if racer.velocity.y > WATER_ENTRY_MIN_DOWN_SPEED:
+		return false
+	var pool: Dictionary = _pool_for_position(racer.global_position)
+	if pool.is_empty():
+		return false
+	var water_y: float = float(pool.get("water_y", -999.0))
+	return racer.global_position.y <= water_y - VINE_ONLY_REQUIRED_FOOT_SUBMERSION * 0.5
+
+func _has_nearby_surface_support(racer: WildDashCharacterController) -> bool:
 	if racer == null or not is_instance_valid(racer):
 		return false
 	var world: World3D = racer.get_world_3d()
 	if world == null:
 		return false
 
-	var ray_from: Vector3 = racer.global_position + Vector3.UP * VINE_ONLY_SUPPORT_PROBE_UP
-	var ray_to: Vector3 = racer.global_position - Vector3.UP * VINE_ONLY_SUPPORT_PROBE_DEPTH
-	var query := PhysicsRayQueryParameters3D.create(ray_from, ray_to)
-	query.collision_mask = VINE_ONLY_WORLD_SUPPORT_MASK
-	query.exclude = [racer.get_rid()]
-	query.collide_with_areas = false
-	query.collide_with_bodies = true
-	var hit: Dictionary = world.direct_space_state.intersect_ray(query)
-	if hit.is_empty():
-		return false
-	var hit_position: Vector3 = hit.get("position", Vector3.INF)
-	if hit_position == Vector3.INF:
-		return false
-	return hit_position.y >= water_y - VINE_ONLY_SUPPORT_SURFACE_TOLERANCE
+	var sample_radius: float = 0.50
+	var collision := racer.get_node_or_null("CollisionShape3D") as CollisionShape3D
+	if collision != null:
+		var capsule := collision.shape as CapsuleShape3D
+		if capsule != null:
+			sample_radius = clampf(
+				capsule.radius * 0.78,
+				VINE_ONLY_SUPPORT_SAMPLE_RADIUS_MIN,
+				VINE_ONLY_SUPPORT_SAMPLE_RADIUS_MAX
+			)
+
+	var right: Vector3 = racer.global_transform.basis.x
+	right.y = 0.0
+	if right.length_squared() <= 0.001:
+		right = Vector3.RIGHT
+	else:
+		right = right.normalized()
+	var forward: Vector3 = -racer.global_transform.basis.z
+	forward.y = 0.0
+	if forward.length_squared() <= 0.001:
+		forward = Vector3.FORWARD
+	else:
+		forward = forward.normalized()
+	var diagonal_a := (right + forward).normalized()
+	var diagonal_b := (right - forward).normalized()
+	var offsets: Array[Vector3] = [
+		Vector3.ZERO,
+		right * sample_radius,
+		-right * sample_radius,
+		forward * sample_radius,
+		-forward * sample_radius,
+		diagonal_a * sample_radius,
+		-diagonal_a * sample_radius,
+		diagonal_b * sample_radius,
+		-diagonal_b * sample_radius,
+	]
+
+	for offset: Vector3 in offsets:
+		var ray_from: Vector3 = racer.global_position + offset + Vector3.UP * VINE_ONLY_SUPPORT_PROBE_UP
+		var ray_to: Vector3 = racer.global_position + offset - Vector3.UP * VINE_ONLY_SUPPORT_PROBE_DEPTH
+		var query := PhysicsRayQueryParameters3D.create(ray_from, ray_to)
+		query.collision_mask = VINE_ONLY_WORLD_SUPPORT_MASK
+		query.exclude = [racer.get_rid()]
+		query.collide_with_areas = false
+		query.collide_with_bodies = true
+		query.hit_from_inside = true
+		var hit: Dictionary = world.direct_space_state.intersect_ray(query)
+		if hit.is_empty():
+			continue
+		var hit_position: Vector3 = hit.get("position", Vector3.INF)
+		if hit_position == Vector3.INF:
+			continue
+		var drop: float = racer.global_position.y - hit_position.y
+		if drop >= -0.12 and drop <= VINE_ONLY_SUPPORT_MAX_DROP:
+			return true
+	return false
 
 func _enter_water(racer: WildDashCharacterController, zone: int, water_y: float) -> void:
 	super(racer, zone, water_y)
@@ -88,14 +161,15 @@ func _enter_water(racer: WildDashCharacterController, zone: int, water_y: float)
 		return
 	var racer_id: int = racer.get_instance_id()
 	_vine_only_entry_candidate_since_msec_by_id.erase(racer_id)
+	_vine_only_last_support_msec_by_id.erase(racer_id)
 	_vine_only_elapsed_by_id[racer_id] = 0.0
 	_preferred_target_by_id.erase(racer_id)
 	_ladder_by_id.erase(racer_id)
 	_set_ux_state(racer, RecoveryUXState.SWIMMING)
 	if racer.is_player and DisplayServer.get_name() != "headless":
 		_set_hud_message("VINE RESCUE · INCOMING")
-	print("LOGSPIRE VINE ONLY RECOVERY START racer=%s zone=%d splash_delay=%.2fs ladder=false stairs=false" % [
-		RaceManager.get_racer_label(racer), zone + 1, VINE_ONLY_CAPTURE_DELAY_SECONDS,
+	print("LOGSPIRE VINE ONLY RECOVERY START racer=%s zone=%d splash_delay=%.2fs foot_submersion=%.2fm support_guard=9ray ladder=false stairs=false" % [
+		RaceManager.get_racer_label(racer), zone + 1, VINE_ONLY_CAPTURE_DELAY_SECONDS, VINE_ONLY_REQUIRED_FOOT_SUBMERSION,
 	])
 
 func _update_swimming(racer: WildDashCharacterController, delta: float) -> void:
@@ -141,5 +215,6 @@ func _begin_ladder_climb(racer: WildDashCharacterController, _ladder: Dictionary
 
 func _clear_reliability_runtime(racer_id: int) -> void:
 	_vine_only_entry_candidate_since_msec_by_id.erase(racer_id)
+	_vine_only_last_support_msec_by_id.erase(racer_id)
 	_vine_only_elapsed_by_id.erase(racer_id)
 	super(racer_id)
