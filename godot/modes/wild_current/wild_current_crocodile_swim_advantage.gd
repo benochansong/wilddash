@@ -4,9 +4,11 @@ extends Node
 ## Round 5-only aquatic specialization for Crocodile.
 ## The base character remains deliberately slower on land; this layer makes the
 ## Water Bruiser fantasy materially true in WILD CURRENT without touching R1-R4.
+## Phase 3 trims raw top speed so the crocodile wins through water handling,
+## dive uptime and tail control rather than simply escaping the pack.
 
-const CROCODILE_MAX_SWIM_SPEED: float = 14.2
-const CROCODILE_CRUISE_SWIM_SPEED: float = 10.2
+const CROCODILE_MAX_SWIM_SPEED: float = 13.6
+const CROCODILE_CRUISE_SWIM_SPEED: float = 9.8
 const CROCODILE_MOMENTUM_RESPONSE_SCALE: float = 0.92
 const CROCODILE_LATERAL_CURRENT_SCALE: float = 0.90
 const CROCODILE_DIVE_RECHARGE_SCALE: float = 0.88
@@ -34,7 +36,7 @@ var _ai_probe_timer: float = 0.0
 func _ready() -> void:
 	if not InputManager.race_combat_action_resolved.is_connected(_on_race_combat_action):
 		InputManager.race_combat_action_resolved.connect(_on_race_combat_action)
-	print("r5_crocodile_swim_advantage_ready round5_only=true max=%.1f cruise=%.1f" % [
+	print("r5_crocodile_swim_advantage_ready round5_only=true max=%.1f cruise=%.1f raw_speed_trimmed=true" % [
 		CROCODILE_MAX_SWIM_SPEED,
 		CROCODILE_CRUISE_SWIM_SPEED,
 	])
@@ -82,7 +84,7 @@ func _apply_to_round5_swimmers() -> void:
 		_crocodile_drivers.append(driver)
 		_attack_cooldowns[racer.get_instance_id()] = 0.0
 
-		print("r5_crocodile_water_advantage racer=%s max=%.1f cruise=%.1f propulsion=%.2f lateral_current=%.2f dive_recharge=%.2f tail_sweep=true" % [
+		print("r5_crocodile_water_advantage racer=%s max=%.1f cruise=%.1f propulsion=%.2f lateral_current=%.2f dive_recharge=%.2f tail_sweep=true raw_speed_trimmed=true" % [
 			RaceManager.get_racer_label(racer),
 			driver.max_swim_speed,
 			driver.cruise_swim_speed,
