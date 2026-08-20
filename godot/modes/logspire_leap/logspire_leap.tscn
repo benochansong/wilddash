@@ -5,6 +5,7 @@
 ; Phase B combat inherits res://modes/logspire_leap/logspire_combat_safety_v2_recovery_protection.gd
 ; Keep Phase A/B gameplay and stable recovery/collision layers load-critical.
 ; Graphics Phase 2/3 and the Wild Moments water adapter remain source-only.
+; World V3 keeps the final recovery trigger but removes the obsolete giant Z6 solid deck.
 ; Water V15 uses direct Vine Rescue over the V14 safe re-entry authority.
 ; WaterSubmergeWatchdog hard-resets any deeply submerged racer that is not in an active Vine pull.
 ; LadderSystem V6 is compatibility-only and removes ladder/root-stair recovery props.
@@ -15,7 +16,7 @@
 ; Phase3Director V5 keeps giant tree visuals out of the Safe Route and prevents phase-through.
 ; JumpCollisionAudit V2 recognizes authored route connectors while rejecting unrelated blockers.
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_leap_v4_phase_b.gd" id="1_mode"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_world_v2_deep_water.gd" id="2_world"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_world_v3_trigger_only_final_recovery.gd" id="2_world"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_rebalance_v3_titan_tree_accessibility.gd" id="2b_jump_rebalance"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_gap_guard.gd" id="2c_gap_guard"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_titan_cp5_corridor_guard.gd" id="2cc_titan_cp5_guard"]
