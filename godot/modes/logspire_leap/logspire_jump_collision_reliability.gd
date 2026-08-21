@@ -236,7 +236,7 @@ func _capsule_blocker_name(feet: Vector3, from_id: StringName, to_id: StringName
 		var collider := collider_value as Node
 		if collider == null or _is_expected_pair_collider(collider, from_id, to_id):
 			continue
-		return String(collider.name)
+		return _collider_label(collider)
 	return ""
 
 func _head_blocker_name(feet: Vector3, from_id: StringName, to_id: StringName) -> String:
@@ -258,7 +258,13 @@ func _head_blocker_name(feet: Vector3, from_id: StringName, to_id: StringName) -
 	var collider := collider_value as Node
 	if collider == null or _is_expected_pair_collider(collider, from_id, to_id):
 		return ""
-	return String(collider.name)
+	return _collider_label(collider)
+
+func _collider_label(collider: Node) -> String:
+	if collider == null:
+		return "unknown"
+	var parent_name: String = String(collider.get_parent().name) if collider.get_parent() != null else "root"
+	return "%s@%s" % [String(collider.name), parent_name]
 
 func _is_expected_pair_collider(collider: Node, from_id: StringName, to_id: StringName) -> bool:
 	var cursor: Node = collider
