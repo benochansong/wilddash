@@ -25,21 +25,21 @@ test("production character select follows the lobby en ko es locale", () => {
     assert.ok(localization.includes(locale), `missing locale ${locale}`);
   }
 
-  assert.match(localization, /WILD DASH — CHOOSE YOUR RACER/);
-  assert.match(localization, /WILD DASH — 레이서 선택/);
-  assert.match(localization, /WILD DASH — ELIGE TU CORREDOR/);
-  assert.match(localization, /ABILITY \+ COMBAT PROFILE/);
-  assert.match(localization, /능력 \+ 전투 프로필/);
-  assert.match(localization, /PERFIL DE HABILIDAD \+ COMBATE/);
+  assert.ok(localization.includes('WILD DASH — CHOOSE YOUR RACER'));
+  assert.ok(localization.includes('WILD DASH — 레이서 선택'));
+  assert.ok(localization.includes('WILD DASH — ELIGE TU CORREDOR'));
+  assert.ok(localization.includes('"context_normal": "ABILITY + COMBAT PROFILE"'));
+  assert.ok(localization.includes('"context_normal": "능력 + 전투 프로필"'));
+  assert.ok(localization.includes('"context_normal": "PERFIL DE HABILIDAD + COMBATE"'));
 });
 
 test("all 12 production racers have localized presentation entries", () => {
   for (const animalId of activeRacers) {
     assert.ok(localization.includes(`&"${animalId}": {`), `missing localized racer ${animalId}`);
   }
-  assert.match(localization, /"name": "Elephant"/);
-  assert.match(localization, /"name": "코끼리"/);
-  assert.match(localization, /"name": "Elefante"/);
+  assert.ok(localization.includes('"name": "Elephant"'));
+  assert.ok(localization.includes('"name": "코끼리"'));
+  assert.ok(localization.includes('"name": "Elefante"'));
 });
 
 test("right-hand stat card localizes labels descriptions and playstyle while retaining canonical numeric stats", () => {
