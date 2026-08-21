@@ -11,6 +11,10 @@ extends "res://modes/logspire_leap/logspire_phase3_director_v6_upper_portal_clea
 ## the late Titan spiral board footprint so the visible mesh matches the actual
 ## playable clearance. No teleport, speed boost or hidden player assist is used.
 
+const TITAN_SPIRAL_ALL_IDS: Array[StringName] = [
+	&"Z5_SPIRAL_01", &"Z5_SPIRAL_02", &"Z5_SPIRAL_03", &"Z5_SPIRAL_04", &"Z5_SPIRAL_05",
+	&"Z5_SPIRAL_06", &"Z5_SPIRAL_07", &"Z5_SPIRAL_08", &"Z5_SPIRAL_09", &"Z5_SPIRAL_10",
+]
 const TITAN_SPIRAL_CLEAR_IDS: Array[StringName] = [
 	&"Z5_SPIRAL_06",
 	&"Z5_SPIRAL_07",
@@ -25,6 +29,7 @@ const TITAN_SPIRAL_COLLISION_MAX_LENGTH: float = 12.8
 
 func configure(world: Node, graph: Node) -> void:
 	super(world, graph)
+	_label_titan_spiral_collision_bodies()
 	_trim_titan_spiral_tail_clearance()
 
 ## V5 converted the two LivingBranch set pieces into solid sloped bridges. The
@@ -55,6 +60,17 @@ func _stabilize_living_tree_route_bridges() -> void:
 		_graph.call("set_world_state", &"STATE_B")
 	print("R3 TITAN SPIRAL LIVING BRANCH CLEARANCE retired=%d collision=false moving_event=false safe_route=true" % retired)
 
+func _label_titan_spiral_collision_bodies() -> void:
+	if _world == null or not is_instance_valid(_world):
+		return
+	for platform_id: StringName in TITAN_SPIRAL_ALL_IDS:
+		var root := _world.get_node_or_null(NodePath(String(platform_id))) as Node3D
+		if root == null:
+			continue
+		var body := root.get_node_or_null("Collision") as StaticBody3D
+		if body != null:
+			body.name = "Collision_%s" % String(platform_id)
+
 func _trim_titan_spiral_tail_clearance() -> void:
 	if _world == null or not is_instance_valid(_world):
 		return
@@ -72,7 +88,7 @@ func _trim_titan_spiral_tail_clearance() -> void:
 			visual_size.z = minf(visual_size.z, TITAN_SPIRAL_VISUAL_MAX_LENGTH)
 			box_mesh.size = visual_size
 
-		var body := root.get_node_or_null("Collision") as StaticBody3D
+		var body := root.get_node_or_null("Collision_%s" % String(platform_id)) as StaticBody3D
 		var collision := body.get_child(0) as CollisionShape3D if body != null and body.get_child_count() > 0 else null
 		var box_shape := collision.shape as BoxShape3D if collision != null else null
 		if box_shape != null:
