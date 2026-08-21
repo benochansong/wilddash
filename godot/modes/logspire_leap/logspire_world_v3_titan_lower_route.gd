@@ -94,15 +94,15 @@ func _apply_lower_route_seed_layout() -> void:
 		{"id": &"Z5_ROOT_RUN_01", "offset": Vector3(0.0, 0.30, -18.0), "size": Vector3(14.0, 0.8, 18.0)},
 		{"id": &"Z5_ROOT_RUN_02", "offset": Vector3(2.0, 0.50, -34.0), "size": Vector3(14.0, 0.8, 18.0)},
 		{"id": &"Z5_BROKEN_TRUNK_TAKEOFF", "offset": Vector3(4.0, 0.70, -48.0), "size": Vector3(13.0, 0.8, 14.0)},
-		{"id": &"Z5_BROKEN_TRUNK_LANDING", "offset": Vector3(4.0, 0.90, -65.8), "size": Vector3(13.0, 0.8, 14.0)},
-		{"id": &"Z5_FORK_SAFE_01", "offset": Vector3(-10.0, 1.10, -78.0), "size": Vector3(14.0, 0.8, 16.0)},
-		{"id": &"Z5_FORK_SAFE_02", "offset": Vector3(-18.0, 1.30, -90.0), "size": Vector3(14.0, 0.8, 16.0)},
+		{"id": &"Z5_BROKEN_TRUNK_LANDING", "offset": Vector3(4.0, 0.90, -64.5), "size": Vector3(13.0, 0.8, 14.0)},
+		{"id": &"Z5_FORK_SAFE_01", "offset": Vector3(-8.0, 1.10, -78.0), "size": Vector3(14.0, 0.8, 16.0)},
+		{"id": &"Z5_FORK_SAFE_02", "offset": Vector3(-14.0, 1.30, -90.0), "size": Vector3(14.0, 0.8, 16.0)},
 		{"id": &"Z5_CANOPY_01", "offset": Vector3(-16.0, 1.50, -102.0), "size": Vector3(12.5, 0.8, 16.0)},
 		{"id": &"Z5_CANOPY_02", "offset": Vector3(-20.0, 1.70, -114.0), "size": Vector3(12.5, 0.8, 16.0)},
 		{"id": &"Z5_CANOPY_03", "offset": Vector3(-18.0, 1.90, -126.0), "size": Vector3(12.5, 0.8, 16.0)},
 		{"id": &"Z5_CANOPY_04", "offset": Vector3(-12.0, 2.10, -138.0), "size": Vector3(12.5, 0.8, 16.0)},
 		{"id": &"Z5_FINAL_TAKEOFF", "offset": Vector3(-5.0, 2.30, -148.0), "size": Vector3(14.0, 0.8, 14.0)},
-		{"id": &"Z5_FINAL_LANDING", "offset": Vector3(0.0, 2.50, -165.0), "size": Vector3(16.0, 0.8, 14.0)},
+		{"id": &"Z5_FINAL_LANDING", "offset": Vector3(0.0, 2.50, -164.0), "size": Vector3(16.0, 0.8, 14.0)},
 	]
 	for entry: Dictionary in layout:
 		_set_platform_layout(StringName(entry["id"]), merge + Vector3(entry["offset"]), Vector3(entry["size"]))
