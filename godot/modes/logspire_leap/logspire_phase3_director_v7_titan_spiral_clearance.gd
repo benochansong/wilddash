@@ -2,14 +2,14 @@ extends "res://modes/logspire_leap/logspire_phase3_director_v6_upper_portal_clea
 
 ## Round 3 Titan Tree mid-spiral clearance repair.
 ##
-## The Safe Route collision audit showed two different blockers inside Z5:
-## 1) the old LivingBranch bridge proxies intersected normal jump capsules, and
-## 2) the oversized late spiral boards curled back over the next jump arcs.
+## The production Safe Route audit identified two independent blockers inside Z5:
+## 1) the old LivingBranch bridge proxies intersect normal jump capsules, and
+## 2) the broad legacy Recovery_Z6_Deck sits across the lowered Titan spiral.
 ##
-## Keep the authored route points, jump power, checkpoints and recovery rules.
-## This pass removes the redundant LivingBranch gameplay collision and trims only
-## the late Titan spiral board footprint so the visible mesh matches the actual
-## playable clearance. No teleport, speed boost or hidden player assist is used.
+## Keep authored route points, jump power, checkpoints and the Z6 recovery Area3D.
+## This pass retires only obsolete solid blockers and trims the late spiral board
+## footprint to match playable clearance. No teleport, speed boost, checkpoint
+## skip or hidden player assist is used.
 
 const TITAN_SPIRAL_CLEAR_IDS: Array[StringName] = [
 	&"Z5_SPIRAL_06",
@@ -22,15 +22,16 @@ const TITAN_SPIRAL_VISUAL_MAX_WIDTH: float = 9.8
 const TITAN_SPIRAL_VISUAL_MAX_LENGTH: float = 12.4
 const TITAN_SPIRAL_COLLISION_MAX_WIDTH: float = 10.2
 const TITAN_SPIRAL_COLLISION_MAX_LENGTH: float = 12.8
+const UPPER_LEGACY_RECOVERY_DECK: StringName = &"Recovery_Z6_Deck"
 
 func configure(world: Node, graph: Node) -> void:
 	super(world, graph)
+	_retire_upper_legacy_recovery_deck_collision()
 	_trim_titan_spiral_tail_clearance()
 
 ## V5 converted the two LivingBranch set pieces into solid sloped bridges. The
-## final runtime audit proves those bridges actually cross the normal Safe Route
-## jump capsule (03->04 and 05->06), so they are now visual/gameplay-retired.
-## The expanded Safe Route platforms already provide the intended traversal.
+## runtime audit proves those bridges cross the normal Safe Route jump capsule
+## (03->04 and 05->06), so the expanded Safe Route platforms replace them.
 func _stabilize_living_tree_route_bridges() -> void:
 	var retired: int = 0
 	for i: int in range(_living_branches.size()):
@@ -54,6 +55,35 @@ func _stabilize_living_tree_route_bridges() -> void:
 	if _graph != null and _graph.has_method("set_world_state"):
 		_graph.call("set_world_state", &"STATE_B")
 	print("R3 TITAN SPIRAL LIVING BRANCH CLEARANCE retired=%d collision=false moving_event=false safe_route=true" % retired)
+
+## The deep-water system keeps Recovery_Z6 as an Area3D recovery authority, so
+## the old 90x180m solid deck is no longer needed for traversal. After the Titan
+## accessibility rebalance lowered the late Z5 spiral, that fixed-height deck
+## became a ceiling/floor slab across four consecutive jump arcs. Retire only the
+## deck's solid collision; the Area3D, Vine Rescue and checkpoint fallback stay.
+func _retire_upper_legacy_recovery_deck_collision() -> void:
+	if _world == null or not is_instance_valid(_world):
+		return
+	var deck := _world.get_node_or_null(NodePath(String(UPPER_LEGACY_RECOVERY_DECK))) as Node3D
+	if deck == null:
+		push_warning("R3 TITAN SPIRAL CLEARANCE missing %s" % String(UPPER_LEGACY_RECOVERY_DECK))
+		return
+	deck.visible = false
+	deck.set_meta(&"retired_for_titan_spiral_clearance", true)
+	var body := deck.get_node_or_null("Collision") as StaticBody3D
+	var disabled_shapes: int = 0
+	if body != null:
+		body.collision_layer = 0
+		body.collision_mask = 0
+		for child: Node in body.get_children():
+			var shape := child as CollisionShape3D
+			if shape == null:
+				continue
+			shape.disabled = true
+			disabled_shapes += 1
+	print("R3 TITAN SPIRAL RECOVERY DECK CLEARANCE deck=%s solid_collision=false disabled_shapes=%d recovery_area_unchanged=true vine_rescue_unchanged=true checkpoint_fallback_unchanged=true" % [
+		String(UPPER_LEGACY_RECOVERY_DECK), disabled_shapes,
+	])
 
 func _trim_titan_spiral_tail_clearance() -> void:
 	if _world == null or not is_instance_valid(_world):
