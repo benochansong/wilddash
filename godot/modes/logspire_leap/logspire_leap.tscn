@@ -6,15 +6,15 @@
 ; Phase B combat inherits res://modes/logspire_leap/logspire_combat_safety_v2_recovery_protection.gd
 ; Keep Phase A/B gameplay and stable recovery/collision layers load-critical.
 ; Graphics Phase 2/3 and the Wild Moments water adapter remain source-only.
-; Water V15 uses direct Vine Rescue over the V14 safe re-entry authority.
+; Water V16 keeps V15 direct Vine Rescue while compacting only the visible upper Z6 water slab.
 ; WaterSubmergeWatchdog hard-resets any deeply submerged racer that is not in an active Vine pull.
 ; LadderSystem V6 is compatibility-only and removes ladder/root-stair recovery props.
 ; JumpRebalance V3 caps Titan Tree Safe Route vertical rises for playable climbing.
 ; PlayerManualThrottle removes neutral auto-cruise only in Round 3.
 ; CrownNestFinish treats the destination platform itself as the R3 finish area.
-; Phase3Director V5 keeps giant tree visuals out of the Safe Route and prevents phase-through.
+; Phase3Director V6 physically opens the upper Titan visual/collision portal instead of shrinking collision under an intact trunk mesh.
 ; PlatformGameplay V2 preserves Finale swing timing while replacing Z6 cylinders with flat box boards.
-; SkyFinaleVisualPolish V2 narrows the visible canopy river and masks the camera-facing water-sheet edge.
+; SkyFinaleVisualPolish V2 now reads the compact Z6 water bounds and masks the remaining channel edges.
 ; Mode V5 promotes direct/F6 Crown Nest finish into Round Recap -> Round 4 and seeds four AI Finale contenders.
 ; JumpCollisionAudit runs only after the final geometry/collision layers exist.
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_leap_v5_finish_ai_convergence.gd" id="1_mode"]
@@ -28,9 +28,9 @@
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_platform_gameplay_v2_finale_flat_boards.gd" id="6_gameplay"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_combat_safety_v3_phase_b.gd" id="7_combat"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_mushroom_feedback.gd" id="8_mushroom"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_phase3_director_v5_route_clearance.gd" id="9_phase3"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_phase3_director_v6_upper_portal_cleanup.gd" id="9_phase3"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_ladder_system_v6_vine_only_cleanup.gd" id="10_ladder"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_recovery_v15_vine_only.gd" id="11_water"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_recovery_v16_upper_canopy_cleanup.gd" id="11_water"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_collision_reliability.gd" id="12_jump_collision_audit"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_player_manual_throttle.gd" id="13_manual_throttle"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_finish_authority.gd" id="14_finish_authority"]
