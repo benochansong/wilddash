@@ -1,36 +1,44 @@
-[gd_scene load_steps=19 format=3]
+[gd_scene load_steps=20 format=3]
 
 ; P0 CAMPAIGN-SAFE ROUND 3
 ; Phase B mode inherits res://modes/logspire_leap/logspire_leap_v3_recovery_camera.gd
+; Mode V6 is a thin playability/AI adapter over res://modes/logspire_leap/logspire_leap_v5_finish_ai_convergence.gd
 ; Phase B combat inherits res://modes/logspire_leap/logspire_combat_safety_v2_recovery_protection.gd
 ; Keep Phase A/B gameplay and stable recovery/collision layers load-critical.
 ; Graphics Phase 2/3 and the Wild Moments water adapter remain source-only.
-; Water V15 uses direct Vine Rescue over the V14 safe re-entry authority.
-; WaterSubmergeWatchdog hard-resets any deeply submerged racer that is not in an active Vine pull.
+; World V3 retires the authored Z5 upper spiral before geometry creation and replaces CP4->CP5 with the lower/mid ROOT RUN -> BROKEN TRUNK -> FORK -> CANOPY DASH -> FINAL ROOT JUMP course.
+; CP5 now belongs to Z5_FINAL_LANDING. The optional Wild-route fork is a shorter FAST path; the normal route stays wide and readable.
+; Water V17 preserves V16 visuals/V15 Vine Rescue but blocks the future Z6 water volume from owning racers before CP6.
+; WaterSubmergeWatchdog V3 also defers its hard escape while that future-zone progression lock is active.
 ; LadderSystem V6 is compatibility-only and removes ladder/root-stair recovery props.
-; JumpRebalance V3 caps Titan Tree Safe Route vertical rises for playable climbing.
+; JumpRebalance V3 keeps baseline Titan vertical accessibility without the retired CP5 upper-spiral offset patch.
+; JumpGapGuard V4 inherits the stable Phase-A guard directly, retires the old Titan upper bridge/shelf stack, and finalizes the new lower route before PlatformGraph caches it.
 ; PlayerManualThrottle removes neutral auto-cruise only in Round 3.
 ; CrownNestFinish treats the destination platform itself as the R3 finish area.
-; Phase3Director V5 keeps giant tree visuals out of the Safe Route and prevents phase-through.
+; Phase3Director V7 keeps the upper portal visually clear and retires obsolete LivingBranch/recovery-deck blockers; old Z5_SPIRAL ids no longer exist in production route geometry.
+; PlatformGameplay V2 preserves Finale swing timing while replacing Z6 cylinders with flat box boards.
+; SkyFinaleVisualPolish V2 reads the compact Z6 water bounds and masks the remaining channel edges.
+; Mode V6 preserves V5 finish/recap behavior while installing lower-route AI V6 for non-human racers.
 ; JumpCollisionAudit runs only after the final geometry/collision layers exist.
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_leap_v4_phase_b.gd" id="1_mode"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_world_v2_deep_water.gd" id="2_world"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_leap_v6_titan_lower_playability.gd" id="1_mode"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_world_v3_titan_lower_route.gd" id="2_world"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_rebalance_v3_titan_tree_accessibility.gd" id="2b_jump_rebalance"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_gap_guard.gd" id="2c_gap_guard"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_gap_guard_v4_lower_route.gd" id="2c_gap_guard"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_depth_guard.gd" id="2d_depth_guard"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_platform_graph.gd" id="3_graph"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_recovery_system_v2_ladder_only.gd" id="4_recovery"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_mobility_assist.gd" id="5_mobility"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_platform_gameplay.gd" id="6_gameplay"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_platform_gameplay_v2_finale_flat_boards.gd" id="6_gameplay"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_combat_safety_v3_phase_b.gd" id="7_combat"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_mushroom_feedback.gd" id="8_mushroom"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_phase3_director_v5_route_clearance.gd" id="9_phase3"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_phase3_director_v7_titan_spiral_clearance.gd" id="9_phase3"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_ladder_system_v6_vine_only_cleanup.gd" id="10_ladder"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_recovery_v15_vine_only.gd" id="11_water"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_recovery_v17_titan_future_zone_guard.gd" id="11_water"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_collision_reliability.gd" id="12_jump_collision_audit"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_player_manual_throttle.gd" id="13_manual_throttle"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_finish_authority.gd" id="14_finish_authority"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_submerge_watchdog.gd" id="15_water_watchdog"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_submerge_watchdog_v3_future_zone_guard.gd" id="15_water_watchdog"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_finale_visual_polish_v2_camera_readability.gd" id="16_finale_visual"]
 
 [node name="LogspireLeap" type="Node3D"]
 script = ExtResource("1_mode")
@@ -76,6 +84,9 @@ script = ExtResource("8_mushroom")
 
 [node name="Phase3Director" type="Node" parent="."]
 script = ExtResource("9_phase3")
+
+[node name="SkyFinaleVisualPolish" type="Node" parent="."]
+script = ExtResource("16_finale_visual")
 
 [node name="PlayerManualThrottle" type="Node" parent="."]
 script = ExtResource("13_manual_throttle")

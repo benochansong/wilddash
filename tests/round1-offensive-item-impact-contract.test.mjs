@@ -6,6 +6,7 @@ const project = readFileSync("godot/project.godot", "utf8");
 const baseItems = readFileSync("godot/systems/item_system.gd", "utf8");
 const rc9Items = readFileSync("godot/systems/item_system_rc9_party_turbo.gd", "utf8");
 const round1Items = readFileSync("godot/systems/item_system_rc9_round1_impact.gd", "utf8");
+const round5Pressure = readFileSync("godot/systems/item_system_rc9_round5_leader_pressure.gd", "utf8");
 const raceCore = readFileSync("godot/systems/race_combat_core_v3.gd", "utf8");
 const raceCorePower = readFileSync("godot/systems/race_combat_core_v3_power.gd", "utf8");
 const profiles = readFileSync("godot/systems/race_impact_profile.gd", "utf8");
@@ -21,7 +22,9 @@ function numericConstant(source, name) {
 }
 
 test("Round 1 impact pass remains an adapter over the existing ItemSystem architecture", () => {
-  assert.match(project, /ItemSystem="\*res:\/\/systems\/item_system_rc9_round1_impact\.gd"/);
+  assert.match(project, /ItemSystem="\*res:\/\/systems\/item_system_rc9_round5_leader_pressure\.gd"/);
+  assert.match(round5Pressure, /extends "res:\/\/systems\/item_system_rc9_round1_impact\.gd"/);
+  assert.match(round5Pressure, /return super\.roll_item_for_rank\(rank, total, history\)/);
   assert.match(round1Items, /extends "res:\/\/systems\/item_system_rc9_party_turbo\.gd"/);
   assert.match(rc9Items, /extends "res:\/\/systems\/item_system\.gd"/);
   assert.match(baseItems, /const ITEM_IDS: Array\[StringName\] = \[/);
