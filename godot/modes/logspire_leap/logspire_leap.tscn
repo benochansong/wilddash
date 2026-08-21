@@ -7,9 +7,10 @@
 ; Keep Phase A/B gameplay and stable recovery/collision layers load-critical.
 ; Graphics Phase 2/3 and the Wild Moments water adapter remain source-only.
 ; Water V16 keeps V15 direct Vine Rescue while compacting only the visible upper Z6 water slab.
-; WaterSubmergeWatchdog hard-resets any deeply submerged racer that is not in an active Vine pull.
+; WaterSubmergeWatchdog V2 blocks false water rewinds while the racer is on/recently left the authored Safe Route.
 ; LadderSystem V6 is compatibility-only and removes ladder/root-stair recovery props.
 ; JumpRebalance V3 caps Titan Tree Safe Route vertical rises for playable climbing.
+; JumpGapGuard V2 adds collision-backed sloped flow bridges through the upper Titan spiral after CP5.
 ; PlayerManualThrottle removes neutral auto-cruise only in Round 3.
 ; CrownNestFinish treats the destination platform itself as the R3 finish area.
 ; Phase3Director V7 keeps the V6 upper portal and also clears the blocked mid-Titan spiral jump corridor.
@@ -20,7 +21,7 @@
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_leap_v5_finish_ai_convergence.gd" id="1_mode"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_world_v2_deep_water.gd" id="2_world"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_rebalance_v3_titan_tree_accessibility.gd" id="2b_jump_rebalance"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_gap_guard.gd" id="2c_gap_guard"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_gap_guard_v2_titan_upper_flow.gd" id="2c_gap_guard"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_depth_guard.gd" id="2d_depth_guard"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_platform_graph.gd" id="3_graph"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_recovery_system_v2_ladder_only.gd" id="4_recovery"]
@@ -34,7 +35,7 @@
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_collision_reliability.gd" id="12_jump_collision_audit"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_player_manual_throttle.gd" id="13_manual_throttle"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_finish_authority.gd" id="14_finish_authority"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_submerge_watchdog.gd" id="15_water_watchdog"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_submerge_watchdog_v2_route_guard.gd" id="15_water_watchdog"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_finale_visual_polish_v2_camera_readability.gd" id="16_finale_visual"]
 
 [node name="LogspireLeap" type="Node3D"]
