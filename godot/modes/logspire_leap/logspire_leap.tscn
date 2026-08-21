@@ -6,22 +6,24 @@
 ; Phase B combat inherits res://modes/logspire_leap/logspire_combat_safety_v2_recovery_protection.gd
 ; Keep Phase A/B gameplay and stable recovery/collision layers load-critical.
 ; Graphics Phase 2/3 and the Wild Moments water adapter remain source-only.
+; World V3 retires the authored Z5 upper spiral before geometry creation and replaces CP4->CP5 with the lower/mid ROOT RUN -> BROKEN TRUNK -> FORK -> CANOPY DASH -> FINAL ROOT JUMP course.
+; CP5 now belongs to Z5_FINAL_LANDING. The optional Wild-route fork is a shorter FAST path; the normal route stays wide and readable.
 ; Water V17 preserves V16 visuals/V15 Vine Rescue but blocks the future Z6 water volume from owning racers before CP6.
 ; WaterSubmergeWatchdog V3 also defers its hard escape while that future-zone progression lock is active.
 ; LadderSystem V6 is compatibility-only and removes ladder/root-stair recovery props.
-; JumpRebalance V4 keeps Titan vertical accessibility and moves the CP5+ spiral outward so upper decks do not fold over the climb corridor.
-; JumpGapGuard V3 keeps the upper Titan flow bridges, widens CP5->upper-deck access, and adds a flat landing shelf over the destination lip.
+; JumpRebalance V3 keeps baseline Titan vertical accessibility without the retired CP5 upper-spiral offset patch.
+; JumpGapGuard V4 inherits the stable Phase-A guard directly, retires the old Titan upper bridge/shelf stack, and finalizes the new lower route before PlatformGraph caches it.
 ; PlayerManualThrottle removes neutral auto-cruise only in Round 3.
 ; CrownNestFinish treats the destination platform itself as the R3 finish area.
-; Phase3Director V7 keeps the V6 upper portal and also clears the blocked mid-Titan spiral jump corridor.
+; Phase3Director V7 keeps the upper portal visually clear and retires obsolete LivingBranch/recovery-deck blockers; old Z5_SPIRAL ids no longer exist in production route geometry.
 ; PlatformGameplay V2 preserves Finale swing timing while replacing Z6 cylinders with flat box boards.
-; SkyFinaleVisualPolish V2 now reads the compact Z6 water bounds and masks the remaining channel edges.
+; SkyFinaleVisualPolish V2 reads the compact Z6 water bounds and masks the remaining channel edges.
 ; Mode V5 promotes direct/F6 Crown Nest finish into Round Recap -> Round 4 and seeds four AI Finale contenders.
 ; JumpCollisionAudit runs only after the final geometry/collision layers exist.
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_leap_v5_finish_ai_convergence.gd" id="1_mode"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_world_v2_deep_water.gd" id="2_world"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_rebalance_v4_cp5_outer_clearance.gd" id="2b_jump_rebalance"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_gap_guard_v3_cp5_upper_landing.gd" id="2c_gap_guard"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_world_v3_titan_lower_route.gd" id="2_world"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_rebalance_v3_titan_tree_accessibility.gd" id="2b_jump_rebalance"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_gap_guard_v4_lower_route.gd" id="2c_gap_guard"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_depth_guard.gd" id="2d_depth_guard"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_platform_graph.gd" id="3_graph"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_recovery_system_v2_ladder_only.gd" id="4_recovery"]
