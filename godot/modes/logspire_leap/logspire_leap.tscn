@@ -9,8 +9,8 @@
 ; Water V16 keeps V15 direct Vine Rescue while compacting only the visible upper Z6 water slab.
 ; WaterSubmergeWatchdog V2 blocks false water rewinds while the racer is on/recently left the authored Safe Route.
 ; LadderSystem V6 is compatibility-only and removes ladder/root-stair recovery props.
-; JumpRebalance V3 caps Titan Tree Safe Route vertical rises for playable climbing.
-; JumpGapGuard V2 adds collision-backed sloped flow bridges through the upper Titan spiral after CP5.
+; JumpRebalance V4 keeps Titan vertical accessibility and moves the CP5+ spiral outward so upper decks do not fold over the climb corridor.
+; JumpGapGuard V3 keeps the upper Titan flow bridges, widens CP5->upper-deck access, and adds a flat landing shelf over the destination lip.
 ; PlayerManualThrottle removes neutral auto-cruise only in Round 3.
 ; CrownNestFinish treats the destination platform itself as the R3 finish area.
 ; Phase3Director V7 keeps the V6 upper portal and also clears the blocked mid-Titan spiral jump corridor.
@@ -20,8 +20,8 @@
 ; JumpCollisionAudit runs only after the final geometry/collision layers exist.
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_leap_v5_finish_ai_convergence.gd" id="1_mode"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_world_v2_deep_water.gd" id="2_world"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_rebalance_v3_titan_tree_accessibility.gd" id="2b_jump_rebalance"]
-[ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_gap_guard_v2_titan_upper_flow.gd" id="2c_gap_guard"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_rebalance_v4_cp5_outer_clearance.gd" id="2b_jump_rebalance"]
+[ext_resource type="Script" path="res://modes/logspire_leap/logspire_jump_gap_guard_v3_cp5_upper_landing.gd" id="2c_gap_guard"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_water_depth_guard.gd" id="2d_depth_guard"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_platform_graph.gd" id="3_graph"]
 [ext_resource type="Script" path="res://modes/logspire_leap/logspire_recovery_system_v2_ladder_only.gd" id="4_recovery"]
