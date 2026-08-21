@@ -19,6 +19,45 @@ const WILD_CURRENT_ROUND_SCENES: Array[String] = [
 	"res://modes/push_out/push_out.tscn",
 	"res://modes/wild_current/wild_current.tscn",
 ]
+const CAMPAIGN_INTRO_SCENE := "res://scenes/campaign_intro.tscn"
+
+var _campaign_intro_pending := false
+
+func start_campaign() -> void:
+	# Automated/headless gates must keep their deterministic direct path. Manual
+	# campaign starts get one short sandbox montage before Round 1.
+	if DisplayServer.get_name() == "headless" or OS.has_environment("WILDDASH_AUTOTEST") or OS.has_environment("WILDDASH_AUTOTEST_LOAD_ONLY") or OS.has_environment("WILDDASH_SKIP_CAMPAIGN_INTRO"):
+		super.start_campaign()
+		return
+	if _campaign_intro_pending:
+		print("CAMPAIGN INTRO START IGNORED already_pending=true")
+		return
+	if campaign_running and state != GameState.CHARACTER_SELECT:
+		super.start_campaign()
+		return
+	_campaign_intro_pending = true
+	round_active = false
+	_transition_pending = false
+	set_state(GameState.COUNTDOWN)
+	print("CAMPAIGN INTRO REQUEST rounds=5 sandbox=true animal=%s" % String(selected_animal))
+	var error := get_tree().change_scene_to_file(CAMPAIGN_INTRO_SCENE)
+	if error != OK:
+		_campaign_intro_pending = false
+		set_state(GameState.CHARACTER_SELECT)
+		push_warning("Campaign intro failed to load; starting Round 1 directly: %s" % error_string(error))
+		super.start_campaign()
+
+func continue_campaign_after_intro() -> void:
+	# Returning to CHARACTER_SELECT state (without loading that scene) intentionally
+	# lets the base manager recover a stale editor campaign if one existed before
+	# the montage. In normal play campaign_running is false and this simply starts.
+	_campaign_intro_pending = false
+	set_state(GameState.CHARACTER_SELECT)
+	print("CAMPAIGN INTRO CONTINUE animal=%s next=round1" % String(selected_animal))
+	super.start_campaign()
+
+func is_campaign_intro_pending() -> bool:
+	return _campaign_intro_pending
 
 func get_current_round_id() -> StringName:
 	if current_round_index < 0 or current_round_index >= WILD_CURRENT_ROUND_IDS.size():
