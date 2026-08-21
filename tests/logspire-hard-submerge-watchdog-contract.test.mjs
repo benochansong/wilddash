@@ -11,8 +11,12 @@ test("Round 3 production wires the route-guarded deep-water watchdog", () => {
   assert.match(scene, /logspire_water_submerge_watchdog_v2_route_guard\.gd/);
   assert.match(scene, /\[node name="WaterSubmergeWatchdog" type="Node" parent="\."\]/);
   assert.match(watchdogBase, /HARD_SUBMERGE_DEPTH: float = 0\.58/);
-  assert.match(watchdog, /ROUTE_HARD_SUBMERGE_CONFIRM_SECONDS: float = 0\.32/);
+  assert.match(watchdog, /ROUTE_HARD_SUBMERGE_CONFIRM_SECONDS: float = 0\.85/);
+  assert.match(watchdog, /ROUTE_HARD_MIN_SUBMERGE_DEPTH: float = 0\.95/);
+  assert.match(watchdog, /ROUTE_HARD_MIN_DESCENT_SPEED: float = -0\.65/);
   assert.match(watchdog, /ROUTE_SUPPORT_GRACE_SECONDS: float = 0\.55/);
+  assert.match(watchdog, /primary_recovery_guard=true/);
+  assert.match(watchdog, /deep_fail_safe=true/);
   assert.match(watchdog, /_hard_checkpoint_escape\(racer, submerged_depth\)/);
 });
 
@@ -27,12 +31,24 @@ test("authored route support and recent support beat broad invisible water overl
   assert.match(watchdog, /no_rewind=true/);
 });
 
-test("hard reset requires primary water authority and sustained descent", () => {
+test("primary WaterRecovery owns ordinary falls and watchdog cannot become a second transform writer", () => {
+  assert.match(watchdog, /_primary_water_recovery_active\(racer\)/);
+  assert.match(watchdog, /racer\.get_meta\(PRIMARY_WATER_META, false\)/);
+  assert.match(watchdog, /_water\.has_method\("is_water_recovering"\)/);
+  assert.match(watchdog, /r3_water_watchdog_deferred/);
+  assert.match(watchdog, /hard_checkpoint_escape=false/);
+  assert.match(watchdog, /transform_owner=WaterRecovery/);
+});
+
+test("emergency hard reset requires deep sustained unsupported descent", () => {
+  assert.match(watchdog, /submerged_depth < maxf\(HARD_SUBMERGE_DEPTH, ROUTE_HARD_MIN_SUBMERGE_DEPTH\)/);
   assert.match(watchdog, /_water\.has_method\("should_handle_racer"\)/);
   assert.match(watchdog, /not bool\(_water\.call\("should_handle_racer", racer\)\)/);
   assert.match(watchdog, /racer\.velocity\.y > ROUTE_HARD_MIN_DESCENT_SPEED/);
   assert.match(watchdog, /elapsed < ROUTE_HARD_SUBMERGE_CONFIRM_SECONDS/);
   assert.match(watchdog, /r3_true_water_reset_confirmed/);
+  assert.match(watchdog, /primary_water_inactive=true/);
+  assert.match(watchdog, /emergency_only=true/);
   assert.match(watchdog, /_vine_rescue_active\(racer_id\)/);
 });
 
