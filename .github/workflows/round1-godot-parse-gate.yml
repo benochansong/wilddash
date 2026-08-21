@@ -109,6 +109,10 @@ jobs:
           grep -q "r3_upper_water_visual_compacted" /tmp/wilddash-round3-load.log
           grep -q "recovery_area_unchanged=true broad_floating_slab=false" /tmp/wilddash-round3-load.log
           grep -q "R3 TITAN SPIRAL RECOVERY DECK CLEARANCE deck=Recovery_Z6_Deck solid_collision=false" /tmp/wilddash-round3-load.log
+          grep -q "LOGSPIRE TITAN UPPER FLOW READY bridges=8" /tmp/wilddash-round3-load.log
+          grep -q "continuous_walkable=true collision_backed=true" /tmp/wilddash-round3-load.log
+          grep -q "LOGSPIRE SUBMERGE WATCHDOG V2 READY" /tmp/wilddash-round3-load.log
+          grep -q "route_support_guard=true" /tmp/wilddash-round3-load.log
           grep -E -q "LOGSPIRE SAFE ROUTE PASS pairs=[0-9]+ blocked_pairs=0 head_blocks=0 .*pass=true" /tmp/wilddash-round3-load.log
 
       - name: Load production Round 5 Wild Current scene
