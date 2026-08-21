@@ -1,12 +1,12 @@
 extends "res://modes/logspire_leap/logspire_world_v2_deep_water.gd"
 
-## Round 3 Titan Tree Phase 1 rebuild.
+## Round 3 Titan Tree lower / mid route source data.
 ##
 ## The former Z5 upper spiral is retired before production geometry is built.
-## Its authored slots are renamed and re-authored as a lower/mid-height route,
-## so no Z5_SPIRAL_* platform node exists in the production world at runtime.
-## A short optional FAST fork is registered as Wild-route geometry while the
-## normal SAFE route remains wide and readable. CP5 moves to the final landing.
+## Its authored slots are renamed and re-authored as a low, open route, so no
+## Z5_SPIRAL_* platform node exists in the production world at runtime.
+## Phase 2 flattens the CP4 -> CP5 climb so the five QA bodies can clear every
+## authored jump with their default jump_velocity / gravity values.
 
 const LEGACY_TO_LOWER_ID: Dictionary = {
 	&"Z5_APPROACH_01": &"Z5_ROOT_RUN_01",
@@ -91,18 +91,18 @@ func _replace_route_name(route: Array[StringName], old_id: StringName, new_id: S
 func _apply_lower_route_seed_layout() -> void:
 	var merge: Vector3 = get_platform_position(_merge_platform_id)
 	var layout: Array[Dictionary] = [
-		{"id": &"Z5_ROOT_RUN_01", "offset": Vector3(0.0, 0.8, -18.0), "size": Vector3(14.0, 0.8, 18.0)},
-		{"id": &"Z5_ROOT_RUN_02", "offset": Vector3(2.0, 1.6, -34.0), "size": Vector3(14.0, 0.8, 18.0)},
-		{"id": &"Z5_BROKEN_TRUNK_TAKEOFF", "offset": Vector3(4.0, 2.4, -48.0), "size": Vector3(13.0, 0.8, 14.0)},
-		{"id": &"Z5_BROKEN_TRUNK_LANDING", "offset": Vector3(4.0, 3.2, -66.6), "size": Vector3(13.0, 0.8, 14.0)},
-		{"id": &"Z5_FORK_SAFE_01", "offset": Vector3(-7.0, 4.0, -78.0), "size": Vector3(14.0, 0.8, 16.0)},
-		{"id": &"Z5_FORK_SAFE_02", "offset": Vector3(-16.0, 4.8, -89.0), "size": Vector3(14.0, 0.8, 16.0)},
-		{"id": &"Z5_CANOPY_01", "offset": Vector3(-26.0, 5.6, -98.0), "size": Vector3(12.5, 0.8, 16.0)},
-		{"id": &"Z5_CANOPY_02", "offset": Vector3(-34.0, 6.4, -106.0), "size": Vector3(12.5, 0.8, 16.0)},
-		{"id": &"Z5_CANOPY_03", "offset": Vector3(-28.0, 7.2, -118.0), "size": Vector3(12.5, 0.8, 16.0)},
-		{"id": &"Z5_CANOPY_04", "offset": Vector3(-18.0, 8.0, -128.0), "size": Vector3(12.5, 0.8, 16.0)},
-		{"id": &"Z5_FINAL_TAKEOFF", "offset": Vector3(-9.0, 8.8, -138.0), "size": Vector3(14.0, 0.8, 14.0)},
-		{"id": &"Z5_FINAL_LANDING", "offset": Vector3(-3.0, 9.6, -157.0), "size": Vector3(16.0, 0.8, 14.0)},
+		{"id": &"Z5_ROOT_RUN_01", "offset": Vector3(0.0, 0.30, -18.0), "size": Vector3(14.0, 0.8, 18.0)},
+		{"id": &"Z5_ROOT_RUN_02", "offset": Vector3(2.0, 0.50, -34.0), "size": Vector3(14.0, 0.8, 18.0)},
+		{"id": &"Z5_BROKEN_TRUNK_TAKEOFF", "offset": Vector3(4.0, 0.70, -48.0), "size": Vector3(13.0, 0.8, 14.0)},
+		{"id": &"Z5_BROKEN_TRUNK_LANDING", "offset": Vector3(4.0, 0.90, -66.0), "size": Vector3(13.0, 0.8, 14.0)},
+		{"id": &"Z5_FORK_SAFE_01", "offset": Vector3(-8.0, 1.10, -78.0), "size": Vector3(14.0, 0.8, 16.0)},
+		{"id": &"Z5_FORK_SAFE_02", "offset": Vector3(-14.0, 1.30, -90.0), "size": Vector3(14.0, 0.8, 16.0)},
+		{"id": &"Z5_CANOPY_01", "offset": Vector3(-16.0, 1.50, -102.0), "size": Vector3(12.5, 0.8, 16.0)},
+		{"id": &"Z5_CANOPY_02", "offset": Vector3(-20.0, 1.70, -114.0), "size": Vector3(12.5, 0.8, 16.0)},
+		{"id": &"Z5_CANOPY_03", "offset": Vector3(-18.0, 1.90, -126.0), "size": Vector3(12.5, 0.8, 16.0)},
+		{"id": &"Z5_CANOPY_04", "offset": Vector3(-12.0, 2.10, -138.0), "size": Vector3(12.5, 0.8, 16.0)},
+		{"id": &"Z5_FINAL_TAKEOFF", "offset": Vector3(-5.0, 2.30, -148.0), "size": Vector3(14.0, 0.8, 14.0)},
+		{"id": &"Z5_FINAL_LANDING", "offset": Vector3(0.0, 2.50, -165.0), "size": Vector3(16.0, 0.8, 14.0)},
 	]
 	for entry: Dictionary in layout:
 		_set_platform_layout(StringName(entry["id"]), merge + Vector3(entry["offset"]), Vector3(entry["size"]))
@@ -116,12 +116,12 @@ func _set_platform_layout(platform_id: StringName, top: Vector3, size: Vector3) 
 
 func _register_lower_fast_fork() -> void:
 	var start: Vector3 = get_platform_position(&"Z5_BROKEN_TRUNK_LANDING")
-	var merge: Vector3 = get_platform_position(&"Z5_CANOPY_03")
+	var canopy: Vector3 = get_platform_position(&"Z5_CANOPY_01")
 	var cp4: StringName = _checkpoint_ids[3] if _checkpoint_ids.size() > 3 else _merge_platform_id
 	var fast_positions: Array[Vector3] = [
-		start.lerp(merge, 0.28) + Vector3(8.0, 0.15, 0.0),
-		start.lerp(merge, 0.56) + Vector3(10.0, 0.25, 0.0),
-		start.lerp(merge, 0.82) + Vector3(6.0, 0.15, 0.0),
+		Vector3(start.x + 5.0, start.y + 0.20, start.z - 13.0),
+		Vector3(start.x + 6.0, start.y + 0.40, start.z - 25.0),
+		Vector3(start.x - 2.0, start.y + 0.60, start.z - 35.0),
 	]
 	for i: int in range(LOWER_FAST_IDS.size()):
 		_register_platform(
@@ -134,6 +134,8 @@ func _register_lower_fast_fork() -> void:
 			true,
 			cp4
 		)
+	# Keep a concrete relationship to the merge target for audit/debug readability.
+	set_meta(&"titan_fast_fork_merge", canopy)
 
 func _rebuild_wild_suffix_for_fast_fork() -> void:
 	var merge_index: int = _wild_route_ids.find(_merge_platform_id)
@@ -152,6 +154,8 @@ func _rebuild_wild_suffix_for_fast_fork() -> void:
 	for platform_id: StringName in LOWER_FAST_IDS:
 		rebuilt.append(platform_id)
 	for platform_id: StringName in [
+		&"Z5_CANOPY_01",
+		&"Z5_CANOPY_02",
 		&"Z5_CANOPY_03",
 		&"Z5_CANOPY_04",
 		&"Z5_FINAL_TAKEOFF",
@@ -197,7 +201,8 @@ func _shift_runtime_recovery_pair(area_name: String, delta: Vector3) -> void:
 func _mark_lower_route_contract() -> void:
 	set_meta(&"titan_upper_spiral_playable", false)
 	set_meta(&"titan_lower_route_phase1", true)
+	set_meta(&"titan_lower_route_phase2_geometry", true)
 	set_meta(&"titan_cp5_platform", &"Z5_FINAL_LANDING")
-	print("LOGSPIRE TITAN LOWER ROUTE DATA READY legacy_upper_spiral=false safe_nodes=%d fast_nodes=%d cp5=Z5_FINAL_LANDING future_z6_shifted=true" % [
+	print("LOGSPIRE TITAN LOWER ROUTE DATA READY legacy_upper_spiral=false safe_nodes=%d fast_nodes=%d cp5=Z5_FINAL_LANDING future_z6_shifted=true baseline_jump_geometry=true" % [
 		LOWER_SAFE_IDS.size(), LOWER_FAST_IDS.size(),
 	])
