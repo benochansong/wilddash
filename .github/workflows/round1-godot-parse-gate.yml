@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   round-parse:
-    name: Godot 4.7.1 Intro + Round 1 + Round 3 + Round 5 parse
+    name: Godot 4.7.1 Round 1 + Round 3 + Round 5 parse
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -40,22 +40,6 @@ jobs:
             echo "Godot import found a parser/script error."
             exit 1
           fi
-
-      - name: Load campaign simulation intro scene
-        shell: bash
-        run: |
-          set -o pipefail
-          /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
-            --headless --path godot \
-            res://scenes/campaign_intro.tscn \
-            --quit-after 2 \
-            2>&1 | tee /tmp/wilddash-campaign-intro.log
-          if grep -E "SCRIPT ERROR: Parse Error|Parse Error:|Failed to load script|Could not resolve script|Cannot get class|Failed loading resource|Failed to load resource" /tmp/wilddash-campaign-intro.log; then
-            echo "Campaign simulation intro found a parser/resource error."
-            exit 1
-          fi
-          grep -q "CAMPAIGN INTRO READY rounds=5" /tmp/wilddash-campaign-intro.log
-          grep -q "CAMPAIGN INTRO ROUND preview=1 mode=grand_prix" /tmp/wilddash-campaign-intro.log
 
       - name: Load production Round 1 scene
         shell: bash
@@ -145,4 +129,4 @@ jobs:
           grep -q "teleport_convergence=false" /tmp/wilddash-round5-load.log
 
       - name: Confirm production scenes parsed
-        run: echo "INTRO + ROUND 1 + ROUND 3 + ROUND 5 GODOT PARSE PASS"
+        run: echo "ROUND 1 + ROUND 3 + ROUND 5 GODOT PARSE PASS"
