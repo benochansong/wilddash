@@ -1,7 +1,8 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://characters/character_visual.gd" id="1_visual"]
 [ext_resource type="Script" path="res://characters/character_face_detail.gd" id="2_face"]
+[ext_resource type="Script" path="res://characters/production_character_polish.gd" id="3_polish"]
 
 [sub_resource type="StandardMaterial3D" id="MatFur"]
 albedo_color = Color(0.66, 0.36, 0.88, 1)
@@ -60,6 +61,10 @@ run_bob_height = 0.085
 idle_bob_height = 0.035
 
 [node name="ImportedModel" type="Node3D" parent="."]
+
+[node name="ProductionPolish" type="Node3D" parent="."]
+script = ExtResource("3_polish")
+species = &"cat"
 
 [node name="Skeleton3D" type="Skeleton3D" parent="ImportedModel"]
 

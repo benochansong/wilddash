@@ -1,34 +1,51 @@
 # Assets
 
-WILD DASH 3D의 runtime asset과 DCC 원본을 분리합니다.
+WILD DASH 3D separates runtime assets from Blender/Maya source files.
 
 ```text
 assets/
-  source/                     Blender/Maya 원본. `.gdignore`로 Godot import 제외
+  source/                     Blender/Maya source; excluded by `.gdignore`
     characters/
-    tracks/
+    environments/
 
-  characters/                 Godot가 실제 import하는 GLB/glTF
-  tracks/                     실제 트랙 GLB/glTF
+  characters/                 Imported GLB/glTF runtime assets
+    playable/
+    npc/
+
+  environments/
+    shared/
+    wild_world/
+    neon_harbor/
+    snowpeak/
+
+  materials/
+    characters/
+    environment/
+
+  textures/
   props/
   items/
-  textures/
 ```
 
-기본 제작 흐름:
+Base production flow:
 
 ```text
 Blender / Maya source
-→ GLB 또는 glTF 2.0 export
-→ assets/characters 또는 assets/tracks
+→ GLB or glTF 2.0 export
+→ assets/characters or assets/environments
 → Godot import
-→ wrapper scene
+→ gameplay-facing wrapper scene
 → gameplay scene
 ```
 
-캐릭터는 imported GLB를 `CharacterController`에 직접 연결하지 않습니다.
-`characters/visuals/*_visual.tscn` wrapper가 모델/Skeleton/Animation을 담당하고,
-`CharacterRoot`는 물리/충돌/게임플레이만 담당합니다.
+Character GLBs are never connected directly to `CharacterController`.
+`characters/visuals/*_visual.tscn` owns imported model / Skeleton / Animation implementation while `CharacterRoot` remains responsible for physics, collision and gameplay.
 
-자세한 캐릭터 제작 규칙, 애니메이션 이름, LOD/폴리곤 예산, Export/Import 체크리스트는
-[`CHARACTER_PIPELINE.md`](./CHARACTER_PIPELINE.md)를 참고하세요.
+RC7 adds an in-engine **production-detail proxy layer** for Dog, Rabbit, Cat and Elephant. It improves silhouette/detail immediately while the final authored GLBs are being produced. The proxy is visual-only and can be removed when the corresponding wrapper switches to a production GLB.
+
+Race-track production dressing follows the same rule: visual hero markers never replace the existing hidden collision, checkpoint, shortcut or AI-route contracts.
+
+See:
+- [`CHARACTER_PIPELINE.md`](./CHARACTER_PIPELINE.md) — character export/import contract
+- [`PRODUCTION_ASSET_MANIFEST.md`](./PRODUCTION_ASSET_MANIFEST.md) — concrete GLB slots and replacement order
+- [`../docs/PRODUCTION_ART_BIBLE.md`](../docs/PRODUCTION_ART_BIBLE.md) — WILD DASH art direction, palettes, budgets and naming
