@@ -87,6 +87,7 @@ jobs:
           probe_script phase3_v4 "res://modes/logspire_leap/logspire_phase3_director_v4_major_collision.gd"
           probe_script phase3_v5 "res://modes/logspire_leap/logspire_phase3_director_v5_route_clearance.gd"
           probe_script phase3_v6 "res://modes/logspire_leap/logspire_phase3_director_v6_upper_portal_cleanup.gd"
+          probe_script phase3_v7 "res://modes/logspire_leap/logspire_phase3_director_v7_titan_spiral_clearance.gd"
           rm -f godot/tmp_phase_probe.tscn
           exit "$failed"
 
@@ -107,6 +108,8 @@ jobs:
           grep -q "visual_phase_through=false collision_phase_through=false" /tmp/wilddash-round3-load.log
           grep -q "r3_upper_water_visual_compacted" /tmp/wilddash-round3-load.log
           grep -q "recovery_area_unchanged=true broad_floating_slab=false" /tmp/wilddash-round3-load.log
+          grep -q "R3 TITAN SPIRAL RECOVERY DECK CLEARANCE deck=Recovery_Z6_Deck solid_collision=false" /tmp/wilddash-round3-load.log
+          grep -E -q "LOGSPIRE SAFE ROUTE PASS pairs=[0-9]+ blocked_pairs=0 head_blocks=0 .*pass=true" /tmp/wilddash-round3-load.log
 
       - name: Load production Round 5 Wild Current scene
         shell: bash
