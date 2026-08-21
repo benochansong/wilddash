@@ -1,6 +1,7 @@
 extends Node
 
 signal settings_changed(settings: Dictionary)
+signal language_changed(language: StringName)
 
 const RESOLUTIONS: Array[Vector2i] = [
 	Vector2i(1280, 720),
@@ -8,11 +9,16 @@ const RESOLUTIONS: Array[Vector2i] = [
 	Vector2i(1920, 1080),
 ]
 const FPS_OPTIONS: Array[int] = [30, 60, 120, 0]
+const SUPPORTED_LANGUAGES: Array[StringName] = [&"en", &"ko", &"es"]
+const DEFAULT_LANGUAGE: StringName = &"en"
 
 var settings: Dictionary = {}
+var language: StringName = DEFAULT_LANGUAGE
 
 func _ready() -> void:
 	settings = SaveManager.get_settings()
+	language = _load_language_preference()
+	TranslationServer.set_locale(String(language))
 	var controls: Dictionary = settings.get("controls", {})
 	var keyboard: Dictionary = controls.get("keyboard", {})
 	InputManager.apply_keyboard_bindings(keyboard)
@@ -23,6 +29,25 @@ func get_audio_settings() -> Dictionary:
 
 func get_graphics_settings() -> Dictionary:
 	return (settings.get("graphics", {}) as Dictionary).duplicate(true)
+
+func get_language() -> StringName:
+	return language
+
+func get_supported_languages() -> Array[StringName]:
+	return SUPPORTED_LANGUAGES.duplicate()
+
+func set_language(value: StringName) -> void:
+	var normalized := value if value in SUPPORTED_LANGUAGES else DEFAULT_LANGUAGE
+	if normalized == language:
+		return
+	language = normalized
+	TranslationServer.set_locale(String(language))
+	var records: Dictionary = SaveManager.current_data.get("records", {})
+	records["language"] = String(language)
+	SaveManager.current_data["records"] = records
+	SaveManager.save_current()
+	language_changed.emit(language)
+	print("RC_LANGUAGE selected=%s persisted=true" % String(language))
 
 func is_reduced_motion() -> bool:
 	var accessibility: Dictionary = settings.get("accessibility", {})
@@ -96,6 +121,11 @@ func get_background_color() -> Color:
 
 func get_accent_color() -> Color:
 	return Color(1.0, 1.0, 0.0, 1.0) if is_high_contrast() else Color(0.22, 0.86, 0.62, 1.0)
+
+func _load_language_preference() -> StringName:
+	var records: Dictionary = SaveManager.current_data.get("records", {})
+	var saved := StringName(String(records.get("language", String(DEFAULT_LANGUAGE))))
+	return saved if saved in SUPPORTED_LANGUAGES else DEFAULT_LANGUAGE
 
 func _set_audio_value(key: String, value: Variant) -> void:
 	var audio: Dictionary = settings.get("audio", {})
