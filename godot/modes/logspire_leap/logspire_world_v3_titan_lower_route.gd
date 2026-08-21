@@ -94,9 +94,9 @@ func _apply_lower_route_seed_layout() -> void:
 		{"id": &"Z5_ROOT_RUN_01", "offset": Vector3(0.0, 0.30, -18.0), "size": Vector3(14.0, 0.8, 18.0)},
 		{"id": &"Z5_ROOT_RUN_02", "offset": Vector3(2.0, 0.50, -34.0), "size": Vector3(14.0, 0.8, 18.0)},
 		{"id": &"Z5_BROKEN_TRUNK_TAKEOFF", "offset": Vector3(4.0, 0.70, -48.0), "size": Vector3(13.0, 0.8, 14.0)},
-		{"id": &"Z5_BROKEN_TRUNK_LANDING", "offset": Vector3(4.0, 0.90, -66.0), "size": Vector3(13.0, 0.8, 14.0)},
-		{"id": &"Z5_FORK_SAFE_01", "offset": Vector3(-8.0, 1.10, -78.0), "size": Vector3(14.0, 0.8, 16.0)},
-		{"id": &"Z5_FORK_SAFE_02", "offset": Vector3(-14.0, 1.30, -90.0), "size": Vector3(14.0, 0.8, 16.0)},
+		{"id": &"Z5_BROKEN_TRUNK_LANDING", "offset": Vector3(4.0, 0.90, -65.8), "size": Vector3(13.0, 0.8, 14.0)},
+		{"id": &"Z5_FORK_SAFE_01", "offset": Vector3(-10.0, 1.10, -78.0), "size": Vector3(14.0, 0.8, 16.0)},
+		{"id": &"Z5_FORK_SAFE_02", "offset": Vector3(-18.0, 1.30, -90.0), "size": Vector3(14.0, 0.8, 16.0)},
 		{"id": &"Z5_CANOPY_01", "offset": Vector3(-16.0, 1.50, -102.0), "size": Vector3(12.5, 0.8, 16.0)},
 		{"id": &"Z5_CANOPY_02", "offset": Vector3(-20.0, 1.70, -114.0), "size": Vector3(12.5, 0.8, 16.0)},
 		{"id": &"Z5_CANOPY_03", "offset": Vector3(-18.0, 1.90, -126.0), "size": Vector3(12.5, 0.8, 16.0)},
@@ -119,22 +119,21 @@ func _register_lower_fast_fork() -> void:
 	var canopy: Vector3 = get_platform_position(&"Z5_CANOPY_01")
 	var cp4: StringName = _checkpoint_ids[3] if _checkpoint_ids.size() > 3 else _merge_platform_id
 	var fast_positions: Array[Vector3] = [
-		Vector3(start.x + 5.0, start.y + 0.20, start.z - 13.0),
-		Vector3(start.x + 6.0, start.y + 0.40, start.z - 25.0),
-		Vector3(start.x - 2.0, start.y + 0.60, start.z - 35.0),
+		Vector3(1.0, start.y + 0.20, start.z - 9.2),
+		Vector3(-3.0, start.y + 0.40, start.z - 18.2),
+		Vector3(-10.0, start.y + 0.60, start.z - 27.2),
 	]
 	for i: int in range(LOWER_FAST_IDS.size()):
 		_register_platform(
 			LOWER_FAST_IDS[i],
 			fast_positions[i],
-			Vector3(10.5, 0.8, 13.5),
+			Vector3(10.5, 0.8, 10.0),
 			4,
 			ROUTE_WILD,
 			0.48 + float(i) * 0.06,
 			true,
 			cp4
 		)
-	# Keep a concrete relationship to the merge target for audit/debug readability.
 	set_meta(&"titan_fast_fork_merge", canopy)
 
 func _rebuild_wild_suffix_for_fast_fork() -> void:
