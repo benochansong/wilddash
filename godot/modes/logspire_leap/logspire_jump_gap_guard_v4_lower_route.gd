@@ -36,10 +36,10 @@ const FINALE_IDS: Array[StringName] = [
 ]
 
 const ROOT_RUN_WIDTH: float = 14.0
-const BROKEN_TRUNK_GAP: float = 4.0
+const BROKEN_TRUNK_GAP: float = 2.5
 const BROKEN_TRUNK_LANDING_WIDTH: float = 13.0
 const CANOPY_MIN_WIDTH: float = 12.5
-const FINAL_ROOT_GAP: float = 3.75
+const FINAL_ROOT_GAP: float = 2.0
 const FINAL_LANDING_WIDTH: float = 16.0
 const MIN_VERTICAL_CLEARANCE_TARGET: float = 8.0
 const LOWER_ROUTE_MAX_AUTHORED_RISE: float = 0.20
@@ -69,7 +69,7 @@ func _author_final_lower_route() -> void:
 		{"id": &"Z5_ROOT_RUN_01", "offset": Vector3(0.0, 0.30, -18.0), "size": Vector3(14.0, 0.8, 18.0)},
 		{"id": &"Z5_ROOT_RUN_02", "offset": Vector3(2.0, 0.50, -34.0), "size": Vector3(14.0, 0.8, 18.0)},
 		{"id": &"Z5_BROKEN_TRUNK_TAKEOFF", "offset": Vector3(4.0, 0.70, -48.0), "size": Vector3(13.0, 0.8, 14.0)},
-		{"id": &"Z5_BROKEN_TRUNK_LANDING", "offset": Vector3(4.0, 0.90, -66.0), "size": Vector3(13.0, 0.8, 14.0)},
+		{"id": &"Z5_BROKEN_TRUNK_LANDING", "offset": Vector3(4.0, 0.90, -64.5), "size": Vector3(13.0, 0.8, 14.0)},
 		{"id": &"Z5_FORK_SAFE_01", "offset": Vector3(-8.0, 1.10, -78.0), "size": Vector3(14.0, 0.8, 16.0)},
 		{"id": &"Z5_FORK_SAFE_02", "offset": Vector3(-14.0, 1.30, -90.0), "size": Vector3(14.0, 0.8, 16.0)},
 		{"id": &"Z5_CANOPY_01", "offset": Vector3(-16.0, 1.50, -102.0), "size": Vector3(12.5, 0.8, 16.0)},
@@ -77,7 +77,7 @@ func _author_final_lower_route() -> void:
 		{"id": &"Z5_CANOPY_03", "offset": Vector3(-18.0, 1.90, -126.0), "size": Vector3(12.5, 0.8, 16.0)},
 		{"id": &"Z5_CANOPY_04", "offset": Vector3(-12.0, 2.10, -138.0), "size": Vector3(12.5, 0.8, 16.0)},
 		{"id": &"Z5_FINAL_TAKEOFF", "offset": Vector3(-5.0, 2.30, -148.0), "size": Vector3(14.0, 0.8, 14.0)},
-		{"id": &"Z5_FINAL_LANDING", "offset": Vector3(0.0, 2.50, -165.0), "size": Vector3(16.0, 0.8, 14.0)},
+		{"id": &"Z5_FINAL_LANDING", "offset": Vector3(0.0, 2.50, -164.0), "size": Vector3(16.0, 0.8, 14.0)},
 	]
 	for entry: Dictionary in layout:
 		_set_final_layout(positions, sizes, StringName(entry["id"]), merge + Vector3(entry["offset"]), Vector3(entry["size"]))
@@ -117,13 +117,16 @@ func _fit_fast_fork(positions: Array, sizes: Array) -> void:
 	if start_index < 0 or start_index >= positions.size():
 		return
 	var start: Vector3 = positions[start_index]
+	# Keep the fast branch narrow and visually risky, but physically continuous.
+	# The previous finalizer spread the third pad ~6.5m away from CANOPY_01,
+	# which exceeded the default Crocodile trajectory at ordinary race speed.
 	var fast_positions: Array[Vector3] = [
-		Vector3(start.x + 5.0, start.y + 0.20, start.z - 13.0),
-		Vector3(start.x + 6.0, start.y + 0.40, start.z - 25.0),
-		Vector3(start.x - 2.0, start.y + 0.60, start.z - 35.0),
+		Vector3(1.0, start.y + 0.20, start.z - 9.2),
+		Vector3(-3.0, start.y + 0.40, start.z - 18.2),
+		Vector3(-10.0, start.y + 0.60, start.z - 27.2),
 	]
 	for i: int in range(LOWER_FAST_IDS.size()):
-		_set_final_layout(positions, sizes, LOWER_FAST_IDS[i], fast_positions[i], Vector3(10.5, 0.8, 13.5))
+		_set_final_layout(positions, sizes, LOWER_FAST_IDS[i], fast_positions[i], Vector3(10.5, 0.8, 10.0))
 
 func _shift_finale_and_recovery_after_cp5(positions: Array, sizes: Array) -> void:
 	var landing_index: int = int(_index_by_id.get(&"Z5_FINAL_LANDING", -1))
