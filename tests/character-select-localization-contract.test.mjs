@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const localization = fs.readFileSync("godot/ui/character_select_localization.gd", "utf8");
+const production = fs.readFileSync("godot/scenes/character_select_spectator.gd", "utf8");
 const adapter = fs.readFileSync("godot/scenes/character_select_crocodile.gd", "utf8");
 const panel = fs.readFileSync("godot/ui/animal_stats_panel_localized.gd", "utf8");
 const scene = fs.readFileSync("godot/scenes/character_select.tscn", "utf8");
@@ -13,7 +14,8 @@ const activeRacers = [
 ];
 
 test("production character select follows the lobby en ko es locale", () => {
-  assert.match(scene, /character_select_crocodile\.gd/);
+  assert.match(scene, /character_select_spectator\.gd/);
+  assert.match(production, /extends "res:\/\/scenes\/character_select_crocodile\.gd"/);
   assert.match(adapter, /character_select_localization\.gd/);
   assert.match(adapter, /animal_stats_panel_localized\.gd/);
   assert.match(adapter, /_localize_static_ui\(\)/);
