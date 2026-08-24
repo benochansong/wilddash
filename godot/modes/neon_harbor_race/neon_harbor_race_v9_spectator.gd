@@ -35,10 +35,18 @@ func _bootstrap_round5_spectator() -> void:
 			item_brain.configure(player, driver)
 			add_child(item_brain)
 			_ai_item_brains.append(item_brain)
+	var finish_callable := Callable(self, "_spectator_featured_finished")
+	if not RaceManager.racer_finished.is_connected(finish_callable):
+		RaceManager.racer_finished.connect(finish_callable)
 	SPECTATOR_MODE.install_camera(self, racers)
 	print("SPECTATOR ROUND READY round=5 mode=neon_harbor_race all_ai=true racers=%d" % racers.size())
 
 func _on_any_racer_finished(racer: Node3D, rank: int) -> void:
 	super(racer, rank)
 	if SPECTATOR_MODE.is_enabled() and racer == player and not mode_finished:
+		_on_player_finished(rank)
+
+func _spectator_featured_finished(racer: Node3D, rank: int) -> void:
+	if SPECTATOR_MODE.is_enabled() and racer == player and not mode_finished:
+		print("SPECTATOR FEATURED FINISH round=5 rank=%d advancing_campaign=true" % rank)
 		_on_player_finished(rank)
