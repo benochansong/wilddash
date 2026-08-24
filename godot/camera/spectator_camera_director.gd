@@ -2,8 +2,9 @@ extends Node
 
 ## AI Battle spectator camera shared by all campaign rounds.
 ## It never changes racer gameplay state; it only owns the active camera and a
-## compact overlay while GameManager.spectator_mode is enabled.
+## compact overlay while the persistent GameManager spectator flag is enabled.
 
+const SPECTATOR_META: StringName = &"wilddash_spectator_mode"
 const AUTO_SWITCH_SECONDS: float = 7.5
 const FOLLOW_DISTANCE: float = 9.5
 const FOLLOW_HEIGHT: float = 5.8
@@ -46,7 +47,7 @@ func configure(mode_root: Node, racer_values: Array) -> void:
 	print("SPECTATOR MODE READY racers=%d auto_switch=%.1fs manual=LEFT_RIGHT" % [_targets.size(), AUTO_SWITCH_SECONDS])
 
 func _process(delta: float) -> void:
-	if not GameManager.spectator_mode or _camera == null or _targets.is_empty():
+	if not _spectator_enabled() or _camera == null or _targets.is_empty():
 		return
 	var target := _current_target()
 	if target == null:
@@ -74,7 +75,7 @@ func _process(delta: float) -> void:
 	_update_overlay(target)
 
 func _unhandled_key_input(event: InputEvent) -> void:
-	if not GameManager.spectator_mode or not event.pressed or event.echo:
+	if not _spectator_enabled() or not event.pressed or event.echo:
 		return
 	match event.keycode:
 		KEY_LEFT:
@@ -132,6 +133,9 @@ func _current_target() -> WildDashCharacterController:
 
 func _is_watchable(racer: WildDashCharacterController) -> bool:
 	return racer != null and is_instance_valid(racer) and racer.visible and not racer.finished
+
+func _spectator_enabled() -> bool:
+	return bool(GameManager.get_meta(SPECTATOR_META, false))
 
 func _build_overlay(mode_root: Node) -> void:
 	var layer := CanvasLayer.new()
