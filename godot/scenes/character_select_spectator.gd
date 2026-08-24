@@ -11,6 +11,8 @@ var _spectator_button: Button
 func _ready() -> void:
 	super()
 	_install_spectator_button()
+	if _start_button != null and not _start_button.button_down.is_connected(_clear_spectator_for_normal_start):
+		_start_button.button_down.connect(_clear_spectator_for_normal_start)
 	print("CHARACTER SELECT SPECTATOR READY watch_ai_battle=true campaign_rounds=5")
 
 func _start_run() -> void:
@@ -30,6 +32,14 @@ func _start_spectator_run() -> void:
 	# Call the P0 parent directly so the normal override above does not clear the
 	# spectator flag. All production Round 1 validation remains intact.
 	super._start_run()
+
+func _clear_spectator_for_normal_start() -> void:
+	SPECTATOR_MODE.set_enabled(false)
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if event.pressed and not event.echo and event.keycode in [KEY_ENTER, KEY_KP_ENTER]:
+		SPECTATOR_MODE.set_enabled(false)
+	super(event)
 
 func _install_spectator_button() -> void:
 	if _start_button == null or _start_button.get_parent() == null:
