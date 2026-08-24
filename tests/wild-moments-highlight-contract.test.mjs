@@ -8,15 +8,20 @@ const grandScene = readFileSync("godot/modes/grand_prix/grand_prix.tscn", "utf8"
 const fruitScene = readFileSync("godot/modes/fruit_collection/fruit_collection.tscn", "utf8");
 const logspireScene = readFileSync("godot/modes/logspire_leap/logspire_leap.tscn", "utf8");
 const rumbleScene = readFileSync("godot/modes/push_out/push_out.tscn", "utf8");
+const r1Spectator = readFileSync("godot/modes/grand_prix/grand_prix_v8_spectator.gd", "utf8");
 const r1 = readFileSync("godot/modes/grand_prix/grand_prix_v7_wild_moments.gd", "utf8");
+const r2Spectator = readFileSync("godot/modes/fruit_collection/fruit_frenzy_v21_spectator.gd", "utf8");
 const r2Economy = readFileSync("godot/modes/fruit_collection/fruit_frenzy_v20_economy_combat_ai.gd", "utf8");
 const r2Species = readFileSync("godot/modes/fruit_collection/fruit_frenzy_v19_species_interaction.gd", "utf8");
 const r2 = readFileSync("godot/modes/fruit_collection/fruit_frenzy_v18_wild_moments.gd", "utf8");
 const r3 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v11_wild_moments.gd", "utf8");
+const r3V17 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v17_titan_future_zone_guard.gd", "utf8");
+const r3V16 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v16_upper_canopy_cleanup.gd", "utf8");
 const r3V15 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v15_vine_only.gd", "utf8");
 const r3V14 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v14_safe_vine_reentry.gd", "utf8");
 const r3Integrated = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v13_integrated_qa.gd", "utf8");
 const r3Authority = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v12_reliability_authority.gd", "utf8");
+const r4Spectator = readFileSync("godot/modes/push_out/wild_rumble_round4_spectator.gd", "utf8");
 const r4 = readFileSync("godot/modes/push_out/wild_rumble_round4_wild_moments.gd", "utf8");
 
 test("shared Wild Moments schema has four importance tiers and normalized event fields", () => {
@@ -43,13 +48,18 @@ test("Replay Lite keeps only recent transforms at 10Hz for player plus four near
   assert.doesNotMatch(resultManager, /get_viewport\(\)\.get_texture|Image\.save|capture.*frame/i);
 });
 
-test("production highlights remain wired while Round 3 uses Vine-only V15 over the reliability stack", () => {
-  assert.match(grandScene, /grand_prix_v7_wild_moments\.gd/);
-  assert.match(fruitScene, /fruit_frenzy_v20_economy_combat_ai\.gd/);
+test("production highlights remain preserved beneath spectator wrappers and current R3 recovery stack", () => {
+  assert.match(grandScene, /grand_prix_v8_spectator\.gd/);
+  assert.match(r1Spectator, /extends "res:\/\/modes\/grand_prix\/grand_prix_v7_wild_moments\.gd"/);
+  assert.match(fruitScene, /fruit_frenzy_v21_spectator\.gd/);
+  assert.match(r2Spectator, /extends "res:\/\/modes\/fruit_collection\/fruit_frenzy_v20_economy_combat_ai\.gd"/);
   assert.match(r2Economy, /extends "res:\/\/modes\/fruit_collection\/fruit_frenzy_v19_species_interaction\.gd"/);
   assert.match(r2Species, /extends "res:\/\/modes\/fruit_collection\/fruit_frenzy_v18_wild_moments\.gd"/);
-  assert.match(rumbleScene, /wild_rumble_round4_wild_moments\.gd/);
-  assert.match(logspireScene, /logspire_water_recovery_v15_vine_only\.gd/);
+  assert.match(rumbleScene, /wild_rumble_round4_spectator\.gd/);
+  assert.match(r4Spectator, /extends "res:\/\/modes\/push_out\/wild_rumble_round4_wild_moments\.gd"/);
+  assert.match(logspireScene, /logspire_water_recovery_v17_titan_future_zone_guard\.gd/);
+  assert.match(r3V17, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v16_upper_canopy_cleanup\.gd"/);
+  assert.match(r3V16, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v15_vine_only\.gd"/);
   assert.match(r3V15, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v14_safe_vine_reentry\.gd"/);
   assert.match(r3V14, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v13_integrated_qa\.gd"/);
   assert.match(r3Integrated, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v12_reliability_authority\.gd"/);
