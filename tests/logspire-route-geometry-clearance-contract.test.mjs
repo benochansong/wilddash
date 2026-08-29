@@ -14,10 +14,12 @@ test("production R3 uses the visibility guard over route-clearance core and V4 m
   assert.match(phase3Base, /func _build_final_recovery_area\(\) -> void:/);
 });
 
-test("giant moving tree bridges are never visible while collision is disabled", () => {
+test("living-tree bridges track collision visibility while the Finale bridge stays visibly collidable", () => {
   assert.match(phase3V5, /func _sync_event_geometry_visibility\(\) -> void:/);
   assert.match(phase3V5, /body\.visible = body\.collision_layer != 0/);
-  assert.match(phase3V5, /_last_tree\.visible = _last_tree\.collision_layer != 0/);
+  assert.match(phase3V5, /_last_tree\.visible = true/);
+  assert.match(phase3V5, /_last_tree\.collision_layer = 1/);
+  assert.match(phase3V5, /_last_tree_state = &"BRIDGE_READY"/);
 });
 
 test("Titan roots and decorative branches are pulled away from the safe-route corridor", () => {

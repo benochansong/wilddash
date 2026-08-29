@@ -5,12 +5,14 @@ import fs from 'node:fs';
 const read = (path) => fs.readFileSync(path, 'utf8');
 
 const scene = read('godot/scenes/character_select.tscn');
+const production = read('godot/scenes/character_select_spectator.gd');
 const active = read('godot/scenes/character_select_crocodile.gd');
 const base = read('godot/scenes/character_select.gd');
 const manager = read('godot/scripts/game_manager.gd');
 
-test('production character select really uses the crocodile adapter', () => {
-  assert.match(scene, /character_select_crocodile\.gd/);
+test('production character select keeps crocodile P0 adapter beneath the spectator wrapper', () => {
+  assert.match(scene, /character_select_spectator\.gd/);
+  assert.match(production, /extends "res:\/\/scenes\/character_select_crocodile\.gd"/);
   assert.match(active, /extends "res:\/\/scenes\/character_select\.gd"/);
   assert.match(active, /crocodile_playable=true/);
 });
@@ -62,7 +64,7 @@ test('start failure cannot remain silent and retry stays available', () => {
   assert.match(active, /func _start_failed\(message: String\) -> void:/);
   assert.match(active, /START ERROR/);
   assert.match(active, /_start_button\.disabled = false/);
-  assert.match(active, /_start_button\.text = "RETRY START"/);
+  assert.match(active, /RETRY START/);
 });
 
 test('emergency fallback files are removed from the production branch', () => {

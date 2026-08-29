@@ -4,77 +4,69 @@ import test from "node:test";
 
 const scene = readFileSync("godot/modes/logspire_leap/logspire_leap.tscn", "utf8");
 const watchdogBase = readFileSync("godot/modes/logspire_leap/logspire_water_submerge_watchdog.gd", "utf8");
-const watchdogV2 = readFileSync("godot/modes/logspire_leap/logspire_water_submerge_watchdog_v2_route_support.gd", "utf8");
-const watchdogV3 = readFileSync("godot/modes/logspire_leap/logspire_water_submerge_watchdog_v3_live_route_corridor.gd", "utf8");
-const waterV16 = readFileSync("godot/modes/logspire_leap/logspire_water_recovery_v16_route_corridor_authority.gd", "utf8");
+const watchdog = readFileSync("godot/modes/logspire_leap/logspire_water_submerge_watchdog_v2_route_guard.gd", "utf8");
 const recovery = readFileSync("godot/modes/logspire_leap/logspire_recovery_system.gd", "utf8");
 
-test("Round 3 production wires live-route watchdog V3 and water authority V16", () => {
-  assert.match(scene, /logspire_water_submerge_watchdog_v3_live_route_corridor\.gd/);
-  assert.match(scene, /logspire_water_recovery_v16_route_corridor_authority\.gd/);
+test("Round 3 production wires the route-guarded deep-water watchdog", () => {
+  assert.match(scene, /logspire_water_submerge_watchdog_v2_route_guard\.gd/);
   assert.match(scene, /\[node name="WaterSubmergeWatchdog" type="Node" parent="\."\]/);
-  assert.match(watchdogV3, /extends "res:\/\/modes\/logspire_leap\/logspire_water_submerge_watchdog_v2_route_support\.gd"/);
-  assert.match(waterV16, /extends "res:\/\/modes\/logspire_leap\/logspire_water_recovery_v15_vine_only\.gd"/);
   assert.match(watchdogBase, /HARD_SUBMERGE_DEPTH: float = 0\.58/);
-  assert.match(watchdogBase, /SUPPORTED_FLOOR_ESCAPE_DEPTH: float = 1\.20/);
-  assert.match(watchdogBase, /HARD_SUBMERGE_CONFIRM_SECONDS: float = 0\.14/);
+  assert.match(watchdog, /ROUTE_HARD_SUBMERGE_CONFIRM_SECONDS: float = 0\.85/);
+  assert.match(watchdog, /ROUTE_HARD_MIN_SUBMERGE_DEPTH: float = 0\.95/);
+  assert.match(watchdog, /ROUTE_HARD_MIN_DESCENT_SPEED: float = -0\.65/);
+  assert.match(watchdog, /ROUTE_SUPPORT_GRACE_SECONDS: float = 0\.55/);
+  assert.match(watchdog, /primary_recovery_guard=true/);
+  assert.match(watchdog, /deep_fail_safe=true/);
+  assert.match(watchdog, /_hard_checkpoint_escape\(racer, submerged_depth\)/);
 });
 
-test("live Safe Route corridor protects jump seams even when foot rays miss", () => {
-  assert.match(waterV16, /ROUTE_CORRIDOR_RADIUS: float = 7\.25/);
-  assert.match(waterV16, /ROUTE_CORRIDOR_MAX_DROP: float = 3\.40/);
-  assert.match(waterV16, /get_route_ids", &"safe"/);
-  assert.match(waterV16, /get_platform_position/);
-  assert.match(waterV16, /var sample: Vector3 = a\.lerp\(b, t\)/);
-  assert.match(waterV16, /best_planar_distance <= ROUTE_CORRIDOR_RADIUS/);
-  assert.match(waterV16, /below_route <= ROUTE_CORRIDOR_MAX_DROP/);
-  assert.match(watchdogV3, /is_route_corridor_protected/);
-  assert.match(watchdogV3, /LiveRouteCorridor/);
+test("authored route support and recent support beat broad invisible water overlap", () => {
+  assert.match(watchdog, /_authored_route_support_platform\(racer\)/);
+  assert.match(watchdog, /racer\.is_on_floor\(\) or _has_surface_support\(racer\) or route_support_id != &""/);
+  assert.match(watchdog, /_has_recent_route_support\(racer_id\)/);
+  assert.match(watchdog, /get_route_ids", &"safe"/);
+  assert.match(watchdog, /var foot_delta: float = racer\.global_position\.y - top\.y/);
+  assert.doesNotMatch(watchdog, /top\.y \+ 0\.40/);
+  assert.match(watchdog, /r3_false_water_reset_blocked/);
+  assert.match(watchdog, /no_rewind=true/);
 });
 
-test("WaterRecovery itself cannot seize transform authority inside the live route corridor", () => {
-  assert.match(waterV16, /func _is_real_water_entry/);
-  assert.match(waterV16, /func should_handle_racer/);
-  assert.match(waterV16, /func _enter_water/);
-  assert.match(waterV16, /LOGSPIRE ROUTE WATER SUPPRESSED/);
-  assert.match(waterV16, /racing_authority=true/);
-  assert.match(waterV16, /return super\(racer, water_y\)/);
-  assert.match(waterV16, /super\(racer, zone, water_y\)/);
+test("primary WaterRecovery owns ordinary falls and watchdog cannot become a second transform writer", () => {
+  assert.match(watchdog, /_primary_water_recovery_active\(racer\)/);
+  assert.match(watchdog, /racer\.get_meta\(PRIMARY_WATER_META, false\)/);
+  assert.match(watchdog, /_water\.has_method\("is_water_recovering"\)/);
+  assert.match(watchdog, /r3_water_watchdog_deferred/);
+  assert.match(watchdog, /hard_checkpoint_escape=false/);
+  assert.match(watchdog, /transform_owner=WaterRecovery/);
 });
 
-test("physical Safe Route support remains a higher-priority stale-pool guard", () => {
-  const routeGuard = watchdogV2.indexOf("var route_support: Dictionary = _route_support_hit(racer)");
-  const hiddenFloorGuard = watchdogV2.indexOf("var has_surface_support: bool = _has_surface_support(racer)");
-  assert.ok(routeGuard >= 0 && hiddenFloorGuard > routeGuard, "route support must be checked before hidden-floor invalidation");
-  assert.match(watchdogV2, /LOGSPIRE WATER RESET SUPPRESSED/);
-  assert.match(watchdogV2, /route_support=true stale_pool_overlap=true/);
-  assert.match(watchdogV2, /logspire_route_connector/);
-  assert.match(watchdogV2, /node_name\.begins_with\("Phase2_"\)/);
+test("emergency hard reset requires deep sustained unsupported descent", () => {
+  assert.match(watchdog, /submerged_depth < maxf\(HARD_SUBMERGE_DEPTH, ROUTE_HARD_MIN_SUBMERGE_DEPTH\)/);
+  assert.match(watchdog, /_water\.has_method\("should_handle_racer"\)/);
+  assert.match(watchdog, /not bool\(_water\.call\("should_handle_racer", racer\)\)/);
+  assert.match(watchdog, /racer\.velocity\.y > ROUTE_HARD_MIN_DESCENT_SPEED/);
+  assert.match(watchdog, /elapsed < ROUTE_HARD_SUBMERGE_CONFIRM_SECONDS/);
+  assert.match(watchdog, /r3_true_water_reset_confirmed/);
+  assert.match(watchdog, /primary_water_inactive=true/);
+  assert.match(watchdog, /emergency_only=true/);
+  assert.match(watchdog, /_vine_rescue_active\(racer_id\)/);
 });
 
-test("genuine off-route deep falls still use the proven hard checkpoint escape", () => {
-  assert.match(watchdogV2, /supported_floor_invalid: bool = has_surface_support and submerged_depth >= SUPPORTED_FLOOR_ESCAPE_DEPTH/);
-  assert.match(watchdogV2, /LOGSPIRE SUBMERGED FLOOR INVALID/);
-  assert.match(watchdogV2, /_hard_checkpoint_escape\(racer, submerged_depth\)/);
-  assert.match(watchdogBase, /racer\.reset_motion\(safe_spawn\)/);
-  assert.match(watchdogBase, /BACK TO THE RACE · WATER RESET/);
-});
-
-test("hard escape still clears water authority before restoring the racer", () => {
+test("genuine hard escape still clears water authority and restores a bounded route spawn", () => {
   assert.match(watchdogBase, /_release_racer_control/);
   assert.match(watchdogBase, /_clear_reliability_runtime/);
   assert.match(watchdogBase, /_clear_water_runtime/);
   assert.match(watchdogBase, /racer\.remove_meta\(WATER_META\)/);
   assert.match(watchdogBase, /_set_water_state_racing\(racer_id\)/);
+  assert.match(watchdogBase, /racer\.reset_motion\(safe_spawn\)/);
+  assert.match(watchdogBase, /BACK TO THE RACE · WATER RESET/);
   assert.match(watchdogBase, /begin_retry_grace/);
 });
 
-test("watchdog still bypasses normal checkpoint water veto for genuine failures", () => {
+test("watchdog remains independent from normal checkpoint recovery veto", () => {
   assert.match(recovery, /func force_checkpoint_recovery/);
   assert.match(recovery, /if _water_should_handle\(racer\):/);
-  assert.doesNotMatch(watchdogBase, /force_checkpoint_recovery/);
-  assert.doesNotMatch(watchdogV2, /force_checkpoint_recovery/);
-  assert.doesNotMatch(watchdogV3, /force_checkpoint_recovery/);
+  assert.doesNotMatch(watchdog, /force_checkpoint_recovery/);
   assert.match(watchdogBase, /_latest_checkpoint_target\(racer\)/);
   assert.match(watchdogBase, /_first_safe_route_target\(\)/);
 });

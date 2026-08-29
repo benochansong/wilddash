@@ -4,6 +4,7 @@ extends WildDashCharacterVisual
 ## intentionally simple/low-poly so it matches the existing prototype animals.
 
 var _materials: Dictionary = {}
+var _tail_sweep_direction: float = 1.0
 
 func _ready() -> void:
 	_build_crocodile()
@@ -48,6 +49,32 @@ func _build_crocodile() -> void:
 	for i: int in range(5):
 		var z: float = -0.15 + float(i) * 0.38
 		_add_cone(root, "BackScale_%d" % i, Vector3(0.0, 1.26, z), Vector3.ZERO, Vector3(0.11, 0.18, 0.11), dark)
+
+func play_tail_sweep(power_scale: float = 1.0) -> void:
+	var root := get_node_or_null("ImportedModel") as Node3D
+	if root == null:
+		return
+	var tail_a := root.get_node_or_null("TailA") as Node3D
+	var tail_b := root.get_node_or_null("TailB") as Node3D
+	var tail_tip := root.get_node_or_null("TailTip") as Node3D
+	if tail_a == null or tail_b == null or tail_tip == null:
+		return
+
+	_tail_sweep_direction *= -1.0
+	var direction := _tail_sweep_direction
+	var scale_value := clampf(power_scale, 0.85, 1.20)
+	var tween := create_tween()
+	tween.set_trans(Tween.TRANS_QUAD)
+	tween.set_ease(Tween.EASE_OUT)
+	tween.tween_property(tail_a, "rotation:y", direction * 0.82 * scale_value, 0.08)
+	tween.parallel().tween_property(tail_b, "rotation:y", direction * 1.08 * scale_value, 0.08)
+	tween.parallel().tween_property(tail_tip, "rotation:y", direction * 1.30 * scale_value, 0.08)
+	tween.chain().set_trans(Tween.TRANS_BACK)
+	tween.set_ease(Tween.EASE_OUT)
+	tween.tween_property(tail_a, "rotation:y", 0.0, 0.18)
+	tween.parallel().tween_property(tail_b, "rotation:y", 0.0, 0.18)
+	tween.parallel().tween_property(tail_tip, "rotation:y", 0.0, 0.18)
+	play_action(&"Skill", 0.26)
 
 func _add_box(root: Node3D, node_name: String, pos: Vector3, size: Vector3, color: Color) -> void:
 	var mesh: BoxMesh = BoxMesh.new()

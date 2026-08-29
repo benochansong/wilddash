@@ -35,10 +35,14 @@ func _physics_process(_delta: float) -> void:
 			continue
 		if not _inside_crown_nest(racer, finish_position):
 			continue
+		print("r3_finale_finish_enter racer=%s object=CROWN_NEST supported_destination=true" % RaceManager.get_racer_label(racer))
 		_complete_final_checkpoint_if_needed(racer)
 		if not RaceManager.can_finish(racer):
 			continue
 		var rank: int = RaceManager.record_finish(racer)
+		print("r3_finale_finish_clear racer=%s rank=%d round3_clear=true recap_transition_authority=unchanged" % [
+			RaceManager.get_racer_label(racer), rank,
+		])
 		print("LOGSPIRE CROWN NEST FINISH racer=%s rank=%d checkpoints=%d/%d platform_finish=true crossing_plane_required=false" % [
 			RaceManager.get_racer_label(racer),
 			rank,

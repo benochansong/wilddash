@@ -12,6 +12,8 @@ extends "res://scenes/character_select.gd"
 ## There is intentionally no stripped gameplay fallback scene.
 
 const ROUND1_SCENE_PATH := "res://modes/grand_prix/grand_prix.tscn"
+const LOCALIZATION = preload("res://ui/character_select_localization.gd")
+const LOCALIZED_STATS_PANEL_SCRIPT = preload("res://ui/animal_stats_panel_localized.gd")
 const ROUND1_CRITICAL_DEPENDENCIES := [
 	"res://modes/grand_prix/grand_prix_v7_wild_moments.gd",
 	"res://modes/grand_prix/grand_prix_v6_item_fairness.gd",
@@ -66,8 +68,16 @@ var _start_attempt_in_progress := false
 func _ready() -> void:
 	super()
 	_replace_panda_button_with_crocodile()
+	_replace_stats_panel_with_localized()
+	_localize_static_ui()
+	_refresh_preview()
+	print("CHARACTER SELECT LOCALIZATION READY locales=en,ko,es active=%s" % String(LOCALIZATION.active_language()))
 	print("CHARACTER SELECT RC9 ROSTER active=12 panda_archived=true crocodile_playable=true")
 	print("CHARACTER SELECT P0 START GUARD READY active_adapter=true deep_cache_retry=true dependency_probe=true fallback=false")
+
+func _refresh_preview() -> void:
+	super()
+	_localize_dynamic_ui()
 
 func _start_run() -> void:
 	if _start_attempt_in_progress:
@@ -77,8 +87,8 @@ func _start_run() -> void:
 
 	if _start_button != null:
 		_start_button.disabled = true
-		_start_button.text = "STARTING ROUND 1..."
-	_set_start_status("STARTING ROUND 1 · validating campaign transition...")
+		_start_button.text = LOCALIZATION.text("starting_round1", "STARTING ROUND 1...")
+	_set_start_status(LOCALIZATION.text("validating_transition", "STARTING ROUND 1 · validating campaign transition..."))
 
 	var requested_ai: int = -1
 	if OS.has_environment("WILDDASH_AI_COUNT"):
@@ -131,7 +141,7 @@ func _verify_start_transition() -> void:
 		return
 
 	push_warning("CHARACTER SELECT P0 START stage=verify status=still_on_character_select deep_cache_retry=true")
-	_set_start_status("ROUND 1 did not transition · retrying with fresh resources...")
+	_set_start_status(LOCALIZATION.text("retrying_round1", "ROUND 1 did not transition · retrying with fresh resources..."))
 	_force_checked_round1_load()
 
 func _force_checked_round1_load() -> void:
@@ -153,7 +163,7 @@ func _force_checked_round1_load() -> void:
 	var packed := resource as PackedScene
 	if packed == null:
 		push_error("CHARACTER SELECT P0 production Round 1 fresh PackedScene load failed; probing dependencies")
-		_set_start_status("ROUND 1 load failed · checking production dependencies...")
+		_set_start_status(LOCALIZATION.text("checking_dependencies", "ROUND 1 load failed · checking production dependencies..."))
 		var dependency_failure: String = _probe_round1_dependencies()
 		if dependency_failure.is_empty():
 			_start_failed("Round 1 fresh load failed; dependencies compile individually. Check first red scene error in Output")
@@ -204,10 +214,10 @@ func _start_failed(message: String) -> void:
 	GameManager.round_active = false
 	_start_attempt_in_progress = false
 	push_error("CHARACTER SELECT P0 START FAILED %s" % message)
-	_set_start_status("START ERROR · %s" % message)
+	_set_start_status(LOCALIZATION.text("start_error", "START ERROR · %s") % message)
 	if _start_button != null:
 		_start_button.disabled = false
-		_start_button.text = "RETRY START"
+		_start_button.text = LOCALIZATION.text("retry_start", "RETRY START")
 
 func _set_start_status(message: String) -> void:
 	if _summary_label == null:
@@ -230,11 +240,11 @@ func _replace_panda_button_with_crocodile() -> void:
 	if definition == null:
 		return
 	var button := Button.new()
-	button.text = definition.display_name.to_upper()
+	button.text = LOCALIZATION.animal_name(&"crocodile", definition.display_name).to_upper()
 	button.tooltip_text = "%s · %s · %s" % [
-		definition.display_name,
-		WildDashAnimalSelectionPresentation.get_identity(&"crocodile"),
-		definition.skill_name,
+		LOCALIZATION.animal_name(&"crocodile", definition.display_name),
+		LOCALIZATION.identity(&"crocodile", WildDashAnimalSelectionPresentation.get_identity(&"crocodile")),
+		LOCALIZATION.skill_name(&"crocodile", definition.skill_name),
 	]
 	button.custom_minimum_size = Vector2(170, 48)
 	button.toggle_mode = true
@@ -243,3 +253,134 @@ func _replace_panda_button_with_crocodile() -> void:
 	grid.move_child(button, old_index)
 	_animal_buttons[&"crocodile"] = button
 	_refresh_animal_button_states()
+
+func _replace_stats_panel_with_localized() -> void:
+	if _stats_panel == null:
+		return
+	var panel_parent := _stats_panel.get_parent()
+	if panel_parent == null:
+		return
+	var old_index := _stats_panel.get_index()
+	panel_parent.remove_child(_stats_panel)
+	_stats_panel.queue_free()
+
+	var localized_panel := LOCALIZED_STATS_PANEL_SCRIPT.new() as WildDashAnimalStatsPanel
+	if localized_panel == null:
+		push_error("CHARACTER SELECT LOCALIZATION failed to instantiate localized stats panel")
+		return
+	localized_panel.name = "AnimalStatsPanel"
+	localized_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	localized_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	panel_parent.add_child(localized_panel)
+	panel_parent.move_child(localized_panel, old_index)
+	_stats_panel = localized_panel
+
+func _localize_static_ui() -> void:
+	for node: Node in find_children("*", "Label", true, false):
+		var label := node as Label
+		if label == null:
+			continue
+		match label.text:
+			"WILD DASH — CHOOSE YOUR RACER":
+				label.text = LOCALIZATION.text("title")
+			"12 UNIQUE RACERS · 6개 실제 능력치·체급·스킬을 비교하고 선택하세요.":
+				label.text = LOCALIZATION.text("subtitle")
+			"CHIMERA CORE PARTS · DOG / RABBIT / ELEPHANT / CAT":
+				label.text = LOCALIZATION.text("chimera_parts")
+			"HEAD · Active Skill":
+				label.text = LOCALIZATION.text("head_caption")
+			"BODY · Passive Trait":
+				label.text = LOCALIZATION.text("body_caption")
+			"TAIL · Utility Bonus":
+				label.text = LOCALIZATION.text("tail_caption")
+			"동물 선택 → 오른쪽 6능력치 비교 · H/B/T: Chimera · Enter: Start":
+				label.text = LOCALIZATION.text("hints")
+
+	for node: Node in find_children("*", "Button", true, false):
+		var button := node as Button
+		if button == null:
+			continue
+		match button.text:
+			"12 RACERS":
+				button.text = LOCALIZATION.text("basic_mode")
+			"CHIMERA LAB · CORE 4":
+				button.text = LOCALIZATION.text("chimera_mode")
+			"COLOR ▶":
+				button.text = LOCALIZATION.text("color")
+			"PATTERN ▶":
+				button.text = LOCALIZATION.text("pattern")
+
+	for node: Node in find_children("*", "OptionButton", true, false):
+		var option := node as OptionButton
+		if option == null or option.item_count != 3:
+			continue
+		option.set_item_text(0, LOCALIZATION.text("difficulty_wild"))
+		option.set_item_text(1, LOCALIZATION.text("difficulty_chaos"))
+		option.set_item_text(2, LOCALIZATION.text("difficulty_nightmare"))
+
+	_localize_animal_buttons()
+
+func _localize_dynamic_ui() -> void:
+	if _loadout == null:
+		return
+
+	if _chimera_mode:
+		_loadout.normalize()
+		var head_definition := WildDashAnimalCatalog.get_definition(_loadout.head_id)
+		var head_skill_fallback := ""
+		if head_definition != null:
+			head_skill_fallback = head_definition.skill_name
+		var head_name := LOCALIZATION.animal_name(_loadout.head_id, String(_loadout.head_id).capitalize())
+		var body_name := LOCALIZATION.animal_name(_loadout.body_id, String(_loadout.body_id).capitalize())
+		var tail_name := LOCALIZATION.animal_name(_loadout.tail_id, String(_loadout.tail_id).capitalize())
+		var head_skill := LOCALIZATION.skill_name(_loadout.head_id, head_skill_fallback)
+		_mode_label.text = LOCALIZATION.text("mode_chimera")
+		_summary_label.text = LOCALIZATION.text("summary_chimera") % [
+			head_name,
+			head_skill,
+			body_name,
+			tail_name,
+			String(_loadout.palette_id).capitalize(),
+			String(_loadout.pattern_id).capitalize(),
+		]
+		_slot_labels[&"head"].text = head_name.to_upper()
+		_slot_labels[&"body"].text = body_name.to_upper()
+		_slot_labels[&"tail"].text = tail_name.to_upper()
+		_start_button.text = LOCALIZATION.text("save_build_start")
+	else:
+		var definition := WildDashAnimalCatalog.get_definition(_selected_animal)
+		if definition == null:
+			return
+		var localized_name := LOCALIZATION.animal_name(_selected_animal, definition.display_name)
+		var localized_identity := LOCALIZATION.identity(_selected_animal, WildDashAnimalSelectionPresentation.get_identity(_selected_animal))
+		var localized_skill := LOCALIZATION.skill_name(_selected_animal, definition.skill_name)
+		var localized_description := LOCALIZATION.skill_description(_selected_animal, definition.skill_description)
+		_mode_label.text = LOCALIZATION.text("mode_animal", "MODE: %s · %s") % [localized_name.to_upper(), localized_identity]
+		_summary_label.text = "%s %.1f · %s %.1f · %s %.2f · %s %.1f · %s %.1f\n%s: %s · %s %.1fs\n%s" % [
+			LOCALIZATION.text("speed", "Speed"), definition.max_speed,
+			LOCALIZATION.text("accel", "Accel"), definition.acceleration,
+			LOCALIZATION.text("handling", "Handling"), definition.turn_speed,
+			LOCALIZATION.text("jump", "Jump"), definition.jump_velocity,
+			LOCALIZATION.text("arena", "Arena"), definition.arena_move_speed,
+			LOCALIZATION.text("skill", "Skill"), localized_skill,
+			LOCALIZATION.text("cooldown", "Cooldown"), definition.skill_cooldown,
+			localized_description,
+		]
+		_start_button.text = LOCALIZATION.text("start_as", "START AS %s") % localized_name.to_upper()
+
+	_localize_animal_buttons()
+
+func _localize_animal_buttons() -> void:
+	for raw_id: Variant in _animal_buttons.keys():
+		var animal_id := StringName(raw_id)
+		var button := _animal_buttons[raw_id] as Button
+		var definition := WildDashAnimalCatalog.get_definition(animal_id)
+		if button == null or definition == null:
+			continue
+		var localized_name := LOCALIZATION.animal_name(animal_id, definition.display_name)
+		button.text = localized_name.to_upper()
+		button.tooltip_text = "%s · %s · %s" % [
+			localized_name,
+			LOCALIZATION.identity(animal_id, WildDashAnimalSelectionPresentation.get_identity(animal_id)),
+			LOCALIZATION.skill_name(animal_id, definition.skill_name),
+		]
