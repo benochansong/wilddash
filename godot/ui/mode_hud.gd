@@ -6,6 +6,8 @@ const EXPANDED_ITEM_CATALOG: Script = preload("res://items/expanded_item_catalog
 var _title_label: Label
 var _metrics_label: Label
 var _message_label: Label
+var _boost_label: Label
+var _body_check_label: Label
 var _item_icon_label: Label
 var _item_label: Label
 var _item_status_label: Label
@@ -13,6 +15,8 @@ var _skill_icon_label: Label
 var _skill_label: Label
 var _skill_status_label: Label
 var _bound_character: WildDashCharacterController
+var _racing_actions: WildDashRacingActionController
+var _bear_combat: WildDashBearCombatV2Controller
 
 func _ready() -> void:
 	_title_label = Label.new()
@@ -25,8 +29,20 @@ func _ready() -> void:
 	_metrics_label.add_theme_font_size_override("font_size", 18)
 	add_child(_metrics_label)
 
+	_boost_label = Label.new()
+	_boost_label.position = Vector2(28, 88)
+	_boost_label.add_theme_font_size_override("font_size", 16)
+	_boost_label.text = ""
+	add_child(_boost_label)
+
+	_body_check_label = Label.new()
+	_body_check_label.position = Vector2(28, 114)
+	_body_check_label.add_theme_font_size_override("font_size", 16)
+	_body_check_label.text = ""
+	add_child(_body_check_label)
+
 	_message_label = Label.new()
-	_message_label.position = Vector2(28, 88)
+	_message_label.position = Vector2(28, 142)
 	_message_label.add_theme_font_size_override("font_size", 16)
 	add_child(_message_label)
 
@@ -74,10 +90,12 @@ func _ready() -> void:
 	add_child(_skill_status_label)
 	set_skill_state("*", "CHARACTER SKILL", "READY · E / X")
 
+	_resolve_racing_actions()
+
 func _process(_delta: float) -> void:
 	if _bound_character == null or not is_instance_valid(_bound_character):
 		return
-	var held_item := _bound_character.get_held_item()
+	var held_item: StringName = _bound_character.get_held_item()
 	if EXPANDED_ITEM_CATALOG.is_expanded(held_item):
 		set_item_state(
 			EXPANDED_ITEM_CATALOG.get_display_name(held_item),
@@ -90,9 +108,10 @@ func _process(_delta: float) -> void:
 			ItemSystem.get_status_text(_bound_character),
 			ItemSystem.get_icon_text(held_item),
 		)
-	var cooldown := _bound_character.skill_cooldown_remaining
-	var status := "READY · E / X" if cooldown <= 0.01 else "%.1f sec" % cooldown
+	var cooldown: float = _bound_character.skill_cooldown_remaining
+	var status: String = "READY · E / X" if cooldown <= 0.01 else "%.1f sec" % cooldown
 	set_skill_state(_bound_character.get_skill_icon_text(), _bound_character.get_skill_name(), status)
+	_update_racing_action_status()
 
 func configure(title: String, message: String) -> void:
 	_title_label.text = title
@@ -100,6 +119,7 @@ func configure(title: String, message: String) -> void:
 
 func bind_character(character: WildDashCharacterController) -> void:
 	_bound_character = character
+	_resolve_racing_actions()
 
 func set_metrics(text: String) -> void:
 	_metrics_label.text = text
@@ -116,3 +136,40 @@ func set_skill_state(icon_text: String, skill_name: String, status: String) -> v
 	_skill_icon_label.text = "[ %s ]" % icon_text
 	_skill_label.text = skill_name
 	_skill_status_label.text = status
+
+func _resolve_racing_actions() -> void:
+	var parent: Node = get_parent()
+	if parent == null:
+		return
+	if _racing_actions == null or not is_instance_valid(_racing_actions):
+		_racing_actions = parent.get_node_or_null("RacingActionController") as WildDashRacingActionController
+	if _bear_combat == null or not is_instance_valid(_bear_combat):
+		_bear_combat = parent.get_node_or_null("BearCombatV2Controller") as WildDashBearCombatV2Controller
+
+func _update_racing_action_status() -> void:
+	_resolve_racing_actions()
+	if _racing_actions == null:
+		_boost_label.text = ""
+		_body_check_label.text = ""
+		return
+
+	var percent: int = int(round(_racing_actions.get_boost_energy_ratio() * 100.0))
+	var blocks: int = clampi(int(round(float(percent) / 10.0)), 0, 10)
+	var meter: String = ""
+	for index: int in range(10):
+		meter += "■" if index < blocks else "□"
+	_boost_label.text = "BOOST ENERGY  [%s] %3d%%  ·  %s" % [meter, percent, _racing_actions.get_boost_status_text()]
+
+	if _bound_character != null and _bound_character.animal_id == &"bear" and _bear_combat != null:
+		_body_check_label.text = "%s  ·  %s" % [
+			_bear_combat.get_action_name(),
+			_bear_combat.get_status_text(),
+		]
+		return
+
+	var power: float = _racing_actions.get_current_body_check_power()
+	_body_check_label.text = "%s  POWER %.1f  ·  %s" % [
+		_racing_actions.get_contact_action_name(),
+		power,
+		_racing_actions.get_body_check_status_text(),
+	]

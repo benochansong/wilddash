@@ -13,6 +13,7 @@ const HARD_MODE_HARD_RECOVERY_SECONDS := 3.35
 const EMERGENCY_REPEAT_LIMIT := 2
 const SOFT_RECOVERY_COOLDOWN := 1.20
 const COLLISION_COUNT_DEBOUNCE := 0.35
+const BALANCE_RANK_SAMPLE_INTERVAL := 0.25
 const RUBBER_BAND_TRAILING_MAX := 0.06
 const RUBBER_BAND_LEADING_MAX := 0.04
 const RUBBER_BAND_SAMPLE_INTERVAL := 0.40
@@ -62,6 +63,7 @@ var _collision_count := 0
 var _overtake_count := 0
 var _low_speed_seconds := 0.0
 var _last_rank := 0
+var _balance_rank_sample_elapsed := 999.0
 var _rubber_band_scale := 1.0
 var _rubber_band_target := 1.0
 var _rubber_band_sample_elapsed := 999.0
@@ -478,6 +480,14 @@ func _update_balance_telemetry(delta: float) -> void:
 	var reference_speed := minf(target_speed, maxf(_racer.cruise_speed * 1.45, 8.0))
 	if _racer.current_speed < reference_speed * 0.48:
 		_low_speed_seconds += delta
+
+	# Overtake telemetry is not gameplay steering. Sampling rank at 4 Hz avoids
+	# a redundant 60 Hz query per AI while preserving the accumulated low-speed
+	# timer at physics frequency.
+	_balance_rank_sample_elapsed += delta
+	if _balance_rank_sample_elapsed < BALANCE_RANK_SAMPLE_INTERVAL:
+		return
+	_balance_rank_sample_elapsed = fmod(_balance_rank_sample_elapsed, BALANCE_RANK_SAMPLE_INTERVAL)
 	var rank := RaceManager.get_rank(_racer)
 	if _last_rank > 0 and rank > 0 and rank < _last_rank:
 		_overtake_count += _last_rank - rank

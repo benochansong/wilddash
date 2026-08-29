@@ -113,16 +113,16 @@ func get_last_character() -> StringName:
 	if current_data.is_empty():
 		current_data = load_data()
 	var profile: Dictionary = current_data.get("profile", {})
-	var value := String(profile.get("last_character", "dog"))
-	if value not in ["dog", "rabbit", "elephant", "cat"]:
-		value = "dog"
-	return StringName(value)
+	var value := StringName(String(profile.get("last_character", "dog")))
+	if not WildDashAnimalCatalog.is_playable(value):
+		value = &"dog"
+	return value
 
 func set_last_character(animal: StringName) -> void:
 	if current_data.is_empty():
 		current_data = load_data()
 	var profile: Dictionary = current_data.get("profile", {})
-	profile["last_character"] = String(animal)
+	profile["last_character"] = String(animal if WildDashAnimalCatalog.is_playable(animal) else &"dog")
 	current_data["profile"] = profile
 	save_current()
 
@@ -187,15 +187,13 @@ func _validate_and_migrate(raw: Dictionary) -> Dictionary:
 		out_profile["best"] = _safe_int(profile.get("best", 50), 50, 1, 50)
 		out_profile["launches"] = _safe_int(profile.get("launches", 0), 0, 0)
 		out_profile["campaigns"] = _safe_int(profile.get("campaigns", 0), 0, 0)
-		var character := String(profile.get("last_character", "dog"))
-		out_profile["last_character"] = character if character in ["dog", "rabbit", "elephant", "cat"] else "dog"
+		var character := StringName(String(profile.get("last_character", "dog")))
+		out_profile["last_character"] = String(character if WildDashAnimalCatalog.is_playable(character) else &"dog")
 		result["profile"] = out_profile
 
 	var settings_value: Variant = raw.get("settings", {})
 	if typeof(settings_value) == TYPE_DICTIONARY:
 		var settings := settings_value as Dictionary
-		# Early prototype saves used a flat settings dictionary even while the
-		# top-level save version was already 2. Detect that shape explicitly.
 		var nested_v2 := settings.has("audio") or settings.has("graphics") or settings.has("accessibility") or settings.has("controls")
 		if raw_version <= 1 or not nested_v2:
 			_migrate_flat_settings(settings, result)

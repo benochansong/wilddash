@@ -1,24 +1,41 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=18 format=3]
 
-[ext_resource type="Script" path="res://modes/neon_harbor_race/neon_harbor_race_mode.gd" id="1_mode"]
-[ext_resource type="Script" path="res://tracks/neon_harbor_lighting_polish.gd" id="2_lighting"]
+[ext_resource type="Script" path="res://modes/neon_harbor_race/neon_harbor_race_v8_round5_campaign.gd" id="1_mode"]
 [ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="3_feel"]
-[ext_resource type="Script" path="res://systems/race_environment_collision_controller.gd" id="4_collision"]
-[ext_resource type="Script" path="res://items/item_combat_expansion_controller.gd" id="5_items"]
-[ext_resource type="Script" path="res://tracks/race_obstacle_expansion_controller.gd" id="6_obstacles"]
-[ext_resource type="Script" path="res://tracks/track_production_dressing.gd" id="7_art"]
+[ext_resource type="Script" path="res://items/item_combat_expansion_long_bomb.gd" id="5_items"]
+[ext_resource type="Script" path="res://systems/racing_action_controller.gd" id="8_actions"]
+[ext_resource type="Script" path="res://systems/elephant_trunk_lunge_controller.gd" id="9_lunge"]
+[ext_resource type="Script" path="res://systems/race_combat_core_v3_power.gd" id="10_combat_v3"]
+[ext_resource type="Script" path="res://systems/bear_combat_v2_controller.gd" id="11_bear_combat"]
+[ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_world_controller_v4_long_water.gd" id="12_world"]
+[ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_canopy_controller.gd" id="13_canopy"]
+[ext_resource type="Script" path="res://modes/neon_harbor_race/mangrove_titan_controller.gd" id="14_titan"]
+[ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_breakthrough_route.gd" id="15_breakthrough"]
+[ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_respawn_guard_v2_long_water.gd" id="16_respawn"]
+[ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_route_network_v2_long_water.gd" id="17_routes"]
+[ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_route_guidance_v3_long_water.gd" id="18_guidance"]
+[ext_resource type="Script" path="res://systems/race_combat_ai_director_party_turbo.gd" id="19_combat_ai"]
+[ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_jump_guard.gd" id="20_jump_guard"]
+[ext_resource type="Script" path="res://modes/neon_harbor_race/wild_tide_water_visibility_boost.gd" id="21_water_visibility"]
 
 [node name="NeonHarborRace" type="Node3D"]
 script = ExtResource("1_mode")
 
-[node name="ProductionArtDressing" type="Node3D" parent="."]
-script = ExtResource("7_art")
-track_id = &"neon_harbor_race"
-beacon_stride = 3
-beacon_offset = 8.4
+[node name="RacingActionController" type="Node" parent="."]
+script = ExtResource("8_actions")
 
-[node name="NeonHarborLightingPolish" type="Node3D" parent="."]
-script = ExtResource("2_lighting")
+[node name="RaceCombatCoreV2" type="Node" parent="."]
+script = ExtResource("10_combat_v3")
+
+[node name="RaceCombatAIDirector" type="Node" parent="."]
+script = ExtResource("19_combat_ai")
+round_id = &"neon_harbor_race"
+
+[node name="ElephantTrunkLungeController" type="Node" parent="."]
+script = ExtResource("9_lunge")
+
+[node name="BearCombatV2Controller" type="Node" parent="."]
+script = ExtResource("11_bear_combat")
 
 [node name="RacingFeelController" type="Node" parent="."]
 script = ExtResource("3_feel")
@@ -27,11 +44,32 @@ boost_fov_bonus = 2.8
 slip_strength = 0.09
 boost_slip_multiplier = 1.2
 
-[node name="RaceEnvironmentCollisionController" type="Node" parent="."]
-script = ExtResource("4_collision")
-
 [node name="ItemCombatExpansionController" type="Node" parent="."]
 script = ExtResource("5_items")
 
-[node name="RaceObstacleExpansionController" type="Node3D" parent="."]
-script = ExtResource("6_obstacles")
+[node name="WildTideWorldController" type="Node3D" parent="."]
+script = ExtResource("12_world")
+
+[node name="WildTideJumpGuard" type="Node" parent="."]
+script = ExtResource("20_jump_guard")
+
+[node name="WildTideWaterVisibilityBoost" type="Node" parent="."]
+script = ExtResource("21_water_visibility")
+
+[node name="WildTideCanopyController" type="Node3D" parent="."]
+script = ExtResource("13_canopy")
+
+[node name="MangroveTitanController" type="Node3D" parent="."]
+script = ExtResource("14_titan")
+
+[node name="WildTideBreakthroughRoute" type="Node3D" parent="."]
+script = ExtResource("15_breakthrough")
+
+[node name="WildTideRespawnGuard" type="Node" parent="."]
+script = ExtResource("16_respawn")
+
+[node name="WildTideRouteNetwork" type="Node3D" parent="."]
+script = ExtResource("17_routes")
+
+[node name="WildTideRouteGuidance" type="Node3D" parent="."]
+script = ExtResource("18_guidance")

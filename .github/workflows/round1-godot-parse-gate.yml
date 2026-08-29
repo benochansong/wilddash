@@ -1,0 +1,107 @@
+name: WILD DASH Godot Parse Gate
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wild-dash-godot-parse-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  round-parse:
+    name: Godot 4.7.1 Round 1 + Round 3 parse
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Download Godot 4.7.1 stable
+        run: |
+          curl -L --fail --retry 3 \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip \
+            -o /tmp/godot.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x /tmp/godot/Godot_v4.7.1-stable_linux.x86_64
+          /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --version
+
+      - name: Import project and register scripts
+        shell: bash
+        run: |
+          set -o pipefail
+          /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --editor --path godot --quit \
+            2>&1 | tee /tmp/wilddash-import.log
+          if grep -E "SCRIPT ERROR: Parse Error|Parse Error:|Failed to load script|Could not resolve script|Cannot get class" /tmp/wilddash-import.log; then
+            echo "Godot import found a parser/script error."
+            exit 1
+          fi
+
+      - name: Load production Round 1 scene
+        shell: bash
+        run: |
+          set -o pipefail
+          /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot \
+            res://modes/grand_prix/grand_prix.tscn \
+            --quit-after 5 \
+            2>&1 | tee /tmp/wilddash-round1-load.log
+          if grep -E "SCRIPT ERROR: Parse Error|Parse Error:|Failed to load script|Could not resolve script|Cannot get class|Failed loading resource|Failed to load resource" /tmp/wilddash-round1-load.log; then
+            echo "Round 1 scene load found a parser/resource error."
+            exit 1
+          fi
+
+      - name: Probe Round 3 Phase3 inheritance chain
+        shell: bash
+        run: |
+          set -o pipefail
+          failed=0
+          probe_script() {
+            label="$1"
+            script_path="$2"
+            cat > godot/tmp_phase_probe.tscn <<EOF
+          [gd_scene load_steps=2 format=3]
+
+          [ext_resource type="Script" path="$script_path" id="1"]
+
+          [node name="Probe" type="Node"]
+          script = ExtResource("1")
+          EOF
+            /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+              --headless --path godot res://tmp_phase_probe.tscn --quit-after 1 \
+              2>&1 | tee "/tmp/${label}.log"
+            if grep -E "SCRIPT ERROR: Parse Error|Parse Error:|Failed to load script|Could not resolve script|Cannot get class|Failed loading resource|Failed to load resource" "/tmp/${label}.log"; then
+              echo "PHASE3 PROBE FAILED: ${label} ${script_path}"
+              failed=1
+            else
+              echo "PHASE3 PROBE PASS: ${label} ${script_path}"
+            fi
+          }
+          probe_script phase3_base "res://modes/logspire_leap/logspire_phase3_director.gd"
+          probe_script phase3_v2 "res://modes/logspire_leap/logspire_phase3_director_v2_performance.gd"
+          probe_script phase3_v3 "res://modes/logspire_leap/logspire_phase3_director_v3_water_priority.gd"
+          probe_script phase3_v4 "res://modes/logspire_leap/logspire_phase3_director_v4_major_collision.gd"
+          probe_script phase3_v5 "res://modes/logspire_leap/logspire_phase3_director_v5_route_clearance.gd"
+          rm -f godot/tmp_phase_probe.tscn
+          exit "$failed"
+
+      - name: Load production Round 3 scene
+        shell: bash
+        run: |
+          set -o pipefail
+          /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path godot \
+            res://modes/logspire_leap/logspire_leap.tscn \
+            --quit-after 5 \
+            2>&1 | tee /tmp/wilddash-round3-load.log
+          if grep -E "SCRIPT ERROR: Parse Error|Parse Error:|Failed to load script|Could not resolve script|Cannot get class|Failed loading resource|Failed to load resource" /tmp/wilddash-round3-load.log; then
+            echo "Round 3 scene load found a parser/resource error."
+            exit 1
+          fi
+
+      - name: Confirm production scenes parsed
+        run: echo "ROUND 1 + ROUND 3 GODOT PARSE PASS"

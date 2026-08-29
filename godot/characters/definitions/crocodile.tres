@@ -1,0 +1,49 @@
+[gd_resource type="Resource" script_class="WildDashAnimalDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://characters/animal_definition.gd" id="1_def"]
+[ext_resource type="PackedScene" path="res://characters/visuals/crocodile_visual.tscn" id="2_visual"]
+
+[resource]
+script = ExtResource("1_def")
+animal_id = &"crocodile"
+display_name = "Crocodile"
+nickname = "악어"
+role = "Water Bruiser"
+accent_color = Color(0.33, 0.62, 0.29, 1)
+visual_scene = ExtResource("2_visual")
+max_speed = 13.0
+cruise_speed = 8.0
+acceleration = 21.0
+turn_speed = 1.72
+jump_velocity = 6.2
+gravity = 23.5
+ai_race_speed = 9.75
+arena_move_speed = 7.3
+arena_acceleration = 22.0
+knockback_decay = 19.5
+ai_arena_speed = 6.2
+collision_radius = 0.82
+collision_height = 1.78
+collision_center_y = 0.89
+camera_follow_distance = 10.4
+camera_follow_height = 5.4
+camera_look_ahead = 4.4
+camera_smoothing = 6.5
+camera_fov = 69.0
+# Use the proven Stampede runtime for E/X while Round 2/4 F/Y is overridden as
+# the dedicated Bite Lunge/Tail Sweep combat kit.
+skill_id = &"stampede"
+skill_name = "BITE LUNGE"
+skill_description = "육지에서는 묵직하고 느리지만 물에서는 폭발적으로 빨라지는 WATER BRUISER."
+skill_cooldown = 8.0
+skill_duration = 0.85
+skill_speed_multiplier = 1.16
+skill_acceleration_multiplier = 1.25
+skill_turn_multiplier = 0.92
+skill_jump_multiplier = 1.0
+skill_knockback_multiplier = 0.74
+skill_collision_retention_multiplier = 1.16
+skill_evade_duration = 0.0
+skill_forward_impulse = 4.6
+skill_lateral_impulse = 0.0
+skill_push_strength = 5.4

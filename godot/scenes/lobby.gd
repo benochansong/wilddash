@@ -1,10 +1,10 @@
 extends Control
 
+const MULTIPLAYER_LOBBY_SCENE := "res://network/multiplayer_lobby.tscn"
+
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	GameManager.set_state(GameManager.GameState.LOBBY)
-	# Reuse the committed Suno result theme as the RC7 lobby BGM so the game
-	# opens with authored music instead of the procedural prototype menu loop.
 	AudioManager.play_theme("result")
 	print("RC_FLOW Launch")
 	print("RC_FLOW Lobby")
@@ -27,9 +27,9 @@ func _build_ui(profile: Dictionary) -> void:
 	add_child(background)
 
 	var box := VBoxContainer.new()
-	box.position = Vector2(420, 150)
-	box.custom_minimum_size = Vector2(600, 620)
-	box.add_theme_constant_override("separation", 18)
+	box.position = Vector2(420, 105)
+	box.custom_minimum_size = Vector2(600, 690)
+	box.add_theme_constant_override("separation", 15)
 	add_child(box)
 
 	var title := Label.new()
@@ -40,9 +40,9 @@ func _build_ui(profile: Dictionary) -> void:
 	box.add_child(title)
 
 	var subtitle := Label.new()
-	subtitle.text = "RC7 RELEASE CANDIDATE · OFFLINE SINGLE PLAYER"
+	subtitle.text = "RC9 DEV · 12 RACERS · SINGLE + LAN PARTY PROTOTYPE"
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	subtitle.add_theme_font_size_override("font_size", 18)
+	subtitle.add_theme_font_size_override("font_size", 17)
 	box.add_child(subtitle)
 
 	var profile_label := Label.new()
@@ -53,21 +53,28 @@ func _build_ui(profile: Dictionary) -> void:
 	profile_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(profile_label)
 
-	var play := Button.new()
-	play.text = "PLAY"
-	play.custom_minimum_size = Vector2(0, 72)
-	play.add_theme_font_size_override("font_size", 26)
-	play.pressed.connect(_on_play)
-	box.add_child(play)
+	var single_player := Button.new()
+	single_player.text = "SINGLE PLAYER"
+	single_player.custom_minimum_size = Vector2(0, 70)
+	single_player.add_theme_font_size_override("font_size", 25)
+	single_player.pressed.connect(_on_play)
+	box.add_child(single_player)
+
+	var multiplayer_button := Button.new()
+	multiplayer_button.text = "MULTIPLAYER · LAN PROTOTYPE"
+	multiplayer_button.custom_minimum_size = Vector2(0, 66)
+	multiplayer_button.add_theme_font_size_override("font_size", 22)
+	multiplayer_button.pressed.connect(_on_multiplayer)
+	box.add_child(multiplayer_button)
 
 	var settings_button := Button.new()
 	settings_button.text = "SETTINGS"
-	settings_button.custom_minimum_size = Vector2(0, 58)
+	settings_button.custom_minimum_size = Vector2(0, 54)
 	settings_button.pressed.connect(_on_settings)
 	box.add_child(settings_button)
 
 	var controls := Label.new()
-	controls.text = "Keyboard: WASD / Arrows · Space Jump · E Skill · Q Item · Esc/P Pause\nGamepad: Left Stick / D-Pad · A Jump · X Skill · B Item · Start Pause"
+	controls.text = "Race: Hold W/↑ OVERDRIVE · S/↓ brake · A/D steer · Space jump · E animal skill · Q item · F body check\nGamepad: Left Stick / D-Pad · A Jump · X Skill · B Item · Y Body Check · Start Pause"
 	controls.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	controls.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(controls)
@@ -76,17 +83,23 @@ func _build_ui(profile: Dictionary) -> void:
 	quit.text = "QUIT"
 	quit.pressed.connect(_on_quit)
 	box.add_child(quit)
-	play.grab_focus()
+	single_player.grab_focus()
 
 func _on_play() -> void:
+	NetworkManager.leave_party(false)
 	AudioManager.play_sfx_id("ui")
 	GameManager.show_character_select()
+
+func _on_multiplayer() -> void:
+	AudioManager.play_sfx_id("ui")
+	get_tree().change_scene_to_file(MULTIPLAYER_LOBBY_SCENE)
 
 func _on_settings() -> void:
 	AudioManager.play_sfx_id("ui")
 	GameManager.show_settings()
 
 func _on_quit() -> void:
+	NetworkManager.leave_party(false)
 	SaveManager.save_current()
 	get_tree().quit(0)
 

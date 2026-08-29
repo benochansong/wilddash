@@ -1,22 +1,121 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=34 format=3]
 
-[ext_resource type="Script" path="res://modes/grand_prix/grand_prix_rc5_mode.gd" id="1_mode"]
+; Wild Moments V7 inherits res://modes/grand_prix/grand_prix_v6_item_fairness.gd
+[ext_resource type="Script" path="res://modes/grand_prix/grand_prix_v7_wild_moments.gd" id="1_mode"]
 [ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="2_feel"]
-[ext_resource type="Script" path="res://systems/race_environment_collision_controller.gd" id="3_collision"]
-[ext_resource type="Script" path="res://items/item_combat_expansion_controller.gd" id="4_items"]
-[ext_resource type="Script" path="res://tracks/race_obstacle_expansion_controller.gd" id="5_obstacles"]
-[ext_resource type="Script" path="res://tracks/track_production_dressing.gd" id="6_art"]
+[ext_resource type="Script" path="res://items/item_combat_expansion_v3_long_bomb.gd" id="4_items"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v2_course_guidance.gd" id="6_art"]
 [ext_resource type="Script" path="res://modes/grand_prix/grand_prix_rival_pressure.gd" id="7_rival"]
-[ext_resource type="Script" path="res://tracks/grand_prix_tunnel_failsafe.gd" id="8_tunnel"]
+[ext_resource type="Script" path="res://network/network_race_sync.gd" id="9_network"]
+[ext_resource type="Script" path="res://systems/racing_action_controller.gd" id="10_actions"]
+[ext_resource type="Script" path="res://systems/elephant_trunk_lunge_controller.gd" id="13_lunge"]
+[ext_resource type="Script" path="res://systems/race_combat_core_v3_power.gd" id="14_combat_v3"]
+[ext_resource type="Script" path="res://systems/bear_combat_v2_controller.gd" id="15_bear_combat"]
+[ext_resource type="Script" path="res://systems/terrain_movement_controller.gd" id="16_terrain"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v2_terrain_gameplay.gd" id="17_terrain_gameplay"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v2_stage3_controller.gd" id="18_stage3"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v2_ai_terrain_strategy.gd" id="19_ai_terrain"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v2_difficulty_controller.gd" id="20_difficulty"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v2_terrain_shell.gd" id="21_terrain_shell"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v2_grounding_world.gd" id="22_grounding_world"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v2_hard_reset_controller.gd" id="23_hard_reset"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v3_obstacle_recovery.gd" id="24_obstacles"]
+[ext_resource type="Script" path="res://modes/grand_prix/grand_prix_v3_combat_accessibility.gd" id="25_combat_access"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v3_offroad_controller.gd" id="26_offroad"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v3_mountain_clearance.gd" id="27_mountain_clearance"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v3_world_foundation.gd" id="28_world_foundation"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v3_offroad_stop_guard.gd" id="29_offroad_stop"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v3_water_reentry.gd" id="30_water_reentry"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v4_landscape_shell.gd" id="31_landscape_shell"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v4_obstacle_expansion.gd" id="32_obstacle_expansion"]
+[ext_resource type="Script" path="res://modes/grand_prix/grand_prix_v4_combat_frequency.gd" id="33_combat_frequency"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v4_environment_dressing.gd" id="34_environment_dressing"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v4_direction_guidance.gd" id="35_direction_guidance"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v4_route_signage.gd" id="36_route_signage"]
+[ext_resource type="Script" path="res://tracks/grand_prix_v5_road_corridor_clearance.gd" id="37_road_clearance"]
+[ext_resource type="Script" path="res://systems/race_combat_ai_director_party_turbo.gd" id="38_combat_ai"]
 
 [node name="GrandPrix" type="Node3D"]
 script = ExtResource("1_mode")
 
-[node name="ProductionArtDressing" type="Node3D" parent="."]
+[node name="V2CourseGuidance" type="Node3D" parent="."]
 script = ExtResource("6_art")
-track_id = &"grand_prix"
-beacon_stride = 4
-beacon_offset = 8.8
+
+[node name="V2TerrainShell" type="Node3D" parent="."]
+script = ExtResource("21_terrain_shell")
+
+[node name="V2GroundingWorld" type="Node3D" parent="."]
+script = ExtResource("22_grounding_world")
+
+[node name="V36ContinuousLand" type="Node3D" parent="."]
+script = ExtResource("28_world_foundation")
+
+[node name="V4LandscapeShell" type="Node3D" parent="."]
+script = ExtResource("31_landscape_shell")
+
+[node name="V42EnvironmentDressing" type="Node3D" parent="."]
+script = ExtResource("34_environment_dressing")
+
+[node name="V5RoadCorridorClearance" type="Node" parent="."]
+script = ExtResource("37_road_clearance")
+
+[node name="V44DirectionGuidance" type="Node3D" parent="."]
+script = ExtResource("35_direction_guidance")
+
+[node name="V45RouteSignage" type="Node3D" parent="."]
+script = ExtResource("36_route_signage")
+
+[node name="V2TerrainGameplay" type="Node3D" parent="."]
+script = ExtResource("17_terrain_gameplay")
+
+[node name="V2Stage3" type="Node3D" parent="."]
+script = ExtResource("18_stage3")
+
+[node name="V3ObstacleRecovery" type="Node3D" parent="."]
+script = ExtResource("24_obstacles")
+
+[node name="V4ObstacleExpansion" type="Node3D" parent="."]
+script = ExtResource("32_obstacle_expansion")
+
+[node name="V2HardResetController" type="Node" parent="."]
+script = ExtResource("23_hard_reset")
+
+[node name="V2AITerrainStrategy" type="Node" parent="."]
+script = ExtResource("19_ai_terrain")
+
+[node name="V2DifficultyController" type="Node" parent="."]
+script = ExtResource("20_difficulty")
+
+[node name="RacingActionController" type="Node" parent="."]
+script = ExtResource("10_actions")
+
+[node name="RaceCombatCoreV2" type="Node" parent="."]
+script = ExtResource("14_combat_v3")
+
+[node name="RaceCombatAIDirector" type="Node" parent="."]
+script = ExtResource("38_combat_ai")
+round_id = &"grand_prix"
+
+[node name="ElephantTrunkLungeController" type="Node" parent="."]
+script = ExtResource("13_lunge")
+
+[node name="BearCombatV2Controller" type="Node" parent="."]
+script = ExtResource("15_bear_combat")
+
+[node name="TerrainMovementController" type="Node" parent="."]
+script = ExtResource("16_terrain")
+
+[node name="V3OffroadController" type="Node" parent="."]
+script = ExtResource("26_offroad")
+
+[node name="V36OffroadSoftStop" type="Node" parent="."]
+script = ExtResource("29_offroad_stop")
+
+[node name="V3WaterReentry" type="Node3D" parent="."]
+script = ExtResource("30_water_reentry")
+
+[node name="V3MountainClearance" type="Node" parent="."]
+script = ExtResource("27_mountain_clearance")
 
 [node name="RacingFeelController" type="Node" parent="."]
 script = ExtResource("2_feel")
@@ -25,17 +124,17 @@ boost_fov_bonus = 2.2
 slip_strength = 0.078
 boost_slip_multiplier = 1.16
 
-[node name="RaceEnvironmentCollisionController" type="Node" parent="."]
-script = ExtResource("3_collision")
-
-[node name="GrandPrixTunnelFailsafe" type="Node" parent="."]
-script = ExtResource("8_tunnel")
-
 [node name="GrandPrixRivalPressure" type="Node" parent="."]
 script = ExtResource("7_rival")
+
+[node name="V3CombatAccessibility" type="Node" parent="."]
+script = ExtResource("25_combat_access")
+
+[node name="V4CombatFrequency" type="Node" parent="."]
+script = ExtResource("33_combat_frequency")
 
 [node name="ItemCombatExpansionController" type="Node" parent="."]
 script = ExtResource("4_items")
 
-[node name="RaceObstacleExpansionController" type="Node3D" parent="."]
-script = ExtResource("5_obstacles")
+[node name="NetworkRaceSync" type="Node" parent="."]
+script = ExtResource("9_network")

@@ -1,0 +1,7 @@
+{
+  "recommendations": [
+    "geequlim.godot-tools",
+    "dbaeumer.vscode-eslint",
+    "eamodio.gitlens"
+  ]
+}

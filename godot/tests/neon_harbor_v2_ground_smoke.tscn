@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/neon_harbor_v2_ground_smoke.gd" id="1_test"]
+
+[node name="NeonHarborV2GroundSmoke" type="Node"]
+script = ExtResource("1_test")

@@ -1,11 +1,11 @@
 class_name WildDashChimeraLoadout
 extends Resource
 
-## Serializable three-slot chimera configuration.
-## Gameplay meaning is intentionally stable:
-## - head: passive trait
-## - body: movement/collision/camera base
-## - tail: active skill source
+## Serializable three-slot Chimera configuration.
+## RC8 keeps Chimera intentionally limited to the original four core animals:
+## - head: active skill source
+## - body: movement/collision base + passive trait
+## - tail: utility bonus
 
 @export var head_id: StringName = &"dog"
 @export var body_id: StringName = &"rabbit"
@@ -14,11 +14,11 @@ extends Resource
 @export var pattern_id: StringName = &"stripe"
 
 func normalize() -> void:
-	if not WildDashAnimalCatalog.is_valid(head_id):
+	if not WildDashAnimalCatalog.is_chimera_part(head_id):
 		head_id = &"dog"
-	if not WildDashAnimalCatalog.is_valid(body_id):
+	if not WildDashAnimalCatalog.is_chimera_part(body_id):
 		body_id = &"dog"
-	if not WildDashAnimalCatalog.is_valid(tail_id):
+	if not WildDashAnimalCatalog.is_chimera_part(tail_id):
 		tail_id = &"dog"
 	if not WildDashChimeraSystem.is_valid_palette(palette_id):
 		palette_id = &"classic"

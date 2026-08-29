@@ -11,28 +11,33 @@ enum GameState {
 	COUNTDOWN,
 	RACE,
 	ROUND_BREAK,
+	ROUND_RECAP,
 	ARENA,
 	FINAL,
 	RESULT,
 }
 
+# RC9 production campaign: two opening rounds, vertical LOGSPIRE race, Round 4
+# Wild Rumble, then the existing Wild Tide / Neon Harbor race as Round 5 finale.
+# TIDAL CLASH remains in the repository as a future Round 6 / bonus mode.
 const ROUND_IDS: Array[StringName] = [
 	&"grand_prix",
 	&"fruit_collection",
-	&"neon_harbor_race",
+	&"logspire_leap",
 	&"push_out",
-	&"snowpeak_winter_rally",
+	&"neon_harbor_race",
 ]
 const ROUND_SCENES: Array[String] = [
 	"res://modes/grand_prix/grand_prix.tscn",
 	"res://modes/fruit_collection/fruit_collection.tscn",
-	"res://modes/neon_harbor_race/neon_harbor_race.tscn",
+	"res://modes/logspire_leap/logspire_leap.tscn",
 	"res://modes/push_out/push_out.tscn",
-	"res://modes/snowpeak_winter_rally/snowpeak_winter_rally.tscn",
+	"res://modes/neon_harbor_race/neon_harbor_race.tscn",
 ]
 const LOBBY_SCENE := "res://scenes/lobby.tscn"
 const CHARACTER_SELECT_SCENE := "res://scenes/character_select.tscn"
 const SETTINGS_SCENE := "res://scenes/settings.tscn"
+const ROUND_RECAP_SCENE := "res://scenes/round_recap.tscn"
 const RESULT_SCENE := "res://scenes/result.tscn"
 
 const CASUAL_AI_COUNT := 9
@@ -76,10 +81,10 @@ func configure_run(
 	difficulty = difficulty_id
 	if not parts.is_empty():
 		chimera_parts = WildDashChimeraLoadout.from_dictionary(parts).to_dictionary()
-	var resolved_ai := get_recommended_ai_count(difficulty_id) if requested_ai_count < 0 else requested_ai_count
+	var resolved_ai: int = get_recommended_ai_count(difficulty_id) if requested_ai_count < 0 else requested_ai_count
 	ai_count = clampi(resolved_ai, MIN_AI_COUNT, MAX_AI_COUNT)
 	SaveManager.set_last_character(selected_animal)
-	print("RACER CONFIG difficulty=%s ai=%d total=%d" % [difficulty, ai_count, ai_count + 1])
+	print("RACER CONFIG animal=%s difficulty=%s ai=%d total=%d" % [String(selected_animal), difficulty, ai_count, ai_count + 1])
 
 func get_recommended_ai_count(difficulty_id: StringName) -> int:
 	match difficulty_id:
@@ -106,7 +111,7 @@ func set_ai_count(value: int) -> void:
 func show_character_select() -> void:
 	set_state(GameState.CHARACTER_SELECT)
 	print("RC_FLOW Character Select")
-	var error := get_tree().change_scene_to_file(CHARACTER_SELECT_SCENE)
+	var error: Error = get_tree().change_scene_to_file(CHARACTER_SELECT_SCENE)
 	if error != OK:
 		push_error("Failed to load Character Select: %s" % error_string(error))
 		return
@@ -117,12 +122,35 @@ func show_settings() -> void:
 	get_tree().change_scene_to_file(SETTINGS_SCENE)
 
 func start_campaign() -> void:
+	# Character Select is always the start of a NEW campaign. During editor/manual
+	# testing it is possible to return here while the autoload still carries a stale
+	# campaign_running=true flag from a previous interrupted run. The old behavior
+	# silently returned, making the START button appear dead. Recover only from
+	# Character Select; duplicate start requests during live gameplay are ignored.
 	if campaign_running:
-		return
+		if state != GameState.CHARACTER_SELECT:
+			print("CAMPAIGN START IGNORED state=%s already_running=true" % str(state))
+			return
+		print("CAMPAIGN START RECOVERY stale_campaign=true animal=%s" % String(selected_animal))
+		campaign_running = false
+		round_active = false
+		current_round_index = -1
+		_transition_pending = false
+		RaceManager.active = false
+		RaceManager.clear_racers()
+		RaceManager.clear_track()
+
+	if not WildDashAnimalCatalog.is_playable(selected_animal):
+		push_warning("CAMPAIGN START invalid/non-playable racer=%s; falling back to dog" % String(selected_animal))
+		selected_animal = &"dog"
+
 	ResultManager.reset_campaign()
 	campaign_running = true
 	current_round_index = 0
 	_transition_pending = false
+	print("CAMPAIGN START REQUEST animal=%s rounds=%d first=%s" % [
+		String(selected_animal), ROUND_SCENES.size(), ROUND_SCENES[0],
+	])
 	call_deferred("_load_current_round")
 
 func begin_round(mode_id: StringName) -> void:
@@ -135,22 +163,25 @@ func begin_round(mode_id: StringName) -> void:
 	match mode_id:
 		&"grand_prix":
 			set_state(GameState.RACE)
-			print("RC_FLOW Race")
+			print("RC_FLOW Round 1 Grand Prix")
 		&"fruit_collection":
 			set_state(GameState.ARENA)
-			print("RC_FLOW Round 2")
-		&"neon_harbor_race":
+			print("RC_FLOW Round 2 Fruit Collection")
+		&"logspire_leap":
 			set_state(GameState.RACE)
-			print("RC_FLOW Round 3 Neon Harbor Race")
+			print("CAMPAIGN ROUND 3 LOGSPIRE")
 		&"floor_collapse":
 			set_state(GameState.ARENA)
 			print("RC_FLOW Floor Collapse Free Play")
 		&"push_out":
 			set_state(GameState.FINAL)
-			print("RC_FLOW Round 4 Push Out")
-		&"snowpeak_winter_rally":
+			print("RC_FLOW Round 4 Wild Rumble FINAL")
+		&"neon_harbor_race":
 			set_state(GameState.RACE)
-			print("RC_FLOW Round 5 Snowpeak Winter Rally")
+			print("CAMPAIGN ROUND 5 NEON HARBOR")
+		&"tidal_clash":
+			set_state(GameState.RACE)
+			print("RC_FLOW Bonus TIDAL CLASH reserve_round_6=true")
 		_:
 			set_state(GameState.ARENA)
 	round_changed.emit(current_round_index, mode_id)
@@ -169,6 +200,12 @@ func get_current_round_id() -> StringName:
 	if current_round_index < 0 or current_round_index >= ROUND_IDS.size():
 		return &""
 	return ROUND_IDS[current_round_index]
+
+func get_next_round_id() -> StringName:
+	var next_index: int = current_round_index + 1
+	if next_index < 0 or next_index >= ROUND_IDS.size():
+		return &""
+	return ROUND_IDS[next_index]
 
 func is_gameplay_state() -> bool:
 	return state in [GameState.COUNTDOWN, GameState.RACE, GameState.ROUND_BREAK, GameState.ARENA, GameState.FINAL]
@@ -202,23 +239,68 @@ func _load_current_round() -> void:
 		return
 	var scene_path: String = ROUND_SCENES[current_round_index]
 	var mode_id: StringName = ROUND_IDS[current_round_index]
-	print("LOAD MODE index=%d id=%s ai=%d" % [current_round_index + 1, mode_id, ai_count])
+	print("LOAD MODE index=%d id=%s ai=%d animal=%s" % [current_round_index + 1, mode_id, ai_count, String(selected_animal)])
 	var error: Error = get_tree().change_scene_to_file(scene_path)
 	if error != OK:
+		campaign_running = false
+		current_round_index = -1
+		_transition_pending = false
 		push_error("Failed to load round scene %s: %s" % [scene_path, error_string(error)])
 
 func _transition_after_round() -> void:
-	var delay := 0.05 if DisplayServer.get_name() == "headless" else 1.2
+	# Leave a very short beat on the finished round, then hand control to the
+	# dedicated recap scene. The completed round index is intentionally retained
+	# while recap is visible so all result data and next-round preview stay stable.
+	var delay: float = 0.04 if DisplayServer.get_name() == "headless" else 0.75
 	await get_tree().create_timer(delay).timeout
-	_transition_pending = false
 	if current_round_index + 1 < ROUND_SCENES.size():
-		current_round_index += 1
-		set_state(GameState.ROUND_BREAK)
-		_load_current_round()
+		set_state(GameState.ROUND_RECAP)
+		print("ROUND RECAP LOAD completed_round=%d mode=%s next=%s" % [
+			current_round_index + 1,
+			String(get_current_round_id()),
+			String(get_next_round_id()),
+		])
+		var recap_error: Error = get_tree().change_scene_to_file(ROUND_RECAP_SCENE)
+		if recap_error != OK:
+			push_error("Failed to load Round Recap: %s; advancing safely" % error_string(recap_error))
+			_advance_round_without_recap()
 		return
+	_finish_campaign_to_result()
+
+func advance_from_round_recap() -> void:
+	if not campaign_running:
+		return
+	if state != GameState.ROUND_RECAP:
+		push_warning("Round recap advance ignored outside ROUND_RECAP state")
+		return
+	if current_round_index + 1 >= ROUND_SCENES.size():
+		_finish_campaign_to_result()
+		return
+	var completed_round: int = current_round_index + 1
+	current_round_index += 1
+	_transition_pending = false
+	set_state(GameState.ROUND_BREAK)
+	print("ROUND RECAP COMPLETE completed_round=%d loading_round=%d id=%s" % [
+		completed_round,
+		current_round_index + 1,
+		String(get_current_round_id()),
+	])
+	call_deferred("_load_current_round")
+
+func _advance_round_without_recap() -> void:
+	if current_round_index + 1 >= ROUND_SCENES.size():
+		_finish_campaign_to_result()
+		return
+	current_round_index += 1
+	_transition_pending = false
+	set_state(GameState.ROUND_BREAK)
+	call_deferred("_load_current_round")
+
+func _finish_campaign_to_result() -> void:
+	_transition_pending = false
 	campaign_running = false
 	set_state(GameState.RESULT)
-	print("CAMPAIGN COMPLETE rounds=%d clears=%d" % [ResultManager.round_results.size(), ResultManager.get_success_count()])
+	print("CAMPAIGN COMPLETE rounds=%d clears=%d final_round=neon_harbor_race" % [ResultManager.round_results.size(), ResultManager.get_success_count()])
 	var error: Error = get_tree().change_scene_to_file(RESULT_SCENE)
 	if error != OK:
 		push_error("Failed to load result scene: %s" % error_string(error))
@@ -226,7 +308,7 @@ func _transition_after_round() -> void:
 func _autotest_start_character_select() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
-	var scene := get_tree().current_scene
+	var scene: Node = get_tree().current_scene
 	if scene == null or not scene.has_method("_start_run"):
 		push_error("RC3 autotest could not start Character Select")
 		get_tree().quit(3)
@@ -237,10 +319,10 @@ func _race_theme_for_current_round() -> String:
 	match get_current_round_id():
 		&"grand_prix":
 			return "race_grand_prix"
+		&"logspire_leap":
+			return "race_logspire"
 		&"neon_harbor_race":
 			return "race_neon_harbor"
-		&"snowpeak_winter_rally":
-			return "race_snowpeak"
 		_:
 			return "race"
 
@@ -254,7 +336,7 @@ func _arena_theme_for_current_round() -> String:
 			return "arena"
 
 func _update_audio_for_state(next_state: GameState) -> void:
-	var audio := get_node_or_null("/root/AudioManager")
+	var audio: Node = get_node_or_null("/root/AudioManager")
 	if audio == null:
 		return
 	match next_state:
@@ -266,7 +348,7 @@ func _update_audio_for_state(next_state: GameState) -> void:
 			audio.call("play_theme", _arena_theme_for_current_round())
 		GameState.ROUND_BREAK:
 			audio.call("play_theme", "arena")
-		GameState.RESULT:
+		GameState.ROUND_RECAP, GameState.RESULT:
 			audio.call("play_theme", "result")
 		_:
 			pass
