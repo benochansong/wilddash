@@ -3,15 +3,28 @@ extends WildDashCharacterVisual
 
 ## Lightweight race-only animal visual builder. Each scene supplies one species,
 ## while gameplay/collision continues to come from WildDashAnimalDefinition.
+## RC7 attaches the same production-polish layer used by the four playable racers
+## so all 12 animals share one commercial visual language without changing gameplay.
 @export var species: StringName = &"fox"
 
 static var _material_cache: Dictionary = {}
 var _detail_nodes: Array[Node3D] = []
 var _micro_nodes: Array[Node3D] = []
+var _production_polish: WildDashProductionCharacterPolish
 
 func _ready() -> void:
 	_build_species_visual()
+	_attach_production_polish()
 	super._ready()
+
+func _attach_production_polish() -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	_production_polish = WildDashProductionCharacterPolish.new()
+	_production_polish.name = "ProductionPolish"
+	_production_polish.species = species
+	_production_polish.imported_model_path = NodePath("../ImportedModel")
+	add_child(_production_polish)
 
 func set_lod_level(level: int) -> void:
 	super.set_lod_level(level)

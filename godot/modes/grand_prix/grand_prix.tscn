@@ -1,13 +1,22 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://modes/grand_prix/grand_prix_rc5_mode.gd" id="1_mode"]
 [ext_resource type="Script" path="res://systems/racing_feel_controller.gd" id="2_feel"]
 [ext_resource type="Script" path="res://systems/race_environment_collision_controller.gd" id="3_collision"]
 [ext_resource type="Script" path="res://items/item_combat_expansion_controller.gd" id="4_items"]
 [ext_resource type="Script" path="res://tracks/race_obstacle_expansion_controller.gd" id="5_obstacles"]
+[ext_resource type="Script" path="res://tracks/track_production_dressing.gd" id="6_art"]
+[ext_resource type="Script" path="res://modes/grand_prix/grand_prix_rival_pressure.gd" id="7_rival"]
+[ext_resource type="Script" path="res://tracks/grand_prix_tunnel_failsafe.gd" id="8_tunnel"]
 
 [node name="GrandPrix" type="Node3D"]
 script = ExtResource("1_mode")
+
+[node name="ProductionArtDressing" type="Node3D" parent="."]
+script = ExtResource("6_art")
+track_id = &"grand_prix"
+beacon_stride = 4
+beacon_offset = 8.8
 
 [node name="RacingFeelController" type="Node" parent="."]
 script = ExtResource("2_feel")
@@ -18,6 +27,12 @@ boost_slip_multiplier = 1.16
 
 [node name="RaceEnvironmentCollisionController" type="Node" parent="."]
 script = ExtResource("3_collision")
+
+[node name="GrandPrixTunnelFailsafe" type="Node" parent="."]
+script = ExtResource("8_tunnel")
+
+[node name="GrandPrixRivalPressure" type="Node" parent="."]
+script = ExtResource("7_rival")
 
 [node name="ItemCombatExpansionController" type="Node" parent="."]
 script = ExtResource("4_items")

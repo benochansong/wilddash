@@ -3,7 +3,9 @@ extends Control
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	GameManager.set_state(GameManager.GameState.LOBBY)
-	AudioManager.play_theme("menu")
+	# Reuse the committed Suno result theme as the RC7 lobby BGM so the game
+	# opens with authored music instead of the procedural prototype menu loop.
+	AudioManager.play_theme("result")
 	print("RC_FLOW Launch")
 	print("RC_FLOW Lobby")
 	var profile: Dictionary = SaveManager.current_data.get("profile", {})
@@ -38,7 +40,7 @@ func _build_ui(profile: Dictionary) -> void:
 	box.add_child(title)
 
 	var subtitle := Label.new()
-	subtitle.text = "RC3 GAMEPLAY UPGRADE · OFFLINE SINGLE PLAYER"
+	subtitle.text = "RC7 RELEASE CANDIDATE · OFFLINE SINGLE PLAYER"
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle.add_theme_font_size_override("font_size", 18)
 	box.add_child(subtitle)

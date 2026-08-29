@@ -4,6 +4,12 @@ const BUS_MASTER := "Master"
 const BUS_MUSIC := "Music"
 const BUS_SFX := "SFX"
 const SFX_POOL_SIZE := 8
+const GRAND_PRIX_THEME_PATH := "res://audio/music/wild_dash_race_theme.ogg"
+const NEON_HARBOR_THEME_PATH := "res://audio/music/wild_dash_race_theme_alt.ogg"
+const SNOWPEAK_THEME_PATH := "res://audio/music/wild_dash_snowpeak_theme.ogg"
+const PUSH_OUT_THEME_PATH := "res://audio/music/wild_dash_arena_theme_alt.ogg"
+const FRUIT_COLLECTION_THEME_PATH := "res://audio/music/wild_dash_fruit_collection_theme.ogg"
+const RESULT_THEME_PATH := "res://audio/music/wild_dash_result_theme.ogg"
 
 var muted := false
 var master_volume := 0.85
@@ -31,6 +37,7 @@ func _ready() -> void:
 		_sfx_players.append(player)
 	if DisplayServer.get_name() != "headless":
 		_build_procedural_audio()
+		_load_external_music()
 	apply_settings(SettingsManager.get_audio_settings())
 	if DisplayServer.get_name() != "headless":
 		play_theme("menu")
@@ -85,8 +92,7 @@ func play_music(stream: AudioStream, loop := true) -> void:
 	_current_theme = "custom"
 	_music_player.stop()
 	_music_player.stream = stream
-	if stream is AudioStreamWAV:
-		(stream as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD if loop else AudioStreamWAV.LOOP_DISABLED
+	_set_stream_loop(stream, loop)
 	_music_player.play()
 
 func stop_music() -> void:
@@ -129,10 +135,43 @@ func _set_bus_volume(bus_name: String, value: float) -> void:
 		return
 	AudioServer.set_bus_volume_db(index, -80.0 if value <= 0.0001 else linear_to_db(value))
 
+func _load_external_music() -> void:
+	_load_external_theme("race_grand_prix", GRAND_PRIX_THEME_PATH)
+	_load_external_theme("race_neon_harbor", NEON_HARBOR_THEME_PATH)
+	_load_external_theme("race_snowpeak", SNOWPEAK_THEME_PATH)
+	_load_external_theme("arena_push_out", PUSH_OUT_THEME_PATH)
+	_load_external_theme("arena_fruit_collection", FRUIT_COLLECTION_THEME_PATH)
+	_load_external_theme("result", RESULT_THEME_PATH)
+
+func _load_external_theme(theme_id: String, path: String) -> void:
+	if not ResourceLoader.exists(path):
+		print("AUDIO external theme missing id=%s; using procedural fallback" % theme_id)
+		return
+	var stream := ResourceLoader.load(path) as AudioStream
+	if stream == null:
+		push_warning("Could not load external theme id=%s path=%s" % [theme_id, path])
+		return
+	_set_stream_loop(stream, true)
+	_themes[theme_id] = stream
+	print("AUDIO external theme loaded id=%s path=%s" % [theme_id, path])
+
+func _set_stream_loop(stream: AudioStream, loop: bool) -> void:
+	if stream is AudioStreamOggVorbis:
+		(stream as AudioStreamOggVorbis).loop = loop
+	elif stream is AudioStreamMP3:
+		(stream as AudioStreamMP3).loop = loop
+	elif stream is AudioStreamWAV:
+		(stream as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD if loop else AudioStreamWAV.LOOP_DISABLED
+
 func _build_procedural_audio() -> void:
 	_themes["menu"] = _make_theme([196.0, 246.94, 293.66], 4.0, 0.16)
 	_themes["race"] = _make_theme([220.0, 329.63, 440.0], 3.2, 0.18)
+	_themes["race_grand_prix"] = _themes["race"]
+	_themes["race_neon_harbor"] = _themes["race"]
+	_themes["race_snowpeak"] = _themes["race"]
 	_themes["arena"] = _make_theme([174.61, 261.63, 349.23], 3.6, 0.18)
+	_themes["arena_push_out"] = _themes["arena"]
+	_themes["arena_fruit_collection"] = _themes["arena"]
 	_themes["result"] = _make_theme([261.63, 329.63, 392.0], 4.4, 0.15)
 	_sfx_library["ui"] = _make_tone(660.0, 0.07, 0.32)
 	_sfx_library["jump"] = _make_sweep(360.0, 720.0, 0.12, 0.28)
